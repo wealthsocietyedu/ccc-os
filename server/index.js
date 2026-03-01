@@ -1,0 +1,105 @@
+// server/index.js
+// Content Command Center OS — Express API Server
+
+require('dotenv').config();
+const express = require('express');
+const cors = require('cors');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
+const path = require('path');
+
+const authRoutes = require('./routes/auth');
+const brandRoutes = require('./routes/brands');
+const productionRoutes = require('./routes/production');
+const distributionRoutes = require('./routes/distribution');
+const dataRoutes = require('./routes/data');
+const billingRoutes = require('./routes/billing');
+const schedulerRoutes = require('./routes/scheduler');
+
+const app = express();
+const PORT = process.env.PORT || 3001;
+const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';
+
+// ─── SECURITY ─────────────────────────────────────────────────────────────────
+app.use(helmet({
+  crossOriginEmbedderPolicy: false,
+  contentSecurityPolicy: false,
+}));
+
+app.use(cors({
+  origin: [CLIENT_URL, 'http://localhost:5173', 'http://localhost:3000'],
+  credentials: true,
+}));
+
+// Rate limiting
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 300,
+  message: { error: 'Too many requests. Please try again in a few minutes.' }
+});
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  message: { error: 'Too many login attempts. Please try again later.' }
+});
+
+app.use(limiter);
+
+// ─── STRIPE WEBHOOK — must receive raw body, BEFORE json middleware ───────────
+app.use('/api/billing/webhooks/stripe', express.raw({ type: 'application/json' }));
+
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: true }));
+
+// ─── ROUTES ───────────────────────────────────────────────────────────────────
+app.use('/api/auth', authLimiter, authRoutes);
+app.use('/api/brands', brandRoutes);
+app.use('/api/production', productionRoutes);
+app.use('/api/distribution', distributionRoutes);
+app.use('/api/data', dataRoutes);
+app.use('/api/billing', billingRoutes);
+app.use('/api/scheduler', schedulerRoutes);
+
+// Health check
+app.get('/api/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    app: 'Content Command Center OS',
+    version: '1.0.0',
+    timestamp: new Date().toISOString()
+  });
+});
+
+// ─── SERVE CLIENT IN PRODUCTION ───────────────────────────────────────────────
+if (process.env.NODE_ENV === 'production') {
+  const clientBuild = path.join(__dirname, '../client/dist');
+  app.use(express.static(clientBuild));
+  app.get('*', (req, res) => {
+    if (!req.path.startsWith('/api')) {
+      res.sendFile(path.join(clientBuild, 'index.html'));
+    }
+  });
+}
+
+// ─── ERROR HANDLER ────────────────────────────────────────────────────────────
+app.use((err, req, res, next) => {
+  console.error('Unhandled error:', err);
+  res.status(500).json({ error: 'Internal server error' });
+});
+
+// 404
+app.use((req, res) => {
+  res.status(404).json({ error: `Route ${req.method} ${req.path} not found` });
+});
+
+app.listen(PORT, () => {
+  console.log(`
+  ┌─────────────────────────────────────────┐
+  │   Content Command Center OS — Server    │
+  │   Running on http://localhost:${PORT}       │
+  │   ENV: ${(process.env.NODE_ENV || 'development').padEnd(30)}│
+  └─────────────────────────────────────────┘
+  `);
+});
+
+module.exports = app;
