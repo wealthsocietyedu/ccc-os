@@ -1,7 +1,18 @@
 // server/billing/stripe.js
 // Stripe integration — subscriptions, webhooks, customer portal
 
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+let _stripe = null;
+const getStripe = () => {
+  if (!_stripe) {
+    if (!process.env.STRIPE_SECRET_KEY) {
+      throw new Error('STRIPE_SECRET_KEY is not set. Add it to your environment variables.');
+    }
+    _stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+  }
+  return _stripe;
+};
+// Backwards-compatible proxy so existing code using `stripe.x` still works
+const stripe = new Proxy({}, { get: (_, prop) => getStripe()[prop] });
 const { getDB } = require('../db');
 const { TIERS } = require('./config');
 

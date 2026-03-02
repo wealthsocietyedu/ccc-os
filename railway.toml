@@ -11,5 +11,4 @@
 
 [environments.production.variables]
   NODE_ENV = "production"
-  PORT = "3001"
   DB_PATH = "/var/data/ccc_os.db"
