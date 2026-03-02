@@ -20,6 +20,9 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';
 
+// Log key env at startup for Railway debugging
+console.log(`[startup] PORT=${PORT} NODE_ENV=${process.env.NODE_ENV} DB_PATH=${process.env.DB_PATH}`);
+
 // ─── SECURITY ─────────────────────────────────────────────────────────────────
 app.use(helmet({
   crossOriginEmbedderPolicy: false,
@@ -92,7 +95,7 @@ app.use((req, res) => {
   res.status(404).json({ error: `Route ${req.method} ${req.path} not found` });
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`
   ┌─────────────────────────────────────────┐
   │   Content Command Center OS — Server    │
