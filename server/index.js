@@ -20,8 +20,6 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';
 
-// Log key env at startup for Railway debugging
-console.log(`[startup] PORT=${PORT} NODE_ENV=${process.env.NODE_ENV} DB_PATH=${process.env.DB_PATH}`);
 
 // ─── SECURITY ─────────────────────────────────────────────────────────────────
 app.use(helmet({
