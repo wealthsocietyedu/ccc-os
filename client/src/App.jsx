@@ -1382,7 +1382,7 @@ function WeeklyRitualWizard({ activeBrand, analytics }) {
       const topAssets = recentAssets.filter(a => topIds.includes(a.id));
       const bottomAssets = recentAssets.filter(a => bottomIds.includes(a.id));
 
-      await import('../lib/api').then(({ data: dataApi }) =>
+      await import('./lib/api').then(({ data: dataApi }) =>
         dataApi.reviews.create({
           brand_id: activeBrand.id,
           week_date: weekDate,
@@ -1674,7 +1674,7 @@ function BrandDealsSection({ activeBrand }) {
 
   const load = () => {
     if (!activeBrand) return;
-    import('../lib/api').then(({ deals: dealsApi }) => dealsApi.list(activeBrand.id).then(setDeals).catch(() => {}));
+    import('./lib/api').then(({ deals: dealsApi }) => dealsApi.list(activeBrand.id).then(setDeals).catch(() => {}));
   };
 
   useEffect(() => { load(); }, [activeBrand?.id]);
@@ -1688,19 +1688,19 @@ function BrandDealsSection({ activeBrand }) {
 
   const handleSave = async () => {
     if (!form.partner_name.trim()) return;
-    await import('../lib/api').then(({ deals: dealsApi }) => dealsApi.create({ brand_id: activeBrand?.id, ...form }));
+    await import('./lib/api').then(({ deals: dealsApi }) => dealsApi.create({ brand_id: activeBrand?.id, ...form }));
     setForm({ partner_name:'', deal_type:'Paid', amount:0, status:'Inbound', deliverables:'', deadline:'', notes:'' });
     setShowAdd(false);
     load();
   };
 
   const updateStatus = async (id, status) => {
-    await import('../lib/api').then(({ deals: dealsApi }) => dealsApi.update(id, { status }));
+    await import('./lib/api').then(({ deals: dealsApi }) => dealsApi.update(id, { status }));
     load();
   };
 
   const handleDelete = async (id) => {
-    await import('../lib/api').then(({ deals: dealsApi }) => dealsApi.delete(id));
+    await import('./lib/api').then(({ deals: dealsApi }) => dealsApi.delete(id));
     load();
   };
 
@@ -3053,7 +3053,7 @@ function SchedulerLogTab({ activeBrand }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    import('../lib/api').then(({ scheduler: s }) =>
+    import('./lib/api').then(({ scheduler: s }) =>
       s.log(activeBrand?.id).then(setLog).catch(() => {}).finally(() => setLoading(false))
     );
   }, [activeBrand?.id]);

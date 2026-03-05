@@ -1,17 +1,59 @@
 // server/routes/scheduler.js
-// Scheduler & Distributor — Phase 1
-// Handles: scheduled posts, platform connections, auto-workflows
+// Scheduler & Distributor — Phase 2
+// Handles: scheduled posts, platform connections, OAuth, auto-workflows, publish log
 
 const express = require('express');
 const router = express.Router();
 const { v4: uuid } = require('uuid');
+const axios = require('axios');
+const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const { getDB } = require('../db');
 const { authenticate } = require('../middleware/auth');
-const { requireSubscription } = require('../middleware/subscription');
+const { requireSubscription, isAdmin } = require('../middleware/subscription');
+const { publishPost } = require('../scheduler/publish');
 
-// All routes require auth
+const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret';
+const SERVER_URL = process.env.SERVER_URL || 'http://localhost:3001';
+const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';
+
+// ─── HELPERS ─────────────────────────────────────────────────────────────────
+
+function upsertConnection(db, userId, platform, handle, accessToken, refreshToken, tokenExpires) {
+  const admin = isAdmin(userId);
+  const h = handle || '';
+
+  if (admin) {
+    // Admin: match by (user, platform, handle) — allows multiple accounts per platform
+    const existing = db.prepare(
+      'SELECT id FROM platform_connections WHERE user_id = ? AND platform = ? AND handle = ?'
+    ).get(userId, platform, h);
+    if (existing) {
+      db.prepare(`UPDATE platform_connections SET access_token=?, refresh_token=?, token_expires=?, connected=1, updated_at=datetime('now') WHERE id=?`)
+        .run(accessToken || '', refreshToken || '', tokenExpires || null, existing.id);
+    } else {
+      db.prepare(`INSERT INTO platform_connections (id, user_id, platform, handle, access_token, refresh_token, token_expires, connected) VALUES (?, ?, ?, ?, ?, ?, ?, 1)`)
+        .run(uuid(), userId, platform, h, accessToken || '', refreshToken || '', tokenExpires || null);
+    }
+  } else {
+    // Regular user: one connection per platform — always upsert by (user, platform)
+    const existing = db.prepare(
+      'SELECT id FROM platform_connections WHERE user_id = ? AND platform = ?'
+    ).get(userId, platform);
+    if (existing) {
+      db.prepare(`UPDATE platform_connections SET handle=?, access_token=?, refresh_token=?, token_expires=?, connected=1, updated_at=datetime('now') WHERE id=?`)
+        .run(h, accessToken || '', refreshToken || '', tokenExpires || null, existing.id);
+    } else {
+      db.prepare(`INSERT INTO platform_connections (id, user_id, platform, handle, access_token, refresh_token, token_expires, connected) VALUES (?, ?, ?, ?, ?, ?, ?, 1)`)
+        .run(uuid(), userId, platform, h, accessToken || '', refreshToken || '', tokenExpires || null);
+    }
+  }
+}
+
+// All routes require auth (except OAuth callbacks which verify JWT state)
 router.use(authenticate);
-router.use(requireSubscription);
+// Note: requireSubscription is applied per-route below.
+// Platform connections and OAuth are free — subscription only gates post scheduling.
 
 // ─── PLATFORM CONNECTIONS ─────────────────────────────────────────────────────
 
@@ -24,8 +66,8 @@ router.get('/platforms', (req, res) => {
   res.json(platforms);
 });
 
-// POST /api/scheduler/platforms/connect — initiate OAuth for a platform
-// In production this returns an OAuth URL. Here we store the connection.
+// POST /api/scheduler/platforms/connect — store a platform connection
+// Admin: inserts a new row per handle (multi-account). Regular: one per platform.
 router.post('/platforms/connect', (req, res) => {
   const { platform, handle, access_token, refresh_token } = req.body;
   if (!platform) return res.status(400).json({ error: 'platform required' });
@@ -36,108 +78,346 @@ router.post('/platforms/connect', (req, res) => {
   }
 
   const db = getDB();
-  const existing = db.prepare(
-    'SELECT id FROM platform_connections WHERE user_id = ? AND platform = ?'
-  ).get(req.userId, platform);
-
-  if (existing) {
-    // Update existing connection
-    db.prepare(`
-      UPDATE platform_connections SET
-        handle = ?, access_token = ?, refresh_token = ?,
-        connected = 1, updated_at = datetime('now')
-      WHERE user_id = ? AND platform = ?
-    `).run(handle || '', access_token || '', refresh_token || '', req.userId, platform);
-  } else {
-    db.prepare(`
-      INSERT INTO platform_connections
-        (id, user_id, platform, handle, access_token, refresh_token, connected, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, 1, datetime('now'), datetime('now'))
-    `).run(uuid(), req.userId, platform, handle || '', access_token || '', refresh_token || '');
-  }
-
+  upsertConnection(db, req.userId, platform, handle, access_token, refresh_token, null);
   res.json({ success: true, platform, connected: true });
 });
 
-// DELETE /api/scheduler/platforms/:platform — disconnect a platform
+// DELETE /api/scheduler/platforms/:platform — disconnect all accounts for a platform (regular users)
 router.delete('/platforms/:platform', (req, res) => {
   const db = getDB();
   db.prepare(
-    'UPDATE platform_connections SET connected = 0, access_token = \'\', refresh_token = \'\', updated_at = datetime(\'now\') WHERE user_id = ? AND platform = ?'
+    `UPDATE platform_connections SET connected = 0, access_token = '', refresh_token = '', updated_at = datetime('now') WHERE user_id = ? AND platform = ?`
   ).run(req.userId, req.params.platform);
+  res.json({ success: true });
+});
+
+// DELETE /api/scheduler/platforms/conn/:id — disconnect a specific account by row ID (admin multi-account)
+router.delete('/platforms/conn/:id', (req, res) => {
+  const db = getDB();
+  // Only the owner can disconnect their own connection
+  const conn = db.prepare('SELECT id FROM platform_connections WHERE id = ? AND user_id = ?').get(req.params.id, req.userId);
+  if (!conn) return res.status(404).json({ error: 'Connection not found' });
+  db.prepare(
+    `UPDATE platform_connections SET connected = 0, access_token = '', refresh_token = '', updated_at = datetime('now') WHERE id = ?`
+  ).run(req.params.id);
   res.json({ success: true });
 });
 
 // ─── OAUTH FLOW (Phase 1 — YouTube + Meta) ───────────────────────────────────
 
-// GET /api/scheduler/oauth/:platform — get OAuth URL
+// Credentials required for each platform OAuth
+const PLATFORM_CREDS = {
+  youtube:   () => process.env.YOUTUBE_CLIENT_ID && process.env.YOUTUBE_CLIENT_SECRET,
+  instagram: () => process.env.INSTAGRAM_APP_ID && process.env.INSTAGRAM_APP_SECRET,
+  facebook:  () => process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET,
+  linkedin:  () => process.env.LINKEDIN_CLIENT_ID && process.env.LINKEDIN_CLIENT_SECRET,
+  tiktok:    () => process.env.TIKTOK_CLIENT_KEY && process.env.TIKTOK_CLIENT_SECRET,
+  twitter:   () => process.env.TWITTER_CLIENT_ID && process.env.TWITTER_CLIENT_SECRET,
+  threads:   () => process.env.INSTAGRAM_APP_ID && process.env.INSTAGRAM_APP_SECRET, // reuses Meta app
+  pinterest: () => process.env.PINTEREST_APP_ID && process.env.PINTEREST_APP_SECRET,
+};
+
+const PLATFORM_SETUP_URLS = {
+  youtube:   'https://console.cloud.google.com/apis/credentials',
+  instagram: 'https://developers.facebook.com/apps',
+  facebook:  'https://developers.facebook.com/apps',
+  linkedin:  'https://www.linkedin.com/developers/apps',
+  tiktok:    'https://developers.tiktok.com',
+  twitter:   'https://developer.twitter.com/en/portal/dashboard',
+  threads:   'https://developers.facebook.com/apps',
+  pinterest: 'https://developers.pinterest.com/apps',
+};
+
+// GET /api/scheduler/oauth/:platform — get OAuth URL (JWT-signed state)
 router.get('/oauth/:platform', (req, res) => {
   const { platform } = req.params;
-  const baseUrl = process.env.CLIENT_URL || 'http://localhost:3001';
-  const redirectUri = `${baseUrl}/api/scheduler/oauth/${platform}/callback`;
+
+  // Check credentials are configured before building OAuth URL
+  const hasCredentials = PLATFORM_CREDS[platform];
+  if (!hasCredentials) return res.status(400).json({ error: 'Platform not supported yet' });
+  if (!hasCredentials()) {
+    return res.status(422).json({
+      error: 'oauth_not_configured',
+      message: `${platform} OAuth credentials are not set in .env. Add ${platform.toUpperCase()}_CLIENT_ID / SECRET and restart the server.`,
+      setup_url: PLATFORM_SETUP_URLS[platform] || null,
+      use_manual: true,
+    });
+  }
+
+  const redirectUri = `${SERVER_URL}/api/scheduler/oauth/${platform}/callback`;
+  // Sign state with JWT so callback can verify it and recover userId
+  const state = jwt.sign({ userId: req.userId }, JWT_SECRET, { expiresIn: '10m' });
+
+  // For Twitter, generate PKCE and embed verifier in state
+  const codeVerifier = crypto.randomBytes(32).toString('base64url');
+  const codeChallenge = crypto.createHash('sha256').update(codeVerifier).digest('base64url');
+  const twitterState = jwt.sign({ userId: req.userId, cv: codeVerifier }, JWT_SECRET, { expiresIn: '10m' });
 
   const oauthUrls = {
     youtube: `https://accounts.google.com/o/oauth2/v2/auth?` + new URLSearchParams({
-      client_id: process.env.YOUTUBE_CLIENT_ID || '',
+      client_id: process.env.YOUTUBE_CLIENT_ID,
       redirect_uri: redirectUri,
       response_type: 'code',
       scope: 'https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube',
       access_type: 'offline',
       prompt: 'consent',
-      state: req.userId,
+      state,
     }),
     instagram: `https://api.instagram.com/oauth/authorize?` + new URLSearchParams({
-      client_id: process.env.INSTAGRAM_APP_ID || '',
+      client_id: process.env.INSTAGRAM_APP_ID,
       redirect_uri: redirectUri,
       scope: 'instagram_basic,instagram_content_publish',
       response_type: 'code',
-      state: req.userId,
+      state,
     }),
     facebook: `https://www.facebook.com/v19.0/dialog/oauth?` + new URLSearchParams({
-      client_id: process.env.FACEBOOK_APP_ID || '',
+      client_id: process.env.FACEBOOK_APP_ID,
       redirect_uri: redirectUri,
-      scope: 'pages_manage_posts,pages_read_engagement,publish_video',
+      scope: 'pages_manage_posts,pages_read_engagement',
       response_type: 'code',
-      state: req.userId,
+      state,
     }),
     linkedin: `https://www.linkedin.com/oauth/v2/authorization?` + new URLSearchParams({
       response_type: 'code',
-      client_id: process.env.LINKEDIN_CLIENT_ID || '',
+      client_id: process.env.LINKEDIN_CLIENT_ID,
       redirect_uri: redirectUri,
       scope: 'w_member_social r_liteprofile',
-      state: req.userId,
+      state,
+    }),
+    tiktok: `https://www.tiktok.com/v2/auth/authorize/?` + new URLSearchParams({
+      client_key: process.env.TIKTOK_CLIENT_KEY,
+      redirect_uri: redirectUri,
+      response_type: 'code',
+      scope: 'user.info.basic,video.publish,video.upload',
+      state,
+    }),
+    twitter: `https://twitter.com/i/oauth2/authorize?` + new URLSearchParams({
+      response_type: 'code',
+      client_id: process.env.TWITTER_CLIENT_ID,
+      redirect_uri: redirectUri,
+      scope: 'tweet.read tweet.write users.read offline.access',
+      state: twitterState,
+      code_challenge: codeChallenge,
+      code_challenge_method: 'S256',
+    }),
+    threads: `https://threads.net/oauth/authorize?` + new URLSearchParams({
+      client_id: process.env.INSTAGRAM_APP_ID,
+      redirect_uri: redirectUri,
+      scope: 'threads_basic,threads_content_publish',
+      response_type: 'code',
+      state,
+    }),
+    pinterest: `https://www.pinterest.com/oauth/?` + new URLSearchParams({
+      client_id: process.env.PINTEREST_APP_ID,
+      redirect_uri: redirectUri,
+      response_type: 'code',
+      scope: 'boards:read,pins:read,pins:write',
+      state,
     }),
   };
 
   const url = oauthUrls[platform];
   if (!url) return res.status(400).json({ error: 'Platform not supported yet' });
-
   res.json({ oauth_url: url, platform });
 });
 
-// GET /api/scheduler/oauth/:platform/callback — OAuth callback handler
+// GET /api/scheduler/oauth/:platform/callback — full token exchange
+// NOTE: This route does NOT use the router-level authenticate middleware
+// because the request comes from the platform (no Bearer token).
+// Authentication is done via the JWT state parameter.
 router.get('/oauth/:platform/callback', async (req, res) => {
   const { platform } = req.params;
-  const { code, state: userId, error } = req.query;
+  const { code, state, error } = req.query;
 
   if (error) {
-    return res.redirect(`${process.env.CLIENT_URL}/?scheduler=error&platform=${platform}`);
+    console.error(`[OAuth] ${platform} error:`, error);
+    return res.redirect(`${CLIENT_URL}/?oauth=error&platform=${platform}`);
   }
 
-  // In production: exchange code for access_token here
-  // For now, log and redirect with success marker
-  console.log(`OAuth callback for ${platform}, userId: ${userId}, code: ${code?.slice(0,10)}...`);
+  // Verify state JWT to recover userId
+  let userId;
+  try {
+    const decoded = jwt.verify(state, JWT_SECRET);
+    userId = decoded.userId;
+  } catch (err) {
+    console.error('[OAuth] Invalid state JWT:', err.message);
+    return res.redirect(`${CLIENT_URL}/?oauth=error&platform=${platform}&reason=state_invalid`);
+  }
 
-  // TODO: Exchange code for token using platform's token endpoint
-  // Store token in platform_connections table
+  const db = getDB();
+  const redirectUri = `${SERVER_URL}/api/scheduler/oauth/${platform}/callback`;
 
-  res.redirect(`${process.env.CLIENT_URL || 'http://localhost:5173'}/?scheduler=connected&platform=${platform}`);
+  try {
+    if (platform === 'youtube') {
+      // Exchange code for tokens
+      const tokenResp = await axios.post('https://oauth2.googleapis.com/token', {
+        code,
+        client_id: process.env.YOUTUBE_CLIENT_ID,
+        client_secret: process.env.YOUTUBE_CLIENT_SECRET,
+        redirect_uri: redirectUri,
+        grant_type: 'authorization_code',
+      });
+      const { access_token, refresh_token, expires_in } = tokenResp.data;
+      // Get channel info
+      const channelResp = await axios.get('https://www.googleapis.com/youtube/v3/channels', {
+        params: { part: 'snippet', mine: true },
+        headers: { Authorization: `Bearer ${access_token}` },
+      });
+      const channelName = channelResp.data.items?.[0]?.snippet?.title || 'YouTube Channel';
+      const expiresAt = new Date(Date.now() + expires_in * 1000).toISOString();
+      upsertConnection(db, userId, 'youtube', channelName, access_token, refresh_token || '', expiresAt);
+
+    } else if (platform === 'facebook') {
+      // Exchange code for user access token (v21.0)
+      const tokenResp = await axios.get('https://graph.facebook.com/v21.0/oauth/access_token', {
+        params: { client_id: process.env.FACEBOOK_APP_ID, client_secret: process.env.FACEBOOK_APP_SECRET, redirect_uri: redirectUri, code },
+      });
+      const userToken = tokenResp.data.access_token;
+      // Get managed pages — page access token is long-lived by default
+      const pagesResp = await axios.get('https://graph.facebook.com/v21.0/me/accounts', {
+        params: { access_token: userToken },
+      });
+      const page = pagesResp.data.data?.[0];
+      if (!page) throw new Error('No Facebook Pages found. Create a Page to connect.');
+      // Store page ID as handle — publishToFacebook uses /{page-id}/videos and /{page-id}/feed
+      upsertConnection(db, userId, 'facebook', page.id, page.access_token, '', null);
+
+    } else if (platform === 'instagram') {
+      // Short-lived token exchange — response includes numeric user_id we need for publishing
+      const formData = new URLSearchParams({ client_id: process.env.INSTAGRAM_APP_ID, client_secret: process.env.INSTAGRAM_APP_SECRET, grant_type: 'authorization_code', redirect_uri: redirectUri, code });
+      const shortResp = await axios.post('https://api.instagram.com/oauth/access_token', formData.toString(), { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
+      const shortToken = shortResp.data.access_token;
+      // CRITICAL: store the numeric IG user ID (not username) — publishToInstagram calls /{igUserId}/media
+      const igUserId = String(shortResp.data.user_id);
+      // Exchange for long-lived token (60-day expiry)
+      const longResp = await axios.get('https://graph.instagram.com/access_token', {
+        params: { grant_type: 'ig_exchange_token', client_secret: process.env.INSTAGRAM_APP_SECRET, access_token: shortToken },
+      });
+      const longToken = longResp.data.access_token;
+      const expiresAt = new Date(Date.now() + (longResp.data.expires_in || 5184000) * 1000).toISOString();
+      // conn.handle = numeric IG user ID (required by graph.facebook.com/v21.0/{igUserId}/media)
+      upsertConnection(db, userId, 'instagram', igUserId, longToken, '', expiresAt);
+
+    } else if (platform === 'linkedin') {
+      // Exchange code for access token
+      const tokenResp = await axios.post('https://www.linkedin.com/oauth/v2/accessToken',
+        new URLSearchParams({ grant_type: 'authorization_code', code, redirect_uri: redirectUri, client_id: process.env.LINKEDIN_CLIENT_ID, client_secret: process.env.LINKEDIN_CLIENT_SECRET }).toString(),
+        { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+      );
+      const { access_token, expires_in } = tokenResp.data;
+      // Get member URN
+      const meResp = await axios.get('https://api.linkedin.com/v2/me', {
+        headers: { Authorization: `Bearer ${access_token}` },
+      });
+      const memberId = meResp.data.id;
+      const handle = `urn:li:person:${memberId}`;
+      const expiresAt = new Date(Date.now() + (expires_in || 5184000) * 1000).toISOString();
+      upsertConnection(db, userId, 'linkedin', handle, access_token, '', expiresAt);
+
+    } else if (platform === 'tiktok') {
+      const tokenResp = await axios.post('https://open.tiktokapis.com/v2/oauth/token/', new URLSearchParams({
+        client_key: process.env.TIKTOK_CLIENT_KEY,
+        client_secret: process.env.TIKTOK_CLIENT_SECRET,
+        code,
+        grant_type: 'authorization_code',
+        redirect_uri: redirectUri,
+      }).toString(), { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
+      const { access_token, refresh_token, expires_in, open_id } = tokenResp.data;
+      const expiresAt = new Date(Date.now() + (expires_in || 86400) * 1000).toISOString();
+      // Get user info
+      const userResp = await axios.get('https://open.tiktokapis.com/v2/user/info/', {
+        params: { fields: 'display_name,username' },
+        headers: { Authorization: `Bearer ${access_token}` },
+      });
+      const handle = userResp.data?.data?.user?.display_name || userResp.data?.data?.user?.username || open_id || 'TikTok User';
+      upsertConnection(db, userId, 'tiktok', handle, access_token, refresh_token || '', expiresAt);
+
+    } else if (platform === 'twitter') {
+      // Extract PKCE code_verifier from JWT state
+      let codeVerifier = '';
+      try {
+        const decoded = jwt.verify(state, JWT_SECRET);
+        codeVerifier = decoded.cv || '';
+      } catch(e) { throw new Error('Invalid Twitter OAuth state'); }
+      const credentials = Buffer.from(`${process.env.TWITTER_CLIENT_ID}:${process.env.TWITTER_CLIENT_SECRET}`).toString('base64');
+      const tokenResp = await axios.post('https://api.twitter.com/2/oauth2/token', new URLSearchParams({
+        code,
+        grant_type: 'authorization_code',
+        redirect_uri: redirectUri,
+        code_verifier: codeVerifier,
+      }).toString(), {
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', Authorization: `Basic ${credentials}` },
+      });
+      const { access_token, refresh_token, expires_in } = tokenResp.data;
+      const expiresAt = expires_in ? new Date(Date.now() + expires_in * 1000).toISOString() : null;
+      const meResp = await axios.get('https://api.twitter.com/2/users/me', {
+        headers: { Authorization: `Bearer ${access_token}` },
+      });
+      const handle = '@' + (meResp.data?.data?.username || 'twitter_user');
+      upsertConnection(db, userId, 'twitter', handle, access_token, refresh_token || '', expiresAt);
+
+    } else if (platform === 'threads') {
+      // Short-lived token exchange (same as Instagram but threads endpoint)
+      const formData = new URLSearchParams({
+        client_id: process.env.INSTAGRAM_APP_ID,
+        client_secret: process.env.INSTAGRAM_APP_SECRET,
+        grant_type: 'authorization_code',
+        redirect_uri: redirectUri,
+        code,
+      });
+      const shortResp = await axios.post('https://graph.threads.net/oauth/access_token', formData.toString(), {
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      });
+      const shortToken = shortResp.data.access_token;
+      // Exchange for long-lived token
+      const longResp = await axios.get('https://graph.threads.net/access_token', {
+        params: { grant_type: 'th_exchange_token', client_secret: process.env.INSTAGRAM_APP_SECRET, access_token: shortToken },
+      });
+      const longToken = longResp.data.access_token;
+      const expiresAt = new Date(Date.now() + (longResp.data.expires_in || 5184000) * 1000).toISOString();
+      const meResp = await axios.get('https://graph.threads.net/v1.0/me', {
+        params: { fields: 'id,username', access_token: longToken },
+      });
+      // Store numeric Threads user ID in handle — publishToThreads calls /{threadsUserId}/threads
+      const threadsUserId = String(meResp.data.id || shortResp.data.user_id || 'threads_user');
+      upsertConnection(db, userId, 'threads', threadsUserId, longToken, '', expiresAt);
+
+    } else if (platform === 'pinterest') {
+      const credentials = Buffer.from(`${process.env.PINTEREST_APP_ID}:${process.env.PINTEREST_APP_SECRET}`).toString('base64');
+      const tokenResp = await axios.post('https://api.pinterest.com/v5/oauth/token', new URLSearchParams({
+        grant_type: 'authorization_code',
+        code,
+        redirect_uri: redirectUri,
+      }).toString(), {
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', Authorization: `Basic ${credentials}` },
+      });
+      const { access_token, refresh_token, expires_in } = tokenResp.data;
+      const expiresAt = expires_in ? new Date(Date.now() + expires_in * 1000).toISOString() : null;
+      const meResp = await axios.get('https://api.pinterest.com/v5/user_account', {
+        headers: { Authorization: `Bearer ${access_token}` },
+      });
+      const handle = meResp.data?.username || 'pinterest_user';
+      upsertConnection(db, userId, 'pinterest', handle, access_token, refresh_token || '', expiresAt);
+
+    } else {
+      throw new Error(`Platform ${platform} not yet supported`);
+    }
+
+    console.log(`[OAuth] ${platform} connected for user ${userId}`);
+    res.redirect(`${CLIENT_URL}/?oauth=success&platform=${platform}`);
+
+  } catch (err) {
+    const reason = encodeURIComponent(err.response?.data?.error_description || err.message || 'unknown');
+    console.error(`[OAuth] ${platform} token exchange failed:`, err.response?.data || err.message);
+    res.redirect(`${CLIENT_URL}/?oauth=error&platform=${platform}&reason=${reason}`);
+  }
 });
 
 // ─── SCHEDULED POSTS ─────────────────────────────────────────────────────────
+// Subscription required from here down (creating & publishing posts is a paid feature)
 
 // GET /api/scheduler/posts — list all scheduled posts for brand
-router.get('/posts', (req, res) => {
+router.get('/posts', requireSubscription, (req, res) => {
   const { brandId, status } = req.query;
   if (!brandId) return res.status(400).json({ error: 'brandId required' });
 
@@ -158,7 +438,7 @@ router.get('/posts', (req, res) => {
 });
 
 // POST /api/scheduler/posts — create a scheduled post
-router.post('/posts', (req, res) => {
+router.post('/posts', requireSubscription, (req, res) => {
   const { brand_id, title, caption, format, destinations, scheduled_at, media_urls } = req.body;
   if (!brand_id || !title || !destinations?.length || !scheduled_at) {
     return res.status(400).json({ error: 'brand_id, title, destinations and scheduled_at required' });
@@ -187,7 +467,7 @@ router.post('/posts', (req, res) => {
 });
 
 // PATCH /api/scheduler/posts/:id — update a scheduled post
-router.patch('/posts/:id', (req, res) => {
+router.patch('/posts/:id', requireSubscription, (req, res) => {
   const { title, caption, destinations, scheduled_at, status } = req.body;
   const db = getDB();
   const post = db.prepare(
@@ -214,55 +494,34 @@ router.patch('/posts/:id', (req, res) => {
 });
 
 // DELETE /api/scheduler/posts/:id — delete a scheduled post
-router.delete('/posts/:id', (req, res) => {
+router.delete('/posts/:id', requireSubscription, (req, res) => {
   const db = getDB();
   db.prepare('DELETE FROM scheduled_posts WHERE id = ? AND user_id = ?').run(req.params.id, req.userId);
   res.json({ success: true });
 });
 
 // POST /api/scheduler/posts/:id/publish — publish immediately
-router.post('/posts/:id/publish', async (req, res) => {
+router.post('/posts/:id/publish', requireSubscription, async (req, res) => {
   const db = getDB();
   const post = db.prepare(
     'SELECT * FROM scheduled_posts WHERE id = ? AND user_id = ?'
   ).get(req.params.id, req.userId);
   if (!post) return res.status(404).json({ error: 'Post not found' });
 
-  const destinations = JSON.parse(post.destinations || '[]');
-  const connections = db.prepare(
-    `SELECT * FROM platform_connections WHERE user_id = ? AND connected = 1 AND platform IN (${destinations.map(()=>'?').join(',')})`
-  ).all(req.userId, ...destinations);
-
-  // Mark as publishing
-  db.prepare("UPDATE scheduled_posts SET status = 'publishing', updated_at = datetime('now') WHERE id = ?").run(post.id);
-
-  const results = [];
-  for (const dest of destinations) {
-    const conn = connections.find(c => c.platform === dest);
-    if (!conn) {
-      results.push({ platform: dest, success: false, error: 'Not connected' });
-      continue;
-    }
-    // Platform publish logic goes here (Phase 2 — API calls)
-    // For Phase 1 — mark as success and log
-    console.log(`[Scheduler] Publishing "${post.title}" to ${dest}`);
-    results.push({ platform: dest, success: true });
+  try {
+    db.prepare("UPDATE scheduled_posts SET status = 'publishing', updated_at = datetime('now') WHERE id = ?").run(post.id);
+    const { results, status } = await publishPost(post, req.userId);
+    res.json({ success: true, results, status });
+  } catch (err) {
+    db.prepare("UPDATE scheduled_posts SET status = 'failed', error_log = ?, updated_at = datetime('now') WHERE id = ?").run(err.message, post.id);
+    res.status(500).json({ error: 'Publish failed', details: err.message });
   }
-
-  const allSuccess = results.every(r => r.success);
-  db.prepare(`
-    UPDATE scheduled_posts SET
-      status = ?, published_at = datetime('now'), updated_at = datetime('now')
-    WHERE id = ?
-  `).run(allSuccess ? 'published' : 'partial', post.id);
-
-  res.json({ success: true, results, status: allSuccess ? 'published' : 'partial' });
 });
 
 // ─── AUTO-WORKFLOWS ───────────────────────────────────────────────────────────
 
 // GET /api/scheduler/workflows
-router.get('/workflows', (req, res) => {
+router.get('/workflows', requireSubscription, (req, res) => {
   const db = getDB();
   const workflows = db.prepare(
     'SELECT * FROM distribution_workflows WHERE user_id = ? ORDER BY created_at DESC'
@@ -274,7 +533,7 @@ router.get('/workflows', (req, res) => {
 });
 
 // POST /api/scheduler/workflows
-router.post('/workflows', (req, res) => {
+router.post('/workflows', requireSubscription, (req, res) => {
   const { brand_id, source_platform, destinations, label } = req.body;
   if (!source_platform || !destinations?.length) {
     return res.status(400).json({ error: 'source_platform and destinations required' });
@@ -292,7 +551,7 @@ router.post('/workflows', (req, res) => {
 });
 
 // PATCH /api/scheduler/workflows/:id
-router.patch('/workflows/:id', (req, res) => {
+router.patch('/workflows/:id', requireSubscription, (req, res) => {
   const { active, destinations, label } = req.body;
   const db = getDB();
   const updates = ["updated_at = datetime('now')"];
@@ -307,7 +566,7 @@ router.patch('/workflows/:id', (req, res) => {
 });
 
 // DELETE /api/scheduler/workflows/:id
-router.delete('/workflows/:id', (req, res) => {
+router.delete('/workflows/:id', requireSubscription, (req, res) => {
   const db = getDB();
   db.prepare('DELETE FROM distribution_workflows WHERE id = ? AND user_id = ?').run(req.params.id, req.userId);
   res.json({ success: true });
@@ -325,6 +584,57 @@ router.get('/log', (req, res) => {
     ORDER BY published_at DESC LIMIT 50
   `).all(...[req.userId, brandId].filter(Boolean));
   res.json(log);
+});
+
+// ─── REPURPOSE RULES ──────────────────────────────────────────────────────────
+
+// GET /api/scheduler/repurpose-rules
+router.get('/repurpose-rules', requireSubscription, (req, res) => {
+  const db = getDB();
+  const rules = db.prepare(
+    'SELECT * FROM repurpose_rules WHERE user_id = ? ORDER BY created_at DESC'
+  ).all(req.userId);
+  res.json(rules.map(r => ({ ...r, dest_platforms: JSON.parse(r.dest_platforms || '[]') })));
+});
+
+// POST /api/scheduler/repurpose-rules
+router.post('/repurpose-rules', requireSubscription, (req, res) => {
+  const { brand_id, source_platform, dest_platforms, delay_hours, adapt_captions, caption_notes } = req.body;
+  if (!source_platform || !dest_platforms?.length) {
+    return res.status(400).json({ error: 'source_platform and dest_platforms required' });
+  }
+  const db = getDB();
+  const id = uuid();
+  db.prepare(`
+    INSERT INTO repurpose_rules (id, user_id, brand_id, source_platform, dest_platforms, delay_hours, adapt_captions, caption_notes, active)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
+  `).run(id, req.userId, brand_id || null, source_platform, JSON.stringify(dest_platforms), delay_hours ?? 2, adapt_captions ?? 1, caption_notes || '');
+  const rule = db.prepare('SELECT * FROM repurpose_rules WHERE id = ?').get(id);
+  res.status(201).json({ ...rule, dest_platforms: JSON.parse(rule.dest_platforms) });
+});
+
+// PATCH /api/scheduler/repurpose-rules/:id
+router.patch('/repurpose-rules/:id', requireSubscription, (req, res) => {
+  const { active, dest_platforms, delay_hours, adapt_captions, caption_notes } = req.body;
+  const db = getDB();
+  const updates = ["updated_at = datetime('now')"];
+  const params = [];
+  if (active !== undefined)        { updates.push('active = ?');          params.push(active ? 1 : 0); }
+  if (dest_platforms)              { updates.push('dest_platforms = ?');   params.push(JSON.stringify(dest_platforms)); }
+  if (delay_hours !== undefined)   { updates.push('delay_hours = ?');      params.push(delay_hours); }
+  if (adapt_captions !== undefined){ updates.push('adapt_captions = ?');   params.push(adapt_captions ? 1 : 0); }
+  if (caption_notes !== undefined) { updates.push('caption_notes = ?');    params.push(caption_notes); }
+  params.push(req.params.id, req.userId);
+  db.prepare(`UPDATE repurpose_rules SET ${updates.join(', ')} WHERE id = ? AND user_id = ?`).run(...params);
+  const rule = db.prepare('SELECT * FROM repurpose_rules WHERE id = ?').get(req.params.id);
+  res.json({ ...rule, dest_platforms: JSON.parse(rule.dest_platforms || '[]') });
+});
+
+// DELETE /api/scheduler/repurpose-rules/:id
+router.delete('/repurpose-rules/:id', requireSubscription, (req, res) => {
+  const db = getDB();
+  db.prepare('DELETE FROM repurpose_rules WHERE id = ? AND user_id = ?').run(req.params.id, req.userId);
+  res.json({ success: true });
 });
 
 module.exports = router;

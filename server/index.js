@@ -15,6 +15,9 @@ const distributionRoutes = require('./routes/distribution');
 const dataRoutes = require('./routes/data');
 const billingRoutes = require('./routes/billing');
 const schedulerRoutes = require('./routes/scheduler');
+const { startCron } = require('./scheduler/cron');
+const { getDB, reseedUserData } = require('./db');
+const { authenticate } = require('./middleware/auth');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -61,6 +64,21 @@ app.use('/api/data', dataRoutes);
 app.use('/api/billing', billingRoutes);
 app.use('/api/scheduler', schedulerRoutes);
 
+// ─── ADMIN ENDPOINTS ──────────────────────────────────────────────────────────
+
+// POST /api/admin/reseed — re-run seed data for the authenticated user (admin only)
+app.post('/api/admin/reseed', authenticate, (req, res) => {
+  const db = getDB();
+  const user = db.prepare('SELECT is_admin FROM users WHERE id = ?').get(req.userId);
+  if (!user?.is_admin) return res.status(403).json({ error: 'Admin only' });
+  try {
+    reseedUserData(req.userId);
+    res.json({ success: true, message: 'Seed data refreshed. Reload the app to see updated KPIs.' });
+  } catch (err) {
+    res.status(500).json({ error: 'Reseed failed', details: err.message });
+  }
+});
+
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({
@@ -101,6 +119,8 @@ app.listen(PORT, '0.0.0.0', () => {
   │   ENV: ${(process.env.NODE_ENV || 'development').padEnd(30)}│
   └─────────────────────────────────────────┘
   `);
+  // Start 5-minute publish cron job
+  startCron();
 });
 
 module.exports = app;

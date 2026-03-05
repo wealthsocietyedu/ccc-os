@@ -144,6 +144,72 @@ router.delete('/ideas/:id', (req, res) => {
   res.json({ success: true });
 });
 
+// POST /api/production/ideas/:id/promote — turn idea into an asset
+router.post('/ideas/:id/promote', (req, res) => {
+  const db = getDB();
+  const idea = db.prepare('SELECT * FROM ideas WHERE id = ? AND user_id = ?').get(req.params.id, req.userId);
+  if (!idea) return res.status(404).json({ error: 'Idea not found' });
+  const assetId = uuidv4();
+  db.prepare(`
+    INSERT INTO assets (id, user_id, brand_id, pillar_id, title, format, platform, status, hook, cta, funnel_stage)
+    VALUES (?, ?, ?, ?, ?, ?, ?, 'Scripted', ?, ?, 'TOFU')
+  `).run(assetId, req.userId, idea.brand_id, idea.pillar_id, idea.title,
+    idea.format, 'TikTok', idea.hook_angle || '', idea.cta || '');
+  db.prepare("UPDATE ideas SET status = 'Scripted' WHERE id = ?").run(idea.id);
+  res.status(201).json({ asset: db.prepare('SELECT * FROM assets WHERE id = ?').get(assetId), idea_id: idea.id });
+});
+
+// ─── REPURPOSED CONTENT ────────────────────────────────────────────────────────
+
+router.get('/assets/:id/repurposed', (req, res) => {
+  const db = getDB();
+  res.json(db.prepare('SELECT * FROM repurposed_content WHERE source_asset_id = ? AND user_id = ? ORDER BY created_at DESC').all(req.params.id, req.userId));
+});
+
+router.post('/assets/:id/repurposed', (req, res) => {
+  const db = getDB();
+  const asset = db.prepare('SELECT * FROM assets WHERE id = ? AND user_id = ?').get(req.params.id, req.userId);
+  if (!asset) return res.status(404).json({ error: 'Asset not found' });
+  const { target_platform, target_format, status, notes } = req.body;
+  if (!target_platform) return res.status(400).json({ error: 'target_platform required' });
+  const id = uuidv4();
+  db.prepare(`INSERT INTO repurposed_content (id, user_id, brand_id, source_asset_id, target_platform, target_format, status, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+    .run(id, req.userId, asset.brand_id, req.params.id, target_platform, target_format || 'Short Form Video', status || 'Planned', notes || '');
+  res.status(201).json(db.prepare('SELECT * FROM repurposed_content WHERE id = ?').get(id));
+});
+
+router.get('/repurposed', (req, res) => {
+  const db = getDB();
+  const { brandId, status } = req.query;
+  let query = `SELECT rc.*, a.title as source_title, a.platform as source_platform FROM repurposed_content rc LEFT JOIN assets a ON rc.source_asset_id = a.id WHERE rc.user_id = ?`;
+  const params = [req.userId];
+  if (brandId) { query += ' AND rc.brand_id = ?'; params.push(brandId); }
+  if (status)  { query += ' AND rc.status = ?';   params.push(status); }
+  query += ' ORDER BY rc.created_at DESC';
+  res.json(db.prepare(query).all(...params));
+});
+
+router.patch('/repurposed/:id', (req, res) => {
+  const db = getDB();
+  const row = db.prepare('SELECT id FROM repurposed_content WHERE id = ? AND user_id = ?').get(req.params.id, req.userId);
+  if (!row) return res.status(404).json({ error: 'Not found' });
+  const { target_platform, target_format, status, notes } = req.body;
+  const updates = ["updated_at = datetime('now')"]; const params = [];
+  if (target_platform !== undefined) { updates.push('target_platform = ?'); params.push(target_platform); }
+  if (target_format !== undefined)   { updates.push('target_format = ?');   params.push(target_format); }
+  if (status !== undefined)          { updates.push('status = ?');          params.push(status); }
+  if (notes !== undefined)           { updates.push('notes = ?');           params.push(notes); }
+  params.push(req.params.id, req.userId);
+  db.prepare(`UPDATE repurposed_content SET ${updates.join(', ')} WHERE id = ? AND user_id = ?`).run(...params);
+  res.json(db.prepare('SELECT * FROM repurposed_content WHERE id = ?').get(req.params.id));
+});
+
+router.delete('/repurposed/:id', (req, res) => {
+  const db = getDB();
+  db.prepare('DELETE FROM repurposed_content WHERE id = ? AND user_id = ?').run(req.params.id, req.userId);
+  res.json({ success: true });
+});
+
 // ─── HOOKS ────────────────────────────────────────────────────────────────────
 
 router.get('/hooks', (req, res) => {

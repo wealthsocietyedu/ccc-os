@@ -3,7 +3,7 @@
 
 const express = require('express');
 const { v4: uuidv4 } = require('uuid');
-const { getDB } = require('../db');
+const { getDB, reseedUserData } = require('../db');
 const { authenticate } = require('../middleware/auth');
 
 const router = express.Router();
@@ -146,6 +146,21 @@ router.get('/reviews', (req, res) => {
   })));
 });
 
+router.patch('/reviews/:id', (req, res) => {
+  const db = getDB();
+  const review = db.prepare('SELECT * FROM weekly_reviews WHERE id = ? AND user_id = ?').get(req.params.id, req.userId);
+  if (!review) return res.status(404).json({ error: 'Review not found' });
+  const fields = ['week_date','posts_published','posts_goal','total_views','new_followers','leads_generated','revenue','best_hook_type','best_pillar','best_platform','next_week_plan'];
+  const updates = ["updated_at = datetime('now')"]; const params = [];
+  fields.forEach(f => { if (req.body[f] !== undefined) { updates.push(`${f} = ?`); params.push(req.body[f]); }});
+  const jsonFields = ['top_performers','bottom_performers','scale_decisions','refine_decisions','kill_decisions'];
+  jsonFields.forEach(f => { if (req.body[f] !== undefined) { updates.push(`${f} = ?`); params.push(JSON.stringify(req.body[f])); }});
+  if (updates.length === 1) return res.json(review);
+  params.push(req.params.id, req.userId);
+  db.prepare(`UPDATE weekly_reviews SET ${updates.join(', ')} WHERE id = ? AND user_id = ?`).run(...params);
+  res.json(db.prepare('SELECT * FROM weekly_reviews WHERE id = ?').get(req.params.id));
+});
+
 router.post('/reviews', (req, res) => {
   const { brand_id, week_date, posts_published, posts_goal, total_views, new_followers, leads_generated, revenue, top_performers, bottom_performers, best_hook_type, best_pillar, best_platform, scale_decisions, refine_decisions, kill_decisions, next_week_plan } = req.body;
   if (!brand_id || !week_date) return res.status(400).json({ error: 'brand_id and week_date are required' });
@@ -251,6 +266,62 @@ router.patch('/campaigns/:id', (req, res) => {
   const setClause = Object.keys(updates).map(k => `${k} = ?`).join(', ');
   db.prepare(`UPDATE campaigns SET ${setClause} WHERE id = ? AND user_id = ?`).run(...Object.values(updates), req.params.id, req.userId);
   res.json(db.prepare('SELECT * FROM campaigns WHERE id = ?').get(req.params.id));
+});
+
+// ─── BRAND DEALS ──────────────────────────────────────────────────────────────
+
+router.get('/deals', (req, res) => {
+  const db = getDB();
+  const { brandId, status } = req.query;
+  let query = 'SELECT * FROM brand_deals WHERE user_id = ?';
+  const params = [req.userId];
+  if (brandId) { query += ' AND brand_id = ?'; params.push(brandId); }
+  if (status)  { query += ' AND status = ?';   params.push(status); }
+  query += ' ORDER BY created_at DESC';
+  res.json(db.prepare(query).all(...params));
+});
+
+router.post('/deals', (req, res) => {
+  const db = getDB();
+  const { brand_id, partner_name, deal_type, amount, status, deliverables, deadline, notes } = req.body;
+  if (!partner_name) return res.status(400).json({ error: 'partner_name required' });
+  const id = uuidv4();
+  db.prepare(`INSERT INTO brand_deals (id, user_id, brand_id, partner_name, deal_type, amount, status, deliverables, deadline, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+    .run(id, req.userId, brand_id || null, partner_name, deal_type || 'Paid', amount || 0, status || 'Inbound', deliverables || '', deadline || null, notes || '');
+  res.status(201).json(db.prepare('SELECT * FROM brand_deals WHERE id = ?').get(id));
+});
+
+router.patch('/deals/:id', (req, res) => {
+  const db = getDB();
+  const deal = db.prepare('SELECT id FROM brand_deals WHERE id = ? AND user_id = ?').get(req.params.id, req.userId);
+  if (!deal) return res.status(404).json({ error: 'Deal not found' });
+  const fields = ['partner_name','deal_type','amount','status','deliverables','deadline','notes'];
+  const updates = ["updated_at = datetime('now')"]; const params = [];
+  fields.forEach(f => { if (req.body[f] !== undefined) { updates.push(`${f} = ?`); params.push(req.body[f]); }});
+  if (updates.length === 1) return res.json(deal);
+  params.push(req.params.id, req.userId);
+  db.prepare(`UPDATE brand_deals SET ${updates.join(', ')} WHERE id = ? AND user_id = ?`).run(...params);
+  res.json(db.prepare('SELECT * FROM brand_deals WHERE id = ?').get(req.params.id));
+});
+
+router.delete('/deals/:id', (req, res) => {
+  const db = getDB();
+  db.prepare('DELETE FROM brand_deals WHERE id = ? AND user_id = ?').run(req.params.id, req.userId);
+  res.json({ success: true });
+});
+
+// ─── ADMIN: RESEED ────────────────────────────────────────────────────────────
+// POST /api/data/reseed — wipes and re-inserts all seed demo data for the current user
+// Fixes KPI cards showing $0 revenue for accounts seeded before revenue was added to performance rows.
+// Requires auth only — each user can only reseed their own data.
+router.post('/reseed', (req, res) => {
+  try {
+    reseedUserData(req.userId);
+    res.json({ success: true, message: 'Seed data refreshed with correct revenue values.' });
+  } catch (err) {
+    console.error('[Reseed] Error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 module.exports = router;

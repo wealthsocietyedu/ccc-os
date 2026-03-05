@@ -13,7 +13,10 @@ const headers = (extra = {}) => ({
 
 const handle = async (res) => {
   const data = await res.json();
-  if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+  if (!res.ok) {
+    const err = Object.assign(new Error(data.error || `HTTP ${res.status}`), data, { status: res.status });
+    throw err;
+  }
   return data;
 };
 
@@ -106,10 +109,6 @@ export const billing = {
 };
 export const data = {
   analytics: (brandId, period = 30) => fetch(`${BASE}/data/analytics/${brandId}?period=${period}`, { headers: headers() }).then(handle),
-  reviews: {
-    list: (brandId) => fetch(`${BASE}/data/reviews?brandId=${brandId}`, { headers: headers() }).then(handle),
-    create: (d) => fetch(`${BASE}/data/reviews`, { method: 'POST', headers: headers(), body: JSON.stringify(d) }).then(handle),
-  },
   offers: {
     list: (brandId) => fetch(`${BASE}/data/offers?brandId=${brandId}`, { headers: headers() }).then(handle),
     create: (d) => fetch(`${BASE}/data/offers`, { method: 'POST', headers: headers(), body: JSON.stringify(d) }).then(handle),
@@ -121,6 +120,26 @@ export const data = {
     create: (d) => fetch(`${BASE}/data/campaigns`, { method: 'POST', headers: headers(), body: JSON.stringify(d) }).then(handle),
     update: (id, d) => fetch(`${BASE}/data/campaigns/${id}`, { method: 'PATCH', headers: headers(), body: JSON.stringify(d) }).then(handle),
   },
+  reviews: {
+    list: (brandId) => fetch(`${BASE}/data/reviews?brandId=${brandId}`, { headers: headers() }).then(handle),
+    create: (d) => fetch(`${BASE}/data/reviews`, { method: 'POST', headers: headers(), body: JSON.stringify(d) }).then(handle),
+    update: (id, d) => fetch(`${BASE}/data/reviews/${id}`, { method: 'PATCH', headers: headers(), body: JSON.stringify(d) }).then(handle),
+  },
+  reseed: () => fetch(`${BASE}/data/reseed`, { method: 'POST', headers: headers() }).then(handle),
+};
+
+export const deals = {
+  list: (brandId) => fetch(`${BASE}/data/deals${brandId ? `?brandId=${brandId}` : ''}`, { headers: headers() }).then(handle),
+  create: (d) => fetch(`${BASE}/data/deals`, { method: 'POST', headers: headers(), body: JSON.stringify(d) }).then(handle),
+  update: (id, d) => fetch(`${BASE}/data/deals/${id}`, { method: 'PATCH', headers: headers(), body: JSON.stringify(d) }).then(handle),
+  delete: (id) => fetch(`${BASE}/data/deals/${id}`, { method: 'DELETE', headers: headers() }).then(handle),
+};
+
+export const repurposed = {
+  list: (brandId, status) => fetch(`${BASE}/production/repurposed${brandId ? `?brandId=${brandId}${status ? `&status=${status}` : ''}` : ''}`, { headers: headers() }).then(handle),
+  create: (assetId, d) => fetch(`${BASE}/production/assets/${assetId}/repurposed`, { method: 'POST', headers: headers(), body: JSON.stringify(d) }).then(handle),
+  update: (id, d) => fetch(`${BASE}/production/repurposed/${id}`, { method: 'PATCH', headers: headers(), body: JSON.stringify(d) }).then(handle),
+  delete: (id) => fetch(`${BASE}/production/repurposed/${id}`, { method: 'DELETE', headers: headers() }).then(handle),
 };
 
 export const scheduler = {
@@ -132,6 +151,8 @@ export const scheduler = {
       fetch(`${BASE}/scheduler/platforms/connect`, { method: 'POST', headers: headers(), body: JSON.stringify({ platform, ...data }) }).then(handle),
     disconnect: (platform) =>
       fetch(`${BASE}/scheduler/platforms/${platform}`, { method: 'DELETE', headers: headers() }).then(handle),
+    disconnectById: (id) =>
+      fetch(`${BASE}/scheduler/platforms/conn/${id}`, { method: 'DELETE', headers: headers() }).then(handle),
     getOAuthUrl: (platform) =>
       fetch(`${BASE}/scheduler/oauth/${platform}`, { headers: headers() }).then(handle),
   },
@@ -162,4 +183,15 @@ export const scheduler = {
   // Publish log
   log: (brandId) =>
     fetch(`${BASE}/scheduler/log${brandId ? `?brandId=${brandId}` : ''}`, { headers: headers() }).then(handle),
+  // Repurpose rules (auto-distribution engine)
+  repurposeRules: {
+    list: () =>
+      fetch(`${BASE}/scheduler/repurpose-rules`, { headers: headers() }).then(handle),
+    create: (d) =>
+      fetch(`${BASE}/scheduler/repurpose-rules`, { method: 'POST', headers: headers(), body: JSON.stringify(d) }).then(handle),
+    update: (id, d) =>
+      fetch(`${BASE}/scheduler/repurpose-rules/${id}`, { method: 'PATCH', headers: headers(), body: JSON.stringify(d) }).then(handle),
+    delete: (id) =>
+      fetch(`${BASE}/scheduler/repurpose-rules/${id}`, { method: 'DELETE', headers: headers() }).then(handle),
+  },
 };

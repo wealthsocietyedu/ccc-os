@@ -18,9 +18,88 @@ const getDB = () => {
   if (!db) {
     db = new Database(DB_PATH);
     initSchema(db);
+    runMigrations(db);
   }
   return db;
 };
+
+// ─── MIGRATIONS ───────────────────────────────────────────────────────────────
+function runMigrations(db) {
+  // Migration: platform_connections UNIQUE(user_id, platform) → UNIQUE(user_id, platform, handle)
+  // This allows admins to connect multiple accounts per platform.
+  try {
+    const tableInfo = db.prepare(
+      `SELECT sql FROM sqlite_master WHERE type='table' AND name='platform_connections'`
+    ).get();
+
+    // Check if old constraint is still in place (does NOT include 'handle' in UNIQUE)
+    if (tableInfo && /UNIQUE\s*\(user_id\s*,\s*platform\s*\)/i.test(tableInfo.sql)) {
+      console.log('[Migration] Upgrading platform_connections: UNIQUE(user_id, platform) → UNIQUE(user_id, platform, handle)');
+      db.transaction(() => {
+        db.exec(`ALTER TABLE platform_connections RENAME TO platform_connections_old`);
+        db.exec(`
+          CREATE TABLE platform_connections (
+            id            TEXT PRIMARY KEY,
+            user_id       TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            platform      TEXT NOT NULL,
+            handle        TEXT NOT NULL DEFAULT '',
+            access_token  TEXT NOT NULL DEFAULT '',
+            refresh_token TEXT NOT NULL DEFAULT '',
+            token_expires TEXT,
+            connected     INTEGER NOT NULL DEFAULT 0,
+            created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+            updated_at    TEXT NOT NULL DEFAULT (datetime('now')),
+            UNIQUE(user_id, platform, handle)
+          )
+        `);
+        db.exec(`INSERT INTO platform_connections SELECT * FROM platform_connections_old`);
+        db.exec(`DROP TABLE platform_connections_old`);
+        db.exec(`CREATE INDEX IF NOT EXISTS idx_platform_conn_user ON platform_connections(user_id)`);
+      })();
+      console.log('[Migration] platform_connections migration complete.');
+    }
+  } catch (err) {
+    console.error('[Migration] platform_connections migration failed:', err.message);
+  }
+
+  // Migration: add source_post_id to scheduled_posts (repurpose engine)
+  try {
+    const cols = db.prepare(`PRAGMA table_info(scheduled_posts)`).all();
+    if (!cols.find(c => c.name === 'source_post_id')) {
+      db.exec(`ALTER TABLE scheduled_posts ADD COLUMN source_post_id TEXT`);
+      console.log('[Migration] scheduled_posts: added source_post_id column');
+    }
+  } catch (err) {
+    console.error('[Migration] scheduled_posts source_post_id failed:', err.message);
+  }
+
+  // Migration: create repurpose_rules table if missing
+  try {
+    const exists = db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='repurpose_rules'`).get();
+    if (!exists) {
+      db.exec(`
+        CREATE TABLE repurpose_rules (
+          id              TEXT PRIMARY KEY,
+          user_id         TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          brand_id        TEXT REFERENCES brands(id) ON DELETE SET NULL,
+          source_platform TEXT NOT NULL,
+          dest_platforms  TEXT NOT NULL DEFAULT '[]',
+          delay_hours     INTEGER NOT NULL DEFAULT 2,
+          adapt_captions  INTEGER NOT NULL DEFAULT 1,
+          caption_notes   TEXT NOT NULL DEFAULT '',
+          active          INTEGER NOT NULL DEFAULT 1,
+          created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+          updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+        CREATE INDEX IF NOT EXISTS idx_repurpose_rules_user ON repurpose_rules(user_id);
+        CREATE INDEX IF NOT EXISTS idx_repurpose_rules_src  ON repurpose_rules(source_platform);
+      `);
+      console.log('[Migration] repurpose_rules table created');
+    }
+  } catch (err) {
+    console.error('[Migration] repurpose_rules creation failed:', err.message);
+  }
+}
 
 // ─── SEED DATA ────────────────────────────────────────────────────────────────
 const seedUserData = (userId) => {
@@ -86,7 +165,7 @@ const seedUserData = (userId) => {
       hook: 'Nobody builds a content business — they just post',
       cta: 'Link in bio', funnel_stage: 'TOFU', pillar: 0,
       published_date: '2025-02-10',
-      perf: { views: 84200, likes: 3100, comments: 287, shares: 912, saves: 2400, followers: 340, leads: 47, decision: 'Scale' }
+      perf: { views: 84200, likes: 3100, comments: 287, shares: 912, saves: 2400, followers: 340, leads: 47, revenue: 2340, decision: 'Scale' }
     },
     {
       title: 'The 7 life force triggers that make content stop scrolls',
@@ -94,7 +173,7 @@ const seedUserData = (userId) => {
       hook: 'Most creators post what they think people want to hear',
       cta: 'Save this', funnel_stage: 'TOFU', pillar: 1,
       published_date: '2025-02-12',
-      perf: { views: 41800, likes: 2800, comments: 156, shares: 440, saves: 3200, followers: 210, leads: 22, decision: 'Scale' }
+      perf: { views: 41800, likes: 2800, comments: 156, shares: 440, saves: 3200, followers: 210, leads: 22, revenue: 1090, decision: 'Scale' }
     },
     {
       title: 'How I reverse engineered $10k/mo to 4 posts per week',
@@ -102,7 +181,7 @@ const seedUserData = (userId) => {
       hook: 'I\'ll show you the exact math',
       cta: 'DM \'calculator\'', funnel_stage: 'MOFU', pillar: 2,
       published_date: '2025-02-14',
-      perf: { views: 29400, likes: 1900, comments: 341, shares: 780, saves: 890, followers: 190, leads: 68, decision: 'Scale' }
+      perf: { views: 29400, likes: 1900, comments: 341, shares: 780, saves: 890, followers: 190, leads: 68, revenue: 3380, decision: 'Scale' }
     },
     {
       title: 'Stop using Notion as a folder. Use it as an OS',
@@ -110,7 +189,7 @@ const seedUserData = (userId) => {
       hook: 'Your Notion workspace is failing you',
       cta: 'Link in bio', funnel_stage: 'TOFU', pillar: 0,
       published_date: '2025-02-16',
-      perf: { views: 52300, likes: 2400, comments: 198, shares: 620, saves: 1800, followers: 280, leads: 31, decision: 'Scale' }
+      perf: { views: 52300, likes: 2400, comments: 198, shares: 620, saves: 1800, followers: 280, leads: 31, revenue: 1540, decision: 'Scale' }
     },
     {
       title: 'Building a $50k digital product from a Notion template',
@@ -118,7 +197,7 @@ const seedUserData = (userId) => {
       hook: 'I built this in a weekend',
       cta: 'Follow for the build', funnel_stage: 'TOFU', pillar: 3,
       published_date: '2025-02-18',
-      perf: { views: 38100, likes: 1700, comments: 224, shares: 390, saves: 1100, followers: 420, leads: 18, decision: 'Refine' }
+      perf: { views: 38100, likes: 1700, comments: 224, shares: 390, saves: 1100, followers: 420, leads: 18, revenue: 890, decision: 'Refine' }
     },
     {
       title: 'Why your hooks aren\'t working (it\'s not the hook)',
@@ -169,14 +248,14 @@ const seedUserData = (userId) => {
 
     if (a.perf) {
       db.prepare(`
-        INSERT INTO performance (id, user_id, asset_id, brand_id, platform, publish_date, views, likes, comments, shares, saves, followers, leads, decision)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO performance (id, user_id, asset_id, brand_id, platform, publish_date, views, likes, comments, shares, saves, followers, leads, revenue, decision)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         `seed_perf_${i}_${userId.slice(0,6)}`, userId, assetId, brandId,
         a.platform, a.published_date,
         a.perf.views, a.perf.likes, a.perf.comments,
         a.perf.shares, a.perf.saves, a.perf.followers,
-        a.perf.leads, a.perf.decision
+        a.perf.leads, a.perf.revenue || 0, a.perf.decision
       );
     }
   });
@@ -263,4 +342,23 @@ const seedUserData = (userId) => {
   console.log(`✅ Seed data created for user ${userId}`);
 };
 
-module.exports = { getDB, seedUserData };
+// One-time reseed for existing users — wipes ALL seed rows then re-inserts with current schema
+const reseedUserData = (userId) => {
+  const db = getDB();
+  // Delete all seed data in dependency order (children before parents)
+  db.prepare(`DELETE FROM performance        WHERE id LIKE 'seed_perf_%'    AND user_id = ?`).run(userId);
+  db.prepare(`DELETE FROM assets             WHERE id LIKE 'seed_asset_%'   AND user_id = ?`).run(userId);
+  db.prepare(`DELETE FROM hooks              WHERE id LIKE 'seed_hook_%'    AND user_id = ?`).run(userId);
+  db.prepare(`DELETE FROM ideas              WHERE id LIKE 'seed_idea_%'    AND user_id = ?`).run(userId);
+  db.prepare(`DELETE FROM cta_routes         WHERE id LIKE 'seed_cta_%'     AND user_id = ?`).run(userId);
+  db.prepare(`DELETE FROM funnels            WHERE id LIKE 'seed_funnel_%'  AND user_id = ?`).run(userId);
+  db.prepare(`DELETE FROM campaigns          WHERE id LIKE 'seed_camp_%'    AND user_id = ?`).run(userId);
+  db.prepare(`DELETE FROM offers             WHERE id LIKE 'seed_offer_%'   AND user_id = ?`).run(userId);
+  db.prepare(`DELETE FROM platform_stats     WHERE id LIKE 'seed_ps_%'      AND user_id = ?`).run(userId);
+  db.prepare(`DELETE FROM pillars            WHERE id LIKE 'seed_pillar_%'  AND user_id = ?`).run(userId);
+  db.prepare(`DELETE FROM brands             WHERE id LIKE 'seed_brand_%'   AND user_id = ?`).run(userId);
+  // Re-run seed — guard passes now that brands are gone
+  seedUserData(userId);
+};
+
+module.exports = { getDB, seedUserData, reseedUserData };

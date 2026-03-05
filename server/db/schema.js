@@ -264,26 +264,44 @@ const initSchema = (db) => {
       connected     INTEGER NOT NULL DEFAULT 0,
       created_at    TEXT NOT NULL DEFAULT (datetime('now')),
       updated_at    TEXT NOT NULL DEFAULT (datetime('now')),
-      UNIQUE(user_id, platform)
+      UNIQUE(user_id, platform, handle)
     );
 
     -- ─── SCHEDULED POSTS ─────────────────────────────────────────────────────
     CREATE TABLE IF NOT EXISTS scheduled_posts (
-      id            TEXT PRIMARY KEY,
-      user_id       TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      brand_id      TEXT REFERENCES brands(id) ON DELETE CASCADE,
-      title         TEXT NOT NULL DEFAULT '',
-      caption       TEXT NOT NULL DEFAULT '',
-      format        TEXT NOT NULL DEFAULT 'Short Form Video',
-      destinations  TEXT NOT NULL DEFAULT '[]',
-      media_urls    TEXT NOT NULL DEFAULT '[]',
-      scheduled_at  TEXT NOT NULL,
-      status        TEXT NOT NULL DEFAULT 'queued',
-      published_at  TEXT,
-      error_log     TEXT NOT NULL DEFAULT '',
-      created_at    TEXT NOT NULL DEFAULT (datetime('now')),
-      updated_at    TEXT NOT NULL DEFAULT (datetime('now'))
+      id              TEXT PRIMARY KEY,
+      user_id         TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      brand_id        TEXT REFERENCES brands(id) ON DELETE CASCADE,
+      title           TEXT NOT NULL DEFAULT '',
+      caption         TEXT NOT NULL DEFAULT '',
+      format          TEXT NOT NULL DEFAULT 'Short Form Video',
+      destinations    TEXT NOT NULL DEFAULT '[]',
+      media_urls      TEXT NOT NULL DEFAULT '[]',
+      scheduled_at    TEXT NOT NULL,
+      status          TEXT NOT NULL DEFAULT 'queued',
+      published_at    TEXT,
+      error_log       TEXT NOT NULL DEFAULT '',
+      source_post_id  TEXT,
+      created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
     );
+
+    -- ─── REPURPOSE RULES ──────────────────────────────────────────────────────
+    CREATE TABLE IF NOT EXISTS repurpose_rules (
+      id              TEXT PRIMARY KEY,
+      user_id         TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      brand_id        TEXT REFERENCES brands(id) ON DELETE SET NULL,
+      source_platform TEXT NOT NULL,
+      dest_platforms  TEXT NOT NULL DEFAULT '[]',
+      delay_hours     INTEGER NOT NULL DEFAULT 2,
+      adapt_captions  INTEGER NOT NULL DEFAULT 1,
+      caption_notes   TEXT NOT NULL DEFAULT '',
+      active          INTEGER NOT NULL DEFAULT 1,
+      created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_repurpose_rules_user ON repurpose_rules(user_id);
+    CREATE INDEX IF NOT EXISTS idx_repurpose_rules_src  ON repurpose_rules(source_platform);
 
     -- ─── DISTRIBUTION WORKFLOWS ───────────────────────────────────────────────
     CREATE TABLE IF NOT EXISTS distribution_workflows (
@@ -333,6 +351,40 @@ const initSchema = (db) => {
     CREATE INDEX IF NOT EXISTS idx_offers_brand ON offers(brand_id);
     CREATE INDEX IF NOT EXISTS idx_campaigns_brand ON campaigns(brand_id);
     CREATE INDEX IF NOT EXISTS idx_weekly_reviews_brand ON weekly_reviews(brand_id);
+
+    -- ─── REPURPOSED CONTENT ───────────────────────────────────────────────────
+    CREATE TABLE IF NOT EXISTS repurposed_content (
+      id                TEXT PRIMARY KEY,
+      user_id           TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      brand_id          TEXT REFERENCES brands(id) ON DELETE CASCADE,
+      source_asset_id   TEXT REFERENCES assets(id) ON DELETE CASCADE,
+      target_platform   TEXT NOT NULL,
+      target_format     TEXT NOT NULL DEFAULT 'Short Form Video',
+      status            TEXT NOT NULL DEFAULT 'Planned',
+      notes             TEXT NOT NULL DEFAULT '',
+      created_at        TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at        TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_repurposed_asset ON repurposed_content(source_asset_id);
+    CREATE INDEX IF NOT EXISTS idx_repurposed_user ON repurposed_content(user_id);
+
+    -- ─── BRAND DEALS ─────────────────────────────────────────────────────────
+    CREATE TABLE IF NOT EXISTS brand_deals (
+      id            TEXT PRIMARY KEY,
+      user_id       TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      brand_id      TEXT REFERENCES brands(id) ON DELETE CASCADE,
+      partner_name  TEXT NOT NULL DEFAULT '',
+      deal_type     TEXT NOT NULL DEFAULT 'Paid',
+      amount        REAL NOT NULL DEFAULT 0,
+      status        TEXT NOT NULL DEFAULT 'Inbound',
+      deliverables  TEXT NOT NULL DEFAULT '',
+      deadline      TEXT,
+      notes         TEXT NOT NULL DEFAULT '',
+      created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at    TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_brand_deals_user ON brand_deals(user_id);
+    CREATE INDEX IF NOT EXISTS idx_brand_deals_brand ON brand_deals(brand_id);
   `);
 
   console.log('✅ Database schema initialized');
