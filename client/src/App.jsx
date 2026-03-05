@@ -39,6 +39,7 @@ const I = ({ n, s = 16, c = "" }) => {
     alert: "M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z M12 9v4 M12 17h.01",
     refresh: "M23 4v6h-6 M1 20v-6h6 M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15",
     logout: "M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4 M16 17l5-5-5-5 M21 12H9",
+    studio: "M15 10l4.553-2.069A1 1 0 0 1 21 8.87V15.13a1 1 0 0 1-1.447.9L15 14 M3 8h12a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V10a2 2 0 0 1 2-2z",
     shield: "M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z",
     review: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z M14 2v6h6 M16 13H8 M16 17H8 M10 9H8",
   };
@@ -599,6 +600,8 @@ function CommandCenter({ activeBrand, setPage }) {
       </div>
 
       {/* Active Campaigns */}
+      <BrandDealsSection activeBrand={activeBrand} />
+
       {campaigns.length > 0 && <>
         <div className="sec-hdr"><div className="sec-title"><I n="target" s={14} /> Active Campaigns</div></div>
         {campaigns.map(c => {
@@ -1021,6 +1024,114 @@ function StrategyRoom({ activeBrand }) {
 }
 
 // ─── PRODUCTION ROOM ──────────────────────────────────────────────────────────
+function RepurposeTracker({ activeBrand, assets }) {
+  const [repurposed, setRepurposed] = useState([]);
+  const [statusFilter, setStatusFilter] = useState('');
+  const [showAdd, setShowAdd] = useState(false);
+  const [form, setForm] = useState({ source_asset_id:'', target_platform:'TikTok', target_format:'Short Form Video', status:'Planned', notes:'' });
+
+  const FORMATS = ['Short Form Video','Carousel','Thread','Story','Long Form','Email'];
+  const PLATFORMS = ['TikTok','Instagram','YouTube','LinkedIn','Twitter','Facebook'];
+  const STATUSES_RP = ['Planned','In Progress','Done'];
+
+  const load = () => {
+    if (!activeBrand) return;
+    fetch(`/api/production/repurposed?brandId=${activeBrand.id}${statusFilter?`&status=${statusFilter}`:''}`, { headers:{ Authorization:`Bearer ${localStorage.getItem('ccc_token')}` } })
+      .then(r=>r.json()).then(setRepurposed).catch(()=>{});
+  };
+
+  useEffect(() => { load(); }, [activeBrand?.id, statusFilter]);
+
+  const handleAdd = async () => {
+    if (!form.source_asset_id || !form.target_platform) return;
+    await fetch(`/api/production/assets/${form.source_asset_id}/repurposed`, { method:'POST', headers:{ Authorization:`Bearer ${localStorage.getItem('ccc_token')}`, 'Content-Type':'application/json' }, body: JSON.stringify(form) });
+    setShowAdd(false);
+    setForm({ source_asset_id:'', target_platform:'TikTok', target_format:'Short Form Video', status:'Planned', notes:'' });
+    load();
+  };
+
+  const updateStatus = async (id, status) => {
+    await fetch(`/api/production/repurposed/${id}`, { method:'PATCH', headers:{ Authorization:`Bearer ${localStorage.getItem('ccc_token')}`, 'Content-Type':'application/json' }, body: JSON.stringify({ status }) });
+    load();
+  };
+
+  const STATUS_C_RP = { Planned:'var(--text3)', 'In Progress':'var(--amber)', Done:'var(--green)' };
+
+  return (
+    <div>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14 }}>
+        <div style={{ display:'flex', gap:6 }}>
+          {['','Planned','In Progress','Done'].map(s => (
+            <button key={s} className={`btn btn-sm ${statusFilter===s?'btn-primary':'btn-ghost'}`} onClick={() => setStatusFilter(s)} style={{ fontSize:11 }}>
+              {s||'All'}
+            </button>
+          ))}
+        </div>
+        <button className="btn btn-primary btn-sm" onClick={() => setShowAdd(true)}><I n="plus" s={12} /> Add Repurpose</button>
+      </div>
+      <div className="panel">
+        <table className="data-table">
+          <thead><tr><th>Source Content</th><th>Original Platform</th><th>→ Target</th><th>Format</th><th>Status</th><th>Notes</th></tr></thead>
+          <tbody>
+            {repurposed.map(r => (
+              <tr key={r.id}>
+                <td style={{ maxWidth:180, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{r.source_title||'—'}</td>
+                <td style={{ fontSize:11.5, color:'var(--text3)' }}>{r.source_platform||'—'}</td>
+                <td><span className="tag">{r.target_platform}</span></td>
+                <td><span className="badge badge-format">{r.target_format}</span></td>
+                <td>
+                  <select value={r.status} onChange={e => updateStatus(r.id, e.target.value)} className="form-select" style={{ width:110, fontSize:11, padding:'3px 6px', color:STATUS_C_RP[r.status]||'var(--text)' }}>
+                    {STATUSES_RP.map(s => <option key={s}>{s}</option>)}
+                  </select>
+                </td>
+                <td style={{ fontSize:11.5, color:'var(--text3)', maxWidth:120, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{r.notes||'—'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {repurposed.length === 0 && <div className="empty">No repurpose tasks yet. Add one to track how you're multiplying your best content.</div>}
+      </div>
+
+      {showAdd && (
+        <div className="modal-overlay" onClick={() => setShowAdd(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-title">Add Repurpose Task</div>
+            <div className="form-row">
+              <label className="form-label">Source Content</label>
+              <select className="form-select" value={form.source_asset_id} onChange={e => setForm({...form,source_asset_id:e.target.value})}>
+                <option value="">Select source asset...</option>
+                {assets.filter(a=>a.status==='Published').map(a => <option key={a.id} value={a.id}>{a.title}</option>)}
+              </select>
+            </div>
+            <div className="form-row-2">
+              <div className="form-row" style={{ marginBottom:0 }}>
+                <label className="form-label">Target Platform</label>
+                <select className="form-select" value={form.target_platform} onChange={e => setForm({...form,target_platform:e.target.value})}>
+                  {PLATFORMS.map(p => <option key={p}>{p}</option>)}
+                </select>
+              </div>
+              <div className="form-row" style={{ marginBottom:0 }}>
+                <label className="form-label">Target Format</label>
+                <select className="form-select" value={form.target_format} onChange={e => setForm({...form,target_format:e.target.value})}>
+                  {FORMATS.map(f => <option key={f}>{f}</option>)}
+                </select>
+              </div>
+            </div>
+            <div className="form-row">
+              <label className="form-label">Notes</label>
+              <input className="form-input" placeholder="e.g. Trim to 30 sec, add captions" value={form.notes} onChange={e => setForm({...form,notes:e.target.value})} />
+            </div>
+            <div className="modal-acts">
+              <button className="btn btn-ghost" onClick={() => setShowAdd(false)}>Cancel</button>
+              <button className="btn btn-primary" onClick={handleAdd}>Add Task</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ProductionRoom({ activeBrand }) {
   const [tab, setTab] = useState('pipeline');
   const [assets, setAssets] = useState([]);
@@ -1028,7 +1139,9 @@ function ProductionRoom({ activeBrand }) {
   const [hooks, setHooks] = useState([]);
   const [pillars, setPillars] = useState([]);
   const [adding, setAdding] = useState(false);
+  const [addingIdea, setAddingIdea] = useState(false);
   const [form, setForm] = useState({ title:'', format:'Short Form Video', platform:'TikTok', status:'Idea', funnel_stage:'TOFU', hook:'', cta:'', pillar_id:'' });
+  const [ideaForm, setIdeaForm] = useState({ title:'', format:'Short Form Video', hook_angle:'', priority:'Medium', status:'Raw Idea' });
 
   useEffect(() => {
     if (!activeBrand) return;
@@ -1049,13 +1162,23 @@ function ProductionRoom({ activeBrand }) {
     setForm({ title:'', format:'Short Form Video', platform:'TikTok', status:'Idea', funnel_stage:'TOFU', hook:'', cta:'', pillar_id:'' });
   };
 
+  const saveIdea = async () => {
+    if (!ideaForm.title.trim()) return;
+    await api.production.ideas.create({ brand_id: activeBrand.id, ...ideaForm });
+    const i = await api.production.ideas.list({ brandId: activeBrand.id });
+    setIdeas(i);
+    setAddingIdea(false);
+    setIdeaForm({ title:'', format:'Short Form Video', hook_angle:'', priority:'Medium', status:'Raw Idea' });
+  };
+
   return (
     <div className="page">
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:18 }}>
         <div className="tabs" style={{ marginBottom:0 }}>
-          {['pipeline','ideas','hooks'].map(t => <button key={t} className={`tab ${tab===t?'active':''}`} onClick={() => setTab(t)}>{t.charAt(0).toUpperCase()+t.slice(1)}</button>)}
+          {[['pipeline','Pipeline'],['ideas','💡 Idea Vault'],['hooks','Hooks'],['repurpose','🔄 Repurpose']].map(([t,lbl]) => <button key={t} className={`tab ${tab===t?'active':''}`} onClick={() => setTab(t)}>{lbl}</button>)}
         </div>
-        {tab !== 'hooks' && <button className="btn btn-primary btn-sm" onClick={() => setAdding(true)}><I n="plus" s={12} /> New {tab === 'pipeline' ? 'Asset' : 'Idea'}</button>}
+        {(tab === 'pipeline') && <button className="btn btn-primary btn-sm" onClick={() => setAdding(true)}><I n="plus" s={12} /> New Asset</button>}
+        {(tab === 'ideas') && <button className="btn btn-primary btn-sm" onClick={() => setAddingIdea(true)}><I n="plus" s={12} /> New Idea</button>}
       </div>
 
       {tab === 'pipeline' && (
@@ -1086,21 +1209,38 @@ function ProductionRoom({ activeBrand }) {
       {tab === 'ideas' && (
         <div className="panel">
           <table className="data-table">
-            <thead><tr><th>Idea</th><th>Format</th><th>Priority</th><th>Status</th></tr></thead>
+            <thead><tr><th>Idea</th><th>Format</th><th>Hook Angle</th><th>Priority</th><th>Status</th><th></th></tr></thead>
             <tbody>
               {ideas.map(i => (
                 <tr key={i.id}>
-                  <td>{i.title}</td>
+                  <td style={{ maxWidth:220, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{i.title}</td>
                   <td><span className="badge badge-format">{i.format}</span></td>
+                  <td style={{ fontSize:11.5, color:'var(--text3)' }}>{i.hook_angle||'—'}</td>
                   <td><span className="tag" style={{ color: i.priority==='High'?'var(--green)':i.priority==='Medium'?'var(--amber)':'var(--text3)' }}>{i.priority}</span></td>
                   <td><span className="badge" style={{ background:`${STATUS_C[i.status]||'#555'}22`, color:STATUS_C[i.status]||'#888' }}>{i.status}</span></td>
+                  <td>
+                    {i.status !== 'Scripted' && (
+                      <button className="btn btn-ghost btn-sm" style={{ fontSize:10.5, whiteSpace:'nowrap' }}
+                        onClick={async () => {
+                          try {
+                            await fetch(`/api/production/ideas/${i.id}/promote`, { method:'POST', headers:{ Authorization:`Bearer ${localStorage.getItem('ccc_token')}`, 'Content-Type':'application/json' } });
+                            const updated = await fetch(`/api/production/ideas?brandId=${activeBrand?.id}`, { headers:{ Authorization:`Bearer ${localStorage.getItem('ccc_token')}` } }).then(r=>r.json());
+                            setIdeas(updated);
+                          } catch(e) { console.error(e); }
+                        }}>
+                        → Pipeline
+                      </button>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
-          {ideas.length === 0 && <div className="empty">No ideas yet.</div>}
+          {ideas.length === 0 && <div className="empty">No ideas yet. Use "New Idea" to capture content ideas as they come.</div>}
         </div>
       )}
+
+      {tab === 'repurpose' && <RepurposeTracker activeBrand={activeBrand} assets={assets} />}
 
       {tab === 'hooks' && (
         <div className="hook-grid">
@@ -1173,6 +1313,258 @@ function ProductionRoom({ activeBrand }) {
           </div>
         </div>
       )}
+
+      {addingIdea && (
+        <div className="modal-overlay" onClick={() => setAddingIdea(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-title">New Idea</div>
+            <div className="form-row">
+              <label className="form-label">Idea Title / Topic</label>
+              <input className="form-input" placeholder="What's the content idea?" value={ideaForm.title} onChange={e => setIdeaForm({...ideaForm,title:e.target.value})} autoFocus />
+            </div>
+            <div className="form-row">
+              <label className="form-label">Hook Angle</label>
+              <input className="form-input" placeholder="e.g. Contrarian take, behind the scenes, story..." value={ideaForm.hook_angle} onChange={e => setIdeaForm({...ideaForm,hook_angle:e.target.value})} />
+            </div>
+            <div className="form-row-2">
+              <div className="form-row" style={{ marginBottom:0 }}>
+                <label className="form-label">Format</label>
+                <select className="form-select" value={ideaForm.format} onChange={e => setIdeaForm({...ideaForm,format:e.target.value})}>
+                  {['Short Form Video','Carousel','Thread','Long Form','Story','Email'].map(f => <option key={f}>{f}</option>)}
+                </select>
+              </div>
+              <div className="form-row" style={{ marginBottom:0 }}>
+                <label className="form-label">Priority</label>
+                <select className="form-select" value={ideaForm.priority} onChange={e => setIdeaForm({...ideaForm,priority:e.target.value})}>
+                  {['High','Medium','Low'].map(p => <option key={p}>{p}</option>)}
+                </select>
+              </div>
+            </div>
+            <div className="modal-acts">
+              <button className="btn btn-ghost" onClick={() => setAddingIdea(false)}>Cancel</button>
+              <button className="btn btn-primary" onClick={saveIdea}>Save Idea</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── WEEKLY RITUAL WIZARD ─────────────────────────────────────────────────────
+function WeeklyRitualWizard({ activeBrand, analytics }) {
+  const [step, setStep] = useState(1);
+  const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const tot = analytics?.totals || {};
+
+  const [nums, setNums] = useState({ posts_published:0, total_views:0, new_followers:0, leads_generated:0, revenue:0 });
+  const [topIds, setTopIds] = useState([]);
+  const [bottomIds, setBottomIds] = useState([]);
+  const [wins, setWins] = useState({ hook_type:'', pillar:'', platform:'' });
+  const [decisions, setDecisions] = useState({});
+  const [nextWeek, setNextWeek] = useState({ posts_goal:5, revenue_target:0, one_focus:'' });
+
+  const recentAssets = analytics?.top_performers?.slice(0,10) || [];
+
+  const HOOK_TYPES = ['Contrarian','Curiosity Gap','Story','Bold Claim','Social Proof','Question','How-To'];
+  const PLATFORMS = ['TikTok','Instagram','YouTube','LinkedIn','Twitter'];
+
+  const toggleTop = (id) => setTopIds(prev => prev.includes(id) ? prev.filter(x=>x!==id) : prev.length<3 ? [...prev,id] : prev);
+  const toggleBottom = (id) => setBottomIds(prev => prev.includes(id) ? prev.filter(x=>x!==id) : prev.length<3 ? [...prev,id] : prev);
+
+  const handleSave = async () => {
+    if (!activeBrand) return;
+    setSaving(true);
+    try {
+      const today = new Date();
+      const weekDate = new Date(today.setDate(today.getDate() - today.getDay())).toISOString().split('T')[0];
+      const topAssets = recentAssets.filter(a => topIds.includes(a.id));
+      const bottomAssets = recentAssets.filter(a => bottomIds.includes(a.id));
+
+      await import('../lib/api').then(({ data: dataApi }) =>
+        dataApi.reviews.create({
+          brand_id: activeBrand.id,
+          week_date: weekDate,
+          posts_published: nums.posts_published,
+          posts_goal: nextWeek.posts_goal,
+          total_views: nums.total_views,
+          new_followers: nums.new_followers,
+          leads_generated: nums.leads_generated,
+          revenue: nums.revenue,
+          top_performers: topAssets.map(a => a.title),
+          bottom_performers: bottomAssets.map(a => a.title),
+          best_hook_type: wins.hook_type,
+          best_pillar: wins.pillar,
+          best_platform: wins.platform,
+          scale_decisions: topAssets.filter(a => decisions[a.id]==='Scale').map(a => a.title),
+          refine_decisions: bottomAssets.filter(a => decisions[a.id]==='Refine').map(a => a.title),
+          kill_decisions: bottomAssets.filter(a => decisions[a.id]==='Kill').map(a => a.title),
+          next_week_plan: nextWeek.one_focus,
+        })
+      );
+      setSaved(true);
+    } catch(e) { console.error(e); }
+    setSaving(false);
+  };
+
+  if (saved) return (
+    <div className="panel" style={{ maxWidth:560, textAlign:'center', padding:40 }}>
+      <div style={{ fontSize:40, marginBottom:12 }}>🎉</div>
+      <div style={{ fontFamily:'var(--font-d)', fontSize:20, fontWeight:800, color:'var(--text)', marginBottom:8 }}>Week Reviewed!</div>
+      <div style={{ fontSize:13, color:'var(--text2)', marginBottom:24, lineHeight:1.6 }}>
+        Your review has been saved. Here's your summary:
+      </div>
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:20, textAlign:'left' }}>
+        {[['Posts',nums.posts_published],['Views',nums.total_views.toLocaleString()],['New Followers',nums.new_followers],['Leads',nums.leads_generated],['Revenue','$'+nums.revenue.toLocaleString()],['Next Goal',nextWeek.posts_goal+' posts']].map(([k,v]) => (
+          <div key={k} style={{ background:'var(--bg3)', border:'1px solid var(--border)', borderRadius:'var(--r-sm)', padding:'10px 13px' }}>
+            <div style={{ fontSize:10, color:'var(--text3)', fontWeight:700, textTransform:'uppercase' }}>{k}</div>
+            <div style={{ fontFamily:'var(--font-d)', fontSize:18, fontWeight:800, color:'var(--text)' }}>{v}</div>
+          </div>
+        ))}
+      </div>
+      {nextWeek.one_focus && <div style={{ padding:'12px 16px', background:'var(--accent3)', border:'1px solid rgba(108,71,255,.2)', borderRadius:'var(--r-sm)', fontSize:13, color:'var(--text2)', marginBottom:20 }}>🎯 Focus: {nextWeek.one_focus}</div>}
+      <button className="btn btn-primary" onClick={() => { setSaved(false); setStep(1); setNums({ posts_published:0,total_views:0,new_followers:0,leads_generated:0,revenue:0 }); setTopIds([]); setBottomIds([]); setWins({ hook_type:'',pillar:'',platform:'' }); setDecisions({}); setNextWeek({ posts_goal:5,revenue_target:0,one_focus:'' }); }}>Start New Review</button>
+    </div>
+  );
+
+  const steps = [
+    { num:1, label:'Numbers', icon:'📊' },
+    { num:2, label:'Performers', icon:'⭐' },
+    { num:3, label:'Wins', icon:'🏆' },
+    { num:4, label:'Decisions', icon:'⚡' },
+    { num:5, label:'Next Week', icon:'🎯' },
+  ];
+
+  return (
+    <div style={{ maxWidth:640 }}>
+      {/* Step indicator */}
+      <div style={{ display:'flex', gap:4, marginBottom:24 }}>
+        {steps.map(s => (
+          <div key={s.num} onClick={() => setStep(s.num)} style={{ flex:1, padding:'8px 4px', background: step===s.num?'var(--accent3)':step>s.num?'var(--green-d)':'var(--surface)', border:`1px solid ${step===s.num?'var(--accent)':step>s.num?'rgba(34,197,94,.3)':'var(--border)'}`, borderRadius:'var(--r-sm)', textAlign:'center', cursor:'pointer', transition:'all .15s' }}>
+            <div style={{ fontSize:16 }}>{step>s.num?'✓':s.icon}</div>
+            <div style={{ fontSize:10, fontWeight:700, color: step===s.num?'var(--accent2)':step>s.num?'var(--green)':'var(--text3)', marginTop:2 }}>{s.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {step === 1 && (
+        <div className="panel">
+          <div className="sec-title" style={{ marginBottom:4 }}>📊 Enter This Week's Numbers</div>
+          <div style={{ fontSize:12, color:'var(--text3)', marginBottom:18 }}>Fill in what actually happened — no judgment, just data.</div>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+            {[['Posts Published','posts_published','number'],['Total Views','total_views','number'],['New Followers','new_followers','number'],['Leads Generated','leads_generated','number'],['Revenue ($)','revenue','number']].map(([lbl,key,type]) => (
+              <div className="form-row" key={key} style={{ marginBottom:0 }}>
+                <label className="form-label">{lbl}</label>
+                <input className="form-input" type={type} value={nums[key]} onChange={e => setNums({...nums,[key]:parseFloat(e.target.value)||0})} />
+              </div>
+            ))}
+            <div style={{ background:'var(--bg3)', border:'1px solid var(--border)', borderRadius:'var(--r-sm)', padding:'10px 13px', display:'flex', flexDirection:'column', gap:4 }}>
+              <div style={{ fontSize:10, color:'var(--text3)', fontWeight:700, textTransform:'uppercase' }}>vs Last 30d</div>
+              <div style={{ fontSize:12, color:'var(--text2)' }}>{(tot.total_views||0).toLocaleString()} views avg</div>
+              <div style={{ fontSize:12, color:'var(--green)' }}>{tot.total_leads||0} leads avg</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {step === 2 && (
+        <div className="panel">
+          <div className="sec-title" style={{ marginBottom:4 }}>⭐ Tag Your Performers</div>
+          <div style={{ fontSize:12, color:'var(--text3)', marginBottom:14 }}>Select up to 3 top and 3 bottom performers from recent content.</div>
+          {recentAssets.length === 0 && <div className="empty">No published content found. Publish some assets first.</div>}
+          {recentAssets.map(a => {
+            const isTop = topIds.includes(a.id);
+            const isBot = bottomIds.includes(a.id);
+            return (
+              <div key={a.id} style={{ display:'flex', gap:8, alignItems:'center', padding:'9px 0', borderBottom:'1px solid var(--border)' }}>
+                <div style={{ flex:1, fontSize:12.5, color:'var(--text)' }}>{a.title}</div>
+                <div style={{ fontSize:11, color:'var(--text3)', minWidth:60 }}>{(a.views||0).toLocaleString()}v</div>
+                <button onClick={() => { if(!isBot) toggleTop(a.id); }} className="btn btn-sm" style={{ padding:'3px 9px', fontSize:10.5, background:isTop?'var(--green-d)':'var(--surface2)', color:isTop?'var(--green)':'var(--text3)', border:`1px solid ${isTop?'rgba(34,197,94,.3)':'var(--border2)'}` }}>
+                  {isTop?'★ Top':'☆ Top'}
+                </button>
+                <button onClick={() => { if(!isTop) toggleBottom(a.id); }} className="btn btn-sm" style={{ padding:'3px 9px', fontSize:10.5, background:isBot?'var(--red-d)':'var(--surface2)', color:isBot?'var(--red)':'var(--text3)', border:`1px solid ${isBot?'rgba(239,68,68,.3)':'var(--border2)'}` }}>
+                  {isBot?'▼ Bot':'▽ Bot'}
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {step === 3 && (
+        <div className="panel">
+          <div className="sec-title" style={{ marginBottom:4 }}>🏆 Identify Your Wins</div>
+          <div style={{ fontSize:12, color:'var(--text3)', marginBottom:18 }}>What worked best this week?</div>
+          {[
+            ['Best Hook Type','hook_type',HOOK_TYPES],
+            ['Best Platform','platform',PLATFORMS],
+          ].map(([lbl,key,opts]) => (
+            <div className="form-row" key={key}>
+              <label className="form-label">{lbl}</label>
+              <select className="form-select" value={wins[key]} onChange={e => setWins({...wins,[key]:e.target.value})}>
+                <option value="">Select...</option>
+                {opts.map(o => <option key={o}>{o}</option>)}
+              </select>
+            </div>
+          ))}
+          <div className="form-row">
+            <label className="form-label">Best Content Pillar</label>
+            <input className="form-input" placeholder="e.g. Systems & Workflow" value={wins.pillar} onChange={e => setWins({...wins,pillar:e.target.value})} />
+          </div>
+        </div>
+      )}
+
+      {step === 4 && (
+        <div className="panel">
+          <div className="sec-title" style={{ marginBottom:4 }}>⚡ Make Decisions</div>
+          <div style={{ fontSize:12, color:'var(--text3)', marginBottom:14 }}>Scale what works. Cut what doesn't.</div>
+          {[...topIds.map(id => ({ id, label:'Top', asset:recentAssets.find(a=>a.id===id) })), ...bottomIds.map(id => ({ id, label:'Bottom', asset:recentAssets.find(a=>a.id===id) }))].filter(x=>x.asset).map(({ id, label, asset }) => (
+            <div key={id} style={{ display:'flex', gap:8, alignItems:'center', padding:'10px 0', borderBottom:'1px solid var(--border)' }}>
+              <span className={`badge badge-${label==='Top'?'scale':'kill'}`} style={{ flexShrink:0 }}>{label}</span>
+              <div style={{ flex:1, fontSize:12, color:'var(--text2)' }}>{asset.title}</div>
+              <div style={{ display:'flex', gap:4 }}>
+                {(label==='Top'?['Scale','Repurpose']:['Refine','Kill']).map(d => (
+                  <button key={d} onClick={() => setDecisions(prev => ({...prev,[id]:d}))} className="btn btn-sm" style={{ padding:'3px 10px', fontSize:10.5, background:decisions[id]===d?(d==='Kill'||d==='Refine'?'var(--amber-d)':'var(--green-d)'):'var(--surface2)', color:decisions[id]===d?(d==='Kill'||d==='Refine'?'var(--amber)':'var(--green)'):'var(--text3)', border:`1px solid ${decisions[id]===d?'var(--border2)':'var(--border)'}` }}>
+                    {d}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+          {(topIds.length + bottomIds.length === 0) && <div className="empty">Go back to Step 2 to tag performers first.</div>}
+        </div>
+      )}
+
+      {step === 5 && (
+        <div className="panel">
+          <div className="sec-title" style={{ marginBottom:4 }}>🎯 Set Next Week's Goals</div>
+          <div style={{ fontSize:12, color:'var(--text3)', marginBottom:18 }}>Commit to the week ahead.</div>
+          <div className="form-row">
+            <label className="form-label">Posts Goal</label>
+            <input className="form-input" type="number" value={nextWeek.posts_goal} onChange={e => setNextWeek({...nextWeek,posts_goal:parseInt(e.target.value)||0})} />
+          </div>
+          <div className="form-row">
+            <label className="form-label">Revenue Target ($)</label>
+            <input className="form-input" type="number" value={nextWeek.revenue_target} onChange={e => setNextWeek({...nextWeek,revenue_target:parseFloat(e.target.value)||0})} />
+          </div>
+          <div className="form-row">
+            <label className="form-label">One Focus This Week</label>
+            <input className="form-input" placeholder="e.g. Test 3 new hook types on Instagram Reels" value={nextWeek.one_focus} onChange={e => setNextWeek({...nextWeek,one_focus:e.target.value})} />
+          </div>
+          <button className="btn btn-primary" style={{ width:'100%', justifyContent:'center', marginTop:8 }} onClick={handleSave} disabled={saving}>
+            {saving ? 'Saving...' : '✓ Save Weekly Review'}
+          </button>
+        </div>
+      )}
+
+      {/* Nav buttons */}
+      <div style={{ display:'flex', justifyContent:'space-between', marginTop:16 }}>
+        <button className="btn btn-ghost" onClick={() => setStep(s => Math.max(1,s-1))} disabled={step===1}>← Back</button>
+        {step < 5
+          ? <button className="btn btn-primary" onClick={() => setStep(s => Math.min(5,s+1))}>Next →</button>
+          : null}
+      </div>
     </div>
   );
 }
@@ -1182,7 +1574,6 @@ function DataRoom({ activeBrand }) {
   const [tab, setTab] = useState('performance');
   const [analytics, setAnalytics] = useState(null);
   const [period, setPeriod] = useState(30);
-  const [reviewNotes, setReviewNotes] = useState('');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -1270,51 +1661,135 @@ function DataRoom({ activeBrand }) {
       )}
 
       {tab === 'weekly' && (
-        <div style={{ maxWidth:600 }}>
-          {[
-            { num:1, title:'Clear Idea Vault', time:'2 min', content: (
-              <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:8 }}>
-                {['Approved','Kill','Someday'].map(s => (
-                  <div key={s} style={{ background:'var(--bg3)', border:'1px solid var(--border)', borderRadius:'var(--r-sm)', padding:'8px 12px', textAlign:'center' }}>
-                    <div style={{ fontSize:10.5, color:'var(--text3)', marginBottom:3 }}>{s}</div>
-                    <div style={{ fontFamily:'var(--font-d)', fontSize:18, fontWeight:800, color:'var(--text)' }}>—</div>
-                  </div>
-                ))}
-              </div>
-            )},
-            { num:2, title:"Review Last Week's Performance", time:'5 min', content: (
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
-                {[['Total Views',fmt(tot.total_views||0)],['Leads',tot.total_leads||0],['Avg Eng Rate',(tot.engagement_rate||0)+'%'],['Posts Published',tot.posts||0]].map(([k,v]) => (
-                  <div key={k} style={{ background:'var(--bg3)', border:'1px solid var(--border)', borderRadius:'var(--r-sm)', padding:'10px 13px' }}>
-                    <div style={{ fontSize:10.5, color:'var(--text3)', marginBottom:3 }}>{k}</div>
-                    <div style={{ fontFamily:'var(--font-d)', fontSize:20, fontWeight:800, color:'var(--text)' }}>{v}</div>
-                  </div>
-                ))}
-              </div>
-            )},
-            { num:3, title:'Make Scale / Refine / Kill Decisions', time:'3 min', content: (
-              <div>
-                {['Scale','Refine','Kill'].map(d => (
-                  <div key={d} style={{ display:'flex', alignItems:'center', gap:10, padding:'7px 0', borderBottom:'1px solid var(--border)' }}>
-                    <span className={`badge badge-${d.toLowerCase()}`} style={{ minWidth:52, justifyContent:'center' }}>{d}</span>
-                    <span style={{ fontSize:12, color:'var(--text3)' }}>Review top performers and assign decisions in the Performance tab.</span>
-                  </div>
-                ))}
-              </div>
-            )},
-            { num:4, title:'Plan Next Week', time:'5 min', content: (
-              <textarea className="review-textarea" value={reviewNotes} onChange={e => setReviewNotes(e.target.value)} placeholder="Posts planned, priority pillar, batch day, platforms to focus on..." />
-            )},
-          ].map(step => (
-            <div className="review-step" key={step.num}>
-              <div className="review-step-hdr">
-                <div className="review-step-num">{step.num}</div>
-                <div className="review-step-title">{step.title}</div>
-                <div className="review-step-time">{step.time}</div>
-              </div>
-              {step.content}
+        <WeeklyRitualWizard activeBrand={activeBrand} analytics={analytics} />
+      )}
+    </div>
+  );
+}
+
+function BrandDealsSection({ activeBrand }) {
+  const [deals, setDeals] = useState([]);
+  const [showAdd, setShowAdd] = useState(false);
+  const [form, setForm] = useState({ partner_name:'', deal_type:'Paid', amount:0, status:'Inbound', deliverables:'', deadline:'', notes:'' });
+
+  const load = () => {
+    if (!activeBrand) return;
+    import('../lib/api').then(({ deals: dealsApi }) => dealsApi.list(activeBrand.id).then(setDeals).catch(() => {}));
+  };
+
+  useEffect(() => { load(); }, [activeBrand?.id]);
+
+  const STATUSES = ['Inbound','Negotiating','Active','Completed','Rejected'];
+  const STATUS_C = { Inbound:'var(--text3)', Negotiating:'var(--amber)', Active:'var(--green)', Completed:'var(--accent2)', Rejected:'var(--red)' };
+  const DEAL_TYPES = ['Paid','Gifted','Affiliate'];
+
+  const totalRevenue = deals.filter(d=>['Active','Completed'].includes(d.status)).reduce((s,d)=>s+(d.amount||0),0);
+  const pipeline = STATUSES.slice(0,4).map(s => ({ status:s, count:deals.filter(d=>d.status===s).length, color:STATUS_C[s] }));
+
+  const handleSave = async () => {
+    if (!form.partner_name.trim()) return;
+    await import('../lib/api').then(({ deals: dealsApi }) => dealsApi.create({ brand_id: activeBrand?.id, ...form }));
+    setForm({ partner_name:'', deal_type:'Paid', amount:0, status:'Inbound', deliverables:'', deadline:'', notes:'' });
+    setShowAdd(false);
+    load();
+  };
+
+  const updateStatus = async (id, status) => {
+    await import('../lib/api').then(({ deals: dealsApi }) => dealsApi.update(id, { status }));
+    load();
+  };
+
+  const handleDelete = async (id) => {
+    await import('../lib/api').then(({ deals: dealsApi }) => dealsApi.delete(id));
+    load();
+  };
+
+  return (
+    <div style={{ marginBottom:28 }}>
+      <div className="sec-hdr" style={{ marginTop:8 }}>
+        <div className="sec-title">🤝 Brand Deals</div>
+        <button className="btn btn-primary btn-sm" onClick={() => setShowAdd(true)}><I n="plus" s={12} /> Add Deal</button>
+      </div>
+
+      {/* Stats row */}
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:8, marginBottom:16 }}>
+        <div style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'var(--r-sm)', padding:'12px 14px', textAlign:'center' }}>
+          <div style={{ fontSize:10, color:'var(--text3)', fontWeight:700, textTransform:'uppercase', marginBottom:4 }}>Total Revenue</div>
+          <div style={{ fontFamily:'var(--font-d)', fontSize:20, fontWeight:800, color:'var(--green)' }}>{money(totalRevenue)}</div>
+        </div>
+        {pipeline.map(p => (
+          <div key={p.status} style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'var(--r-sm)', padding:'12px 14px', textAlign:'center' }}>
+            <div style={{ fontSize:10, color:'var(--text3)', fontWeight:700, textTransform:'uppercase', marginBottom:4 }}>{p.status}</div>
+            <div style={{ fontFamily:'var(--font-d)', fontSize:20, fontWeight:800, color:p.color }}>{p.count}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Deal cards */}
+      {deals.map(d => (
+        <div key={d.id} style={{ display:'flex', gap:12, alignItems:'center', padding:'11px 14px', background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'var(--r-sm)', marginBottom:7 }}>
+          <div style={{ flex:1, minWidth:0 }}>
+            <div style={{ fontWeight:600, fontSize:13, color:'var(--text)', marginBottom:3 }}>{d.partner_name}</div>
+            <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+              <span className="tag">{d.deal_type}</span>
+              {d.deliverables && <span className="tag" style={{ maxWidth:160, overflow:'hidden', textOverflow:'ellipsis' }}>{d.deliverables}</span>}
+              {d.deadline && <span className="tag" style={{ color:'var(--amber)' }}>Due {d.deadline}</span>}
             </div>
-          ))}
+          </div>
+          <div style={{ fontFamily:'var(--font-d)', fontSize:16, fontWeight:800, color:'var(--green)', flexShrink:0 }}>{money(d.amount)}</div>
+          <select value={d.status} onChange={e => updateStatus(d.id, e.target.value)} className="form-select" style={{ width:130, fontSize:12, padding:'4px 8px', color:STATUS_C[d.status]||'var(--text)', background:'var(--bg3)' }}>
+            {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
+          <button className="btn btn-ghost btn-sm btn-icon" onClick={() => handleDelete(d.id)}><I n="trash" s={11} /></button>
+        </div>
+      ))}
+      {deals.length === 0 && <div className="panel empty">No brand deals yet. Track inbound partnerships, gifted collab requests, and paid deals here.</div>}
+
+      {showAdd && (
+        <div className="modal-overlay" onClick={() => setShowAdd(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-title">Add Brand Deal</div>
+            <div className="form-row">
+              <label className="form-label">Partner / Brand Name</label>
+              <input className="form-input" placeholder="e.g. Notion, Skillshare, Manscaped..." value={form.partner_name} onChange={e => setForm({...form,partner_name:e.target.value})} autoFocus />
+            </div>
+            <div className="form-row-2">
+              <div className="form-row" style={{ marginBottom:0 }}>
+                <label className="form-label">Deal Type</label>
+                <select className="form-select" value={form.deal_type} onChange={e => setForm({...form,deal_type:e.target.value})}>
+                  {DEAL_TYPES.map(t => <option key={t}>{t}</option>)}
+                </select>
+              </div>
+              <div className="form-row" style={{ marginBottom:0 }}>
+                <label className="form-label">Amount ($)</label>
+                <input className="form-input" type="number" value={form.amount} onChange={e => setForm({...form,amount:parseFloat(e.target.value)||0})} />
+              </div>
+            </div>
+            <div className="form-row-2">
+              <div className="form-row" style={{ marginBottom:0 }}>
+                <label className="form-label">Status</label>
+                <select className="form-select" value={form.status} onChange={e => setForm({...form,status:e.target.value})}>
+                  {STATUSES.map(s => <option key={s}>{s}</option>)}
+                </select>
+              </div>
+              <div className="form-row" style={{ marginBottom:0 }}>
+                <label className="form-label">Deadline</label>
+                <input className="form-input" type="date" value={form.deadline} onChange={e => setForm({...form,deadline:e.target.value})} />
+              </div>
+            </div>
+            <div className="form-row">
+              <label className="form-label">Deliverables</label>
+              <input className="form-input" placeholder="e.g. 2 IG Reels + 1 Story" value={form.deliverables} onChange={e => setForm({...form,deliverables:e.target.value})} />
+            </div>
+            <div className="form-row">
+              <label className="form-label">Notes</label>
+              <textarea className="form-textarea" rows={2} value={form.notes} onChange={e => setForm({...form,notes:e.target.value})} />
+            </div>
+            <div className="modal-acts">
+              <button className="btn btn-ghost" onClick={() => setShowAdd(false)}>Cancel</button>
+              <button className="btn btn-primary" onClick={handleSave}>Add Deal</button>
+            </div>
+          </div>
         </div>
       )}
     </div>
@@ -1406,22 +1881,193 @@ function MonetizationRoom({ activeBrand }) {
   );
 }
 
+// ─── CONTENT STUDIO ───────────────────────────────────────────────────────────
+function ContentStudioRoom({ activeBrand }) {
+  const [tab, setTab] = useState('brief');
+  const [brief, setBrief] = useState({ title:'', platform:'TikTok', pillar:'', hook_angle:'' });
+  const [script, setScript] = useState({ hook:'', context:'', value:'', cta:'' });
+  const [batchTopic, setBatchTopic] = useState('');
+  const [batchPlatform, setBatchPlatform] = useState('TikTok');
+
+  const HOOK_TYPES = ['Contrarian','Curiosity Gap','Story','Bold Claim','Social Proof','Question','How-To'];
+  const PLATFORMS = ['TikTok','Instagram','YouTube','LinkedIn','Twitter'];
+
+  const scriptTemplate = `HOOK:\n${script.hook || '[Your scroll-stopping opening line]'}\n\nCONTEXT:\n${script.context || '[Why this matters / who it\'s for]'}\n\nVALUE:\n${script.value || '[The actual insight / teaching / story]'}\n\nCTA:\n${script.cta || '[Clear next step for viewer]'}`;
+
+  const captionVariations = batchTopic ? [
+    `POV: You discovered ${batchTopic} and nothing has been the same since. Here's what changed →`,
+    `The uncomfortable truth about ${batchTopic} nobody talks about. Save this before it's gone.`,
+    `I spent 6 months figuring out ${batchTopic} so you don't have to. Here's everything:`,
+    `If you're struggling with ${batchTopic}, you're not alone. This framework changed everything for me.`,
+    `Hot take: ${batchTopic} isn't about what you think it's about. Here's the real insight:`,
+  ] : [];
+
+  return (
+    <div className="page">
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:18 }}>
+        <div className="tabs" style={{ marginBottom:0 }}>
+          {[['brief','📋 Brief Builder'],['script','📝 Script Template'],['batch','🔁 Batch Captions']].map(([t,lbl]) => (
+            <button key={t} className={`tab ${tab===t?'active':''}`} onClick={() => setTab(t)}>{lbl}</button>
+          ))}
+        </div>
+        <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+          <span style={{ fontSize:10.5, color:'var(--text3)', background:'var(--surface2)', border:'1px solid var(--border)', borderRadius:4, padding:'3px 8px', fontWeight:600 }}>✨ AI-powered — Coming soon</span>
+        </div>
+      </div>
+
+      {tab === 'brief' && (
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:20 }}>
+          <div className="panel">
+            <div className="sec-title" style={{ marginBottom:18 }}>Content Brief Generator</div>
+            <div className="form-row">
+              <label className="form-label">Content Title / Topic</label>
+              <input className="form-input" placeholder="e.g. How I batch 30 days of content in 6 hours" value={brief.title} onChange={e => setBrief({...brief,title:e.target.value})} />
+            </div>
+            <div className="form-row-2">
+              <div className="form-row" style={{ marginBottom:0 }}>
+                <label className="form-label">Platform</label>
+                <select className="form-select" value={brief.platform} onChange={e => setBrief({...brief,platform:e.target.value})}>
+                  {PLATFORMS.map(p => <option key={p}>{p}</option>)}
+                </select>
+              </div>
+              <div className="form-row" style={{ marginBottom:0 }}>
+                <label className="form-label">Content Pillar</label>
+                <input className="form-input" placeholder="e.g. Systems & Workflow" value={brief.pillar} onChange={e => setBrief({...brief,pillar:e.target.value})} />
+              </div>
+            </div>
+            <div className="form-row">
+              <label className="form-label">Hook Angle</label>
+              <select className="form-select" value={brief.hook_angle} onChange={e => setBrief({...brief,hook_angle:e.target.value})}>
+                <option value="">Select hook type...</option>
+                {HOOK_TYPES.map(h => <option key={h}>{h}</option>)}
+              </select>
+            </div>
+          </div>
+
+          <div>
+            {brief.title ? (
+              <div className="panel">
+                <div className="sec-title" style={{ marginBottom:14 }}>Generated Brief</div>
+                <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+                  {[
+                    ['Platform',brief.platform],
+                    ['Content Pillar',brief.pillar||'—'],
+                    ['Hook Type',brief.hook_angle||'—'],
+                    ['Suggested Hook',brief.hook_angle === 'Contrarian' ? `"Stop ${brief.title.toLowerCase().replace('how','doing')} — do this instead"` :
+                      brief.hook_angle === 'Curiosity Gap' ? `"The one thing about ${brief.title.split(' ').slice(-3).join(' ')} nobody shows you"` :
+                      brief.hook_angle === 'Story' ? `"I almost quit ${brief.title.split(' ').slice(-2).join(' ')} until this happened"` :
+                      `"${brief.title}"` ],
+                    ['Caption Structure','Hook → Context → Value → CTA'],
+                    ['Ideal Length',brief.platform==='TikTok'?'15–60 sec':brief.platform==='Instagram'?'15–30 sec':brief.platform==='YouTube'?'60–90 sec':'150–300 words'],
+                    ['CTA Recommendation',brief.platform==='LinkedIn'?'Comment below':'Save this · Follow for more'],
+                  ].map(([k,v]) => (
+                    <div key={k} style={{ display:'flex', flexDirection:'column', gap:3, padding:'10px 12px', background:'var(--bg3)', border:'1px solid var(--border)', borderRadius:'var(--r-sm)' }}>
+                      <div style={{ fontSize:10, color:'var(--text3)', fontWeight:700, textTransform:'uppercase', letterSpacing:'.08em' }}>{k}</div>
+                      <div style={{ fontSize:12.5, color:'var(--text)', lineHeight:1.5 }}>{v}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="panel" style={{ display:'flex', alignItems:'center', justifyContent:'center', minHeight:280, flexDirection:'column', gap:10 }}>
+                <div style={{ fontSize:32 }}>🎬</div>
+                <div style={{ fontSize:13, color:'var(--text3)', textAlign:'center' }}>Fill in a topic and platform<br />to generate your content brief</div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {tab === 'script' && (
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:20 }}>
+          <div className="panel">
+            <div className="sec-title" style={{ marginBottom:4 }}>Script Template</div>
+            <div style={{ fontSize:11.5, color:'var(--text3)', marginBottom:18 }}>Hook → Context → Value → CTA</div>
+            {[
+              ['🎣 HOOK','The first 1–3 seconds. Pattern interrupt.','hook','e.g. "I quit making content for 30 days. Here\'s what happened."'],
+              ['🌍 CONTEXT','Why this matters and who it\'s for.','context','e.g. "Most creators grind daily and burn out. I found a different way."'],
+              ['💡 VALUE','The actual insight, teaching, or story.','value','e.g. "Batch everything. Film once, schedule for 30 days, then live your life."'],
+              ['📣 CTA','The single clear next step.','cta','e.g. "Follow for the full batch system → Link in bio"'],
+            ].map(([lbl, hint, field, placeholder]) => (
+              <div className="form-row" key={field}>
+                <label className="form-label">{lbl} <span style={{ color:'var(--text3)', fontWeight:400, marginLeft:4 }}>{hint}</span></label>
+                <textarea className="form-textarea" rows={field==='value'?4:2} placeholder={placeholder} value={script[field]} onChange={e => setScript({...script,[field]:e.target.value})} />
+              </div>
+            ))}
+          </div>
+          <div className="panel" style={{ position:'relative' }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14 }}>
+              <div className="sec-title">Script Preview</div>
+              <button className="btn btn-ghost btn-sm" onClick={() => { navigator.clipboard?.writeText(scriptTemplate); }}>Copy</button>
+            </div>
+            <pre style={{ fontFamily:'var(--font-b)', fontSize:12.5, color:'var(--text)', lineHeight:1.75, whiteSpace:'pre-wrap', background:'var(--bg3)', border:'1px solid var(--border)', borderRadius:'var(--r-sm)', padding:'16px', minHeight:300 }}>
+              {scriptTemplate}
+            </pre>
+          </div>
+        </div>
+      )}
+
+      {tab === 'batch' && (
+        <div>
+          <div className="panel" style={{ maxWidth:520, marginBottom:20 }}>
+            <div className="sec-title" style={{ marginBottom:14 }}>Batch Caption Writer</div>
+            <div className="form-row">
+              <label className="form-label">Content Topic</label>
+              <input className="form-input" placeholder="e.g. content batching, creator systems, productivity" value={batchTopic} onChange={e => setBatchTopic(e.target.value)} />
+            </div>
+            <div className="form-row">
+              <label className="form-label">Platform</label>
+              <select className="form-select" value={batchPlatform} onChange={e => setBatchPlatform(e.target.value)}>
+                {PLATFORMS.map(p => <option key={p}>{p}</option>)}
+              </select>
+            </div>
+            <div style={{ padding:'10px 14px', background:'var(--accent3)', border:'1px solid rgba(108,71,255,.2)', borderRadius:'var(--r-sm)', fontSize:11.5, color:'var(--text2)', marginTop:8 }}>
+              ✨ <strong>AI-powered batch generation</strong> coming soon. Below are template variations based on your topic.
+            </div>
+          </div>
+
+          {captionVariations.length > 0 && (
+            <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+              <div style={{ fontSize:12, fontWeight:700, color:'var(--text2)', marginBottom:4 }}>5 Caption Variations for "{batchTopic}"</div>
+              {captionVariations.map((c, i) => (
+                <div key={i} style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'var(--r-sm)', padding:'14px 16px', display:'flex', gap:12, alignItems:'flex-start' }}>
+                  <div style={{ fontFamily:'var(--font-d)', fontSize:18, fontWeight:800, color:'var(--accent2)', flexShrink:0, lineHeight:1 }}>#{i+1}</div>
+                  <div style={{ flex:1, fontSize:13, color:'var(--text)', lineHeight:1.65 }}>{c}</div>
+                  <button className="btn btn-ghost btn-sm" style={{ flexShrink:0 }} onClick={() => navigator.clipboard?.writeText(c)}>Copy</button>
+                </div>
+              ))}
+            </div>
+          )}
+          {!captionVariations.length && (
+            <div className="panel empty">Enter a topic above to generate 5 caption variations.</div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── SCHEDULER ROOM ───────────────────────────────────────────────────────────
 const PLATFORM_DEFS = [
-  { id:'youtube',   name:'YouTube Shorts', icon:'▶', color:'#ff4444', comingSoon:false },
-  { id:'instagram', name:'Instagram Reels',icon:'📷', color:'#e1306c', comingSoon:false },
-  { id:'facebook',  name:'Facebook Reels', icon:'ⓕ', color:'#1877f2', comingSoon:false },
-  { id:'linkedin',  name:'LinkedIn',        icon:'in', color:'#0a66c2', comingSoon:false },
-  { id:'tiktok',    name:'TikTok',          icon:'♪', color:'#ffffff', comingSoon:true },
-  { id:'pinterest', name:'Pinterest',        icon:'P', color:'#e60023', comingSoon:true },
+  { id:'youtube',   name:'YouTube',       icon:'▶',  color:'#ff0000', comingSoon:false },
+  { id:'instagram', name:'Instagram',     icon:'📷', color:'#e1306c', comingSoon:false },
+  { id:'tiktok',    name:'TikTok',        icon:'♪',  color:'#69c9d0', comingSoon:false },
+  { id:'twitter',   name:'X / Twitter',  icon:'𝕏',  color:'#1d9bf0', comingSoon:false },
+  { id:'threads',   name:'Threads',       icon:'@',  color:'#aaaaaa', comingSoon:false },
+  { id:'facebook',  name:'Facebook',      icon:'ⓕ', color:'#1877f2', comingSoon:false },
+  { id:'linkedin',  name:'LinkedIn',      icon:'in', color:'#0a66c2', comingSoon:false },
+  { id:'pinterest', name:'Pinterest',     icon:'P',  color:'#e60023', comingSoon:false },
 ];
 
 const DEST_META = {
-  youtube:   { label:'YT',  color:'#ff4444', bg:'rgba(255,0,0,.12)' },
+  youtube:   { label:'YT',  color:'#ff0000', bg:'rgba(255,0,0,.12)' },
   instagram: { label:'IG',  color:'#e1306c', bg:'rgba(225,48,108,.12)' },
+  tiktok:    { label:'TT',  color:'#69c9d0', bg:'rgba(105,201,208,.12)' },
+  twitter:   { label:'X',   color:'#1d9bf0', bg:'rgba(29,155,240,.12)' },
+  threads:   { label:'TH',  color:'#aaaaaa', bg:'rgba(170,170,170,.1)' },
   facebook:  { label:'FB',  color:'#1877f2', bg:'rgba(24,119,242,.12)' },
   linkedin:  { label:'LI',  color:'#0a66c2', bg:'rgba(10,102,194,.12)' },
-  tiktok:    { label:'TT',  color:'#ffffff', bg:'rgba(255,255,255,.08)' },
+  pinterest: { label:'PIN', color:'#e60023', bg:'rgba(230,0,35,.12)' },
 };
 
 function DestBadge({ id }) {
@@ -1433,16 +2079,27 @@ function DestBadge({ id }) {
   );
 }
 
-function SchedulerRoom({ activeBrand }) {
+function SchedulerRoom({ activeBrand, user }) {
+  const isAdmin = user?.is_admin === 1;
   const [tab, setTab] = useState('queue');
   const [connections, setConnections] = useState([]);
   const [posts, setPosts] = useState([]);
   const [workflows, setWorkflows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
+  const [showAddWorkflow, setShowAddWorkflow] = useState(false);
+  const [wfForm, setWfForm] = useState({ source:'', dests:[], label:'' });
   const [connecting, setConnecting] = useState(null);
+  const [manualConnect, setManualConnect] = useState(null); // { platform, setupUrl }
+  const [manualForm, setManualForm] = useState({ handle:'', access_token:'' });
   const [toast, setToast] = useState(null);
-  const [form, setForm] = useState({ title:'', caption:'', format:'Short Form Video', scheduledDate:'', scheduledTime:'09:00', dests:[] });
+  const [form, setForm] = useState({ title:'', caption:'', format:'Short Form Video', scheduledDate:'', scheduledTime:'09:00', dests:[], mediaUrl:'' });
+
+  // ── Repurpose Rules state ──────────────────────────────────────────────────
+  const [repurposeRules, setRepurposeRules] = useState([]);
+  const [showAddRule, setShowAddRule] = useState(false);
+  const [editingRule, setEditingRule] = useState(null); // rule object for edit
+  const [ruleForm, setRuleForm] = useState({ source_platform:'', dest_platforms:[], delay_hours:2, adapt_captions:1, caption_notes:'' });
 
   const showToast = (msg, type='green') => {
     setToast({ msg, type });
@@ -1451,41 +2108,93 @@ function SchedulerRoom({ activeBrand }) {
 
   const load = useCallback(async () => {
     setLoading(true);
-    try {
-      const [conns, wflows] = await Promise.all([
-        api.scheduler.platforms.list(),
-        api.scheduler.workflows.list(),
-      ]);
-      setConnections(conns);
-      setWorkflows(wflows);
-      if (activeBrand) {
+    // Use allSettled so a failed call never blocks others from showing
+    const [connsRes, wflowsRes, rulesRes] = await Promise.allSettled([
+      api.scheduler.platforms.list(),
+      api.scheduler.workflows.list(),
+      api.scheduler.repurposeRules.list(),
+    ]);
+    if (connsRes.status === 'fulfilled') setConnections(connsRes.value);
+    else console.error('[Scheduler] platforms/list failed:', connsRes.reason);
+    if (wflowsRes.status === 'fulfilled') setWorkflows(wflowsRes.value);
+    else console.error('[Scheduler] workflows/list failed:', wflowsRes.reason);
+    if (rulesRes.status === 'fulfilled') setRepurposeRules(rulesRes.value);
+    else console.error('[Scheduler] repurpose-rules/list failed:', rulesRes.reason);
+    if (activeBrand) {
+      try {
         const p = await api.scheduler.posts.list(activeBrand.id);
         setPosts(p);
-      }
-    } catch(e) { console.error(e); }
+      } catch(e) { console.error('[Scheduler] posts/list failed:', e); }
+    }
     setLoading(false);
   }, [activeBrand?.id]);
 
   useEffect(() => { load(); }, [load]);
 
+  // Check for OAuth result after same-tab redirect returns
+  useEffect(() => {
+    const raw = sessionStorage.getItem('oauth_result');
+    if (!raw) return;
+    sessionStorage.removeItem('oauth_result');
+    try {
+      const { status, platform } = JSON.parse(raw);
+      if (status === 'success') {
+        showToast(`✓ ${platform ? platform.charAt(0).toUpperCase() + platform.slice(1) : 'Platform'} connected successfully`, 'green');
+        setTab('connect');
+        load();
+      } else {
+        showToast(`Connection failed for ${platform || 'platform'} — check your OAuth credentials`, 'red');
+        setTab('connect');
+      }
+    } catch(e) { /* ignore parse errors */ }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const handleConnect = async (platformId) => {
     setConnecting(platformId);
     try {
-      const { oauth_url } = await api.scheduler.platforms.getOAuthUrl(platformId);
-      // Open OAuth popup
-      const popup = window.open(oauth_url, 'oauth', 'width=500,height=700,left=300,top=100');
-      // Poll for callback
-      const poll = setInterval(() => {
-        if (popup?.closed) {
-          clearInterval(poll);
-          setConnecting(null);
-          load(); // Refresh connections
-          showToast(`Platform connected successfully`, 'green');
-        }
-      }, 800);
+      const data = await api.scheduler.platforms.getOAuthUrl(platformId);
+      // Safety check — if the URL has an empty client_id, credentials aren't set up
+      // (this catches old server builds before the credential-check was added)
+      const urlParams = new URL(data.oauth_url);
+      const clientId = urlParams.searchParams.get('client_id');
+      if (!clientId || clientId.trim() === '') {
+        setConnecting(null);
+        setManualConnect({ platform: platformId, setupUrl: null });
+        setManualForm({ handle:'', access_token:'' });
+        return;
+      }
+      // Save brand so we can restore it after the OAuth redirect lands back
+      if (activeBrand?.id) sessionStorage.setItem('oauth_return_brand', activeBrand.id);
+      // Same-tab redirect — never blocked by any browser popup blocker
+      window.location.href = data.oauth_url;
     } catch(e) {
       setConnecting(null);
-      showToast('Connection failed — check API keys are configured', 'red');
+      // If credentials aren't configured, open manual connect form instead
+      if (e?.status === 422 || e?.error === 'oauth_not_configured') {
+        setManualConnect({ platform: platformId, setupUrl: e?.setup_url });
+        setManualForm({ handle:'', access_token:'' });
+      } else {
+        showToast('Connection failed — check server is running', 'red');
+      }
+    }
+  };
+
+  const handleManualConnect = async () => {
+    if (!manualForm.handle.trim()) return showToast('Enter your account handle or name', 'amber');
+    if (!manualForm.access_token.trim()) return showToast('Enter your access token', 'amber');
+    try {
+      await api.scheduler.platforms.connect(manualConnect.platform, {
+        handle: manualForm.handle.trim(),
+        access_token: manualForm.access_token.trim(),
+      });
+      const platform = manualConnect.platform;
+      setManualConnect(null);
+      setManualForm({ handle:'', access_token:'' });
+      await load(); // wait for refresh so the new connection shows immediately
+      showToast(`✓ ${platform.charAt(0).toUpperCase() + platform.slice(1)} connected`, 'green');
+    } catch(e) {
+      showToast(e?.message || 'Failed to save connection — check server is running', 'red');
     }
   };
 
@@ -1495,10 +2204,18 @@ function SchedulerRoom({ activeBrand }) {
     showToast('Platform disconnected');
   };
 
+  const handleDisconnectById = async (connId, handle) => {
+    await api.scheduler.platforms.disconnectById(connId);
+    load();
+    showToast(`Disconnected ${handle || 'account'}`);
+  };
+
   const handleAddPost = async () => {
     if (!form.title.trim()) return showToast('Add a title', 'amber');
     if (!form.dests.length) return showToast('Select at least one platform', 'amber');
     if (!form.scheduledDate) return showToast('Set a date', 'amber');
+    const needsMedia = form.dests.some(d => d === 'youtube' || d === 'instagram');
+    if (needsMedia && !form.mediaUrl.trim()) return showToast('YouTube & Instagram require a media URL', 'amber');
     const scheduledAt = `${form.scheduledDate}T${form.scheduledTime}:00`;
     try {
       await api.scheduler.posts.create({
@@ -1508,8 +2225,9 @@ function SchedulerRoom({ activeBrand }) {
         format: form.format,
         destinations: form.dests,
         scheduled_at: scheduledAt,
+        media_urls: form.mediaUrl.trim() ? [form.mediaUrl.trim()] : [],
       });
-      setForm({ title:'', caption:'', format:'Short Form Video', scheduledDate:'', scheduledTime:'09:00', dests:[] });
+      setForm({ title:'', caption:'', format:'Short Form Video', scheduledDate:'', scheduledTime:'09:00', dests:[], mediaUrl:'' });
       setShowAdd(false);
       load();
       showToast('✓ Post scheduled', 'green');
@@ -1540,11 +2258,99 @@ function SchedulerRoom({ activeBrand }) {
     load();
   };
 
+  const handleAddWorkflow = async () => {
+    if (!wfForm.source) return showToast('Pick a source platform', 'amber');
+    if (!wfForm.dests.length) return showToast('Pick at least one destination', 'amber');
+    if (wfForm.dests.includes(wfForm.source)) return showToast('Source and destination can\'t be the same', 'amber');
+    try {
+      await api.scheduler.workflows.create({
+        brand_id: activeBrand?.id,
+        source_platform: wfForm.source,
+        destinations: wfForm.dests,
+        label: wfForm.label.trim() || undefined,
+      });
+      setWfForm({ source:'', dests:[], label:'' });
+      setShowAddWorkflow(false);
+      load();
+      showToast('✓ Workflow created', 'green');
+    } catch(e) { showToast('Failed to create workflow', 'red'); }
+  };
+
+  const toggleWfDest = (id) => {
+    setWfForm(f => ({
+      ...f,
+      dests: f.dests.includes(id) ? f.dests.filter(d=>d!==id) : [...f.dests, id]
+    }));
+  };
+
   const toggleDest = (id) => {
     setForm(f => ({
       ...f,
       dests: f.dests.includes(id) ? f.dests.filter(d=>d!==id) : [...f.dests, id]
     }));
+  };
+
+  // ── Repurpose Rule handlers ────────────────────────────────────────────────
+  const toggleRuleDest = (id) => {
+    setRuleForm(f => ({
+      ...f,
+      dest_platforms: f.dest_platforms.includes(id) ? f.dest_platforms.filter(d=>d!==id) : [...f.dest_platforms, id]
+    }));
+  };
+
+  const openAddRule = () => {
+    setEditingRule(null);
+    setRuleForm({ source_platform:'', dest_platforms:[], delay_hours:2, adapt_captions:1, caption_notes:'' });
+    setShowAddRule(true);
+  };
+
+  const openEditRule = (rule) => {
+    setEditingRule(rule);
+    setRuleForm({
+      source_platform: rule.source_platform,
+      dest_platforms: rule.dest_platforms || [],
+      delay_hours: rule.delay_hours ?? 2,
+      adapt_captions: rule.adapt_captions ?? 1,
+      caption_notes: rule.caption_notes || '',
+    });
+    setShowAddRule(true);
+  };
+
+  const handleSaveRule = async () => {
+    if (!ruleForm.source_platform) return showToast('Pick a source platform', 'amber');
+    if (!ruleForm.dest_platforms.length) return showToast('Pick at least one destination', 'amber');
+    if (ruleForm.dest_platforms.includes(ruleForm.source_platform)) return showToast("Source and destination can't be the same", 'amber');
+    try {
+      const payload = {
+        brand_id: activeBrand?.id,
+        source_platform: ruleForm.source_platform,
+        dest_platforms: ruleForm.dest_platforms,
+        delay_hours: Number(ruleForm.delay_hours) || 2,
+        adapt_captions: ruleForm.adapt_captions ? 1 : 0,
+        caption_notes: ruleForm.caption_notes.trim(),
+      };
+      if (editingRule) {
+        await api.scheduler.repurposeRules.update(editingRule.id, payload);
+        showToast('✓ Rule updated', 'green');
+      } else {
+        await api.scheduler.repurposeRules.create(payload);
+        showToast('✓ Repurpose rule created', 'green');
+      }
+      setShowAddRule(false);
+      setEditingRule(null);
+      load();
+    } catch(e) { showToast(e?.message || 'Failed to save rule', 'red'); }
+  };
+
+  const handleToggleRule = async (rule) => {
+    await api.scheduler.repurposeRules.update(rule.id, { active: !rule.active });
+    load();
+  };
+
+  const handleDeleteRule = async (id) => {
+    await api.scheduler.repurposeRules.delete(id);
+    load();
+    showToast('Rule deleted');
   };
 
   if (loading) return <div className="page"><div className="loading"><I n="refresh" s={16} c="spin" /> Loading scheduler...</div></div>;
@@ -1633,7 +2439,7 @@ function SchedulerRoom({ activeBrand }) {
 
       {/* Tabs */}
       <div className="tabs">
-        {[['queue','📋 Queue'],['workflows','⚡ Workflows'],['connect','🔌 Platforms']].map(([t,lbl]) => (
+        {[['queue','📋 Queue'],['repurpose','🔄 Repurpose'],['workflows','⚡ Workflows'],['connect','🔌 Platforms'],['log','📊 Log']].map(([t,lbl]) => (
           <button key={t} className={`tab ${tab===t?'active':''}`} onClick={() => setTab(t)}>{lbl}</button>
         ))}
       </div>
@@ -1710,12 +2516,106 @@ function SchedulerRoom({ activeBrand }) {
         </div>
       )}
 
+      {/* ── Repurpose Tab ── */}
+      {tab === 'repurpose' && (
+        <div>
+          <div className="sec-hdr">
+            <div className="sec-title">Auto-Repurpose Engine</div>
+            <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+              <span style={{ fontSize:11, color:'var(--text3)' }}>Publish once → auto-schedule everywhere</span>
+              <button className="btn btn-primary btn-sm" onClick={openAddRule}>
+                <I n="plus" s={12} /> New Rule
+              </button>
+            </div>
+          </div>
+
+          {/* Explainer banner */}
+          <div style={{ background:'var(--accent3)', border:'1px solid rgba(108,71,255,.2)', borderRadius:'var(--r-sm)', padding:'12px 16px', marginBottom:18, display:'flex', gap:12, alignItems:'flex-start' }}>
+            <span style={{ fontSize:20, flexShrink:0 }}>🔄</span>
+            <div>
+              <div style={{ fontSize:12.5, fontWeight:700, color:'var(--accent2)', marginBottom:3 }}>How the Repurpose Engine Works</div>
+              <div style={{ fontSize:11.5, color:'var(--text2)', lineHeight:1.6 }}>
+                When a post publishes to a source platform, CCC OS automatically schedules derivative posts to your chosen destinations — with AI-adapted captions per platform. Like repurpose.io, but built in.
+              </div>
+            </div>
+          </div>
+
+          {/* Rules list */}
+          {repurposeRules.length === 0 && (
+            <div className="panel empty">
+              No repurpose rules yet. Create one to auto-distribute your content across platforms.
+            </div>
+          )}
+          {repurposeRules.map(rule => {
+            const srcDef = PLATFORM_DEFS.find(p => p.id === rule.source_platform);
+            const destDefs = (rule.dest_platforms || []).map(d => PLATFORM_DEFS.find(p => p.id === d)).filter(Boolean);
+            return (
+              <div key={rule.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'13px 16px', background:'var(--surface)', border:`1px solid ${rule.active ? 'rgba(108,71,255,.2)' : 'var(--border)'}`, borderRadius:'var(--r-sm)', marginBottom:8, opacity: rule.active ? 1 : 0.6, transition:'all .15s' }}>
+                {/* Source */}
+                <div style={{ display:'flex', alignItems:'center', gap:7, flexShrink:0 }}>
+                  <span style={{ fontSize:18 }}>{srcDef?.icon || '•'}</span>
+                  <div>
+                    <div style={{ fontSize:11.5, fontWeight:700, color:'var(--text)' }}>{srcDef?.name || rule.source_platform}</div>
+                    <div style={{ fontSize:10, color:'var(--text3)' }}>source</div>
+                  </div>
+                </div>
+
+                {/* Arrow */}
+                <div style={{ color:'var(--accent2)', fontSize:16, fontWeight:700, flexShrink:0 }}>→</div>
+
+                {/* Destinations */}
+                <div style={{ display:'flex', gap:5, flex:1, flexWrap:'wrap', alignItems:'center' }}>
+                  {destDefs.map(d => <DestBadge key={d.id} id={d.id} />)}
+                </div>
+
+                {/* Meta */}
+                <div style={{ display:'flex', flexDirection:'column', gap:3, alignItems:'flex-end', flexShrink:0 }}>
+                  <span style={{ fontSize:10.5, color:'var(--text3)' }}>⏱ {rule.delay_hours}h delay</span>
+                  <span style={{ fontSize:10.5, color: rule.adapt_captions ? 'var(--accent2)' : 'var(--text3)' }}>
+                    {rule.adapt_captions ? '✦ AI captions' : '○ Copy caption'}
+                  </span>
+                </div>
+
+                {/* Active toggle */}
+                <div style={{ display:'flex', alignItems:'center', gap:8, flexShrink:0 }}>
+                  <span style={{ fontSize:10.5, color: rule.active ? 'var(--green)' : 'var(--text3)', fontWeight:600 }}>{rule.active ? 'Active' : 'Paused'}</span>
+                  <button onClick={() => handleToggleRule(rule)}
+                    style={{ width:36, height:20, borderRadius:10, background: rule.active ? 'var(--green)' : 'var(--surface2)', border:'none', cursor:'pointer', position:'relative', transition:'background .15s', flexShrink:0 }}>
+                    <span style={{ position:'absolute', top:2, left: rule.active ? 18 : 2, width:16, height:16, borderRadius:'50%', background:'#fff', transition:'left .15s', display:'block' }} />
+                  </button>
+                </div>
+
+                {/* Edit / Delete */}
+                <div style={{ display:'flex', gap:5, flexShrink:0 }}>
+                  <button className="btn btn-ghost btn-sm btn-icon" onClick={() => openEditRule(rule)} title="Edit rule"><I n="edit" s={11} /></button>
+                  <button className="btn btn-ghost btn-sm btn-icon" onClick={() => handleDeleteRule(rule.id)} title="Delete rule"><I n="trash" s={11} /></button>
+                </div>
+              </div>
+            );
+          })}
+
+          {/* Stats footer */}
+          {repurposeRules.length > 0 && (
+            <div style={{ marginTop:14, padding:'10px 14px', background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'var(--r-sm)', display:'flex', gap:24, fontSize:11.5, color:'var(--text3)' }}>
+              <span>📋 <strong style={{ color:'var(--text)' }}>{repurposeRules.length}</strong> rule{repurposeRules.length!==1?'s':''} total</span>
+              <span>✅ <strong style={{ color:'var(--green)' }}>{repurposeRules.filter(r=>r.active).length}</strong> active</span>
+              <span>✦ <strong style={{ color:'var(--accent2)' }}>{repurposeRules.filter(r=>r.adapt_captions).length}</strong> using AI captions</span>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* ── Workflows Tab ── */}
       {tab === 'workflows' && (
         <div>
           <div className="sec-hdr">
             <div className="sec-title">Auto-Distribution Workflows</div>
-            <span style={{ fontSize:11, color:'var(--text3)' }}>Post once → publish everywhere</span>
+            <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+              <span style={{ fontSize:11, color:'var(--text3)' }}>Post once → publish everywhere</span>
+              <button className="btn btn-primary btn-sm" onClick={() => setShowAddWorkflow(true)}>
+                <I n="plus" s={12} /> Add Workflow
+              </button>
+            </div>
           </div>
           <div style={{ background:'var(--accent3)', border:'1px solid rgba(108,71,255,.2)', borderRadius:'var(--r-sm)', padding:'12px 16px', marginBottom:18, display:'flex', gap:10, alignItems:'center' }}>
             <span style={{ fontSize:18 }}>⚡</span>
@@ -1752,35 +2652,315 @@ function SchedulerRoom({ activeBrand }) {
         <div>
           <div className="sec-hdr">
             <div className="sec-title">Connect Your Platforms</div>
-            <span style={{ fontSize:11, color:'var(--text3)' }}>🔒 OAuth only — passwords never shared</span>
+            <button className="btn btn-ghost btn-sm" onClick={load} title="Refresh connections">
+              <I n="refresh" s={12} /> Refresh
+            </button>
           </div>
           <div style={{ background:'var(--green-d)', border:'1px solid rgba(34,197,94,.2)', borderRadius:'var(--r-sm)', padding:'11px 15px', marginBottom:18, fontSize:11.5, color:'var(--text2)' }}>
             🔒 Platforms connect via secure OAuth 2.0. We store only an access token — never your password. Disconnect any time.
           </div>
           <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:12 }}>
             {PLATFORM_DEFS.map(p => {
-              const conn = connections.find(c => c.platform === p.id && c.connected);
+              // All connected accounts for this platform
+              const platformConns = connections.filter(c => c.platform === p.id && c.connected);
+              const conn = platformConns[0]; // primary (first)
               const isConnecting = connecting === p.id;
               return (
                 <div key={p.id} style={{ background: conn?'var(--green-d)':p.comingSoon?'var(--surface)':'var(--surface)', border:`2px solid ${conn?'rgba(34,197,94,.35)':'var(--border)'}`, borderRadius:'var(--r)', padding:'18px 14px', textAlign:'center', opacity: p.comingSoon?.5:1 }}>
                   <div style={{ fontSize:28, marginBottom:8 }}>{p.icon}</div>
-                  <div style={{ fontFamily:'var(--font-d)', fontSize:12.5, fontWeight:700, color:'var(--text)', marginBottom:4 }}>{p.name}</div>
-                  {conn && <div style={{ fontSize:10.5, color:'var(--green)', marginBottom:8 }}>● {conn.handle || 'Connected'}</div>}
+                  <div style={{ fontFamily:'var(--font-d)', fontSize:12.5, fontWeight:700, color:'var(--text)', marginBottom:6 }}>{p.name}</div>
+
+                  {/* Show all connected accounts */}
+                  {platformConns.length > 0 && (
+                    <div style={{ marginBottom:8 }}>
+                      {platformConns.map(c => (
+                        <div key={c.id} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:6, padding:'4px 6px', background:'rgba(34,197,94,.08)', borderRadius:6, marginBottom:4, fontSize:10.5 }}>
+                          <span style={{ color:'var(--green)', fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', maxWidth:120 }}>● {c.handle || 'Connected'}</span>
+                          {isAdmin && (
+                            <button className="btn btn-ghost btn-sm btn-icon" style={{ padding:'1px 4px', minWidth:'unset' }} onClick={() => handleDisconnectById(c.id, c.handle)} title="Disconnect this account">
+                              <I n="x" s={9} />
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
                   {!conn && !p.comingSoon && <div style={{ fontSize:10.5, color:'var(--text3)', marginBottom:8 }}>Not connected</div>}
                   {p.comingSoon && <div style={{ fontSize:10.5, color:'var(--text3)', marginBottom:8 }}>Coming Soon</div>}
+
                   {!p.comingSoon && (
-                    conn
-                      ? <button className="btn btn-danger btn-sm" style={{ width:'100%', justifyContent:'center' }} onClick={() => handleDisconnect(p.id)}>Disconnect</button>
-                      : <button className="btn btn-primary btn-sm" style={{ width:'100%', justifyContent:'center', background: isConnecting?'var(--surface2)':'var(--accent)' }} onClick={() => handleConnect(p.id)} disabled={isConnecting}>
-                          {isConnecting ? 'Connecting...' : 'Connect →'}
+                    <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                      {/* Connect / Add another button */}
+                      <button
+                        className="btn btn-primary btn-sm"
+                        style={{ width:'100%', justifyContent:'center', background: isConnecting?'var(--surface2)':'var(--accent)' }}
+                        onClick={() => handleConnect(p.id)}
+                        disabled={isConnecting}
+                      >
+                        {isConnecting ? 'Connecting...' : conn ? (isAdmin ? '+ Add Account' : 'Reconnect') : 'Connect →'}
+                      </button>
+                      {/* Disconnect all (non-admin, or admin convenience) */}
+                      {conn && !isAdmin && (
+                        <button className="btn btn-danger btn-sm" style={{ width:'100%', justifyContent:'center' }} onClick={() => handleDisconnect(p.id)}>
+                          Disconnect
                         </button>
+                      )}
+                    </div>
                   )}
                 </div>
               );
             })}
           </div>
           <div style={{ marginTop:20, padding:'14px 18px', background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'var(--r)', fontSize:12, color:'var(--text3)', lineHeight:1.6 }}>
-            <strong style={{ color:'var(--text2)' }}>Phase 1 supports:</strong> YouTube, Instagram, Facebook, LinkedIn. TikTok and Pinterest are in Phase 2. To enable OAuth, add your platform app credentials to the <code style={{ background:'var(--surface2)', padding:'1px 5px', borderRadius:4, fontSize:11 }}>.env</code> file before deploying.
+            <strong style={{ color:'var(--text2)' }}>All 8 platforms supported:</strong> YouTube, Instagram, TikTok, X/Twitter, Threads, Facebook, LinkedIn, Pinterest. To enable OAuth for each platform, add the corresponding credentials to the <code style={{ background:'var(--surface2)', padding:'1px 5px', borderRadius:4, fontSize:11 }}>.env</code> file. Threads reuses your Instagram/Meta app credentials — no separate app needed.
+          </div>
+        </div>
+      )}
+
+      {/* ── Log Tab ── */}
+      {tab === 'log' && <SchedulerLogTab activeBrand={activeBrand} />}
+
+      {/* ── Manual Connect Modal ── */}
+      {manualConnect && (
+        <div className="modal-overlay" onClick={() => setManualConnect(null)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-title">
+              {PLATFORM_DEFS.find(p => p.id === manualConnect.platform)?.icon} Manual Connect — {manualConnect.platform.charAt(0).toUpperCase() + manualConnect.platform.slice(1)}
+            </div>
+
+            <div style={{ background:'var(--amber-d)', border:'1px solid rgba(245,158,11,.25)', borderRadius:'var(--r-sm)', padding:'11px 14px', marginBottom:18, fontSize:12, color:'var(--text2)', lineHeight:1.6 }}>
+              ⚠️ <strong style={{ color:'var(--amber)' }}>OAuth credentials not set up yet.</strong><br />
+              You can paste an access token directly to connect now, or{' '}
+              {manualConnect.setupUrl && <><a href={manualConnect.setupUrl} target="_blank" rel="noreferrer" style={{ color:'var(--accent2)' }}>create a developer app here</a> and add the credentials to your </>}
+              <code style={{ background:'var(--surface2)', padding:'1px 5px', borderRadius:4, fontSize:11 }}>.env</code> file to enable full OAuth.
+            </div>
+
+            <div className="form-row">
+              <label className="form-label">Account Handle / Name</label>
+              <input
+                className="form-input"
+                placeholder={manualConnect.platform === 'youtube' ? 'My YouTube Channel' : manualConnect.platform === 'instagram' ? '@yourusername' : manualConnect.platform === 'linkedin' ? 'urn:li:person:xxxx' : 'Page ID or name'}
+                value={manualForm.handle}
+                onChange={e => setManualForm(f => ({ ...f, handle: e.target.value }))}
+                autoFocus
+              />
+            </div>
+
+            <div className="form-row">
+              <label className="form-label">Access Token</label>
+              <textarea
+                className="form-textarea"
+                rows={3}
+                placeholder="Paste your access token here..."
+                value={manualForm.access_token}
+                onChange={e => setManualForm(f => ({ ...f, access_token: e.target.value }))}
+                style={{ fontFamily:'monospace', fontSize:11 }}
+              />
+              <div style={{ fontSize:11, color:'var(--text3)', marginTop:5, lineHeight:1.5 }}>
+                {manualConnect.platform === 'youtube' && 'Get from Google OAuth Playground: oauth2.googleapis.com/device/code — needs youtube.upload scope.'}
+                {manualConnect.platform === 'instagram' && 'Get from Meta Graph Explorer (graph.facebook.com/explorer) — needs instagram_content_publish scope.'}
+                {manualConnect.platform === 'facebook' && 'Get from Meta Graph Explorer — Page access token with pages_manage_posts scope.'}
+                {manualConnect.platform === 'linkedin' && 'Get from LinkedIn OAuth token generator — needs w_member_social scope.'}
+              </div>
+            </div>
+
+            <div className="modal-acts">
+              <button className="btn btn-ghost" onClick={() => setManualConnect(null)}>Cancel</button>
+              <button className="btn btn-primary" onClick={handleManualConnect}>
+                <I n="link" s={13} /> Save Connection
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Add Workflow Modal ── */}
+      {showAddWorkflow && (
+        <div className="modal-overlay" onClick={() => setShowAddWorkflow(false)}>
+          <div className="modal modal-lg" onClick={e => e.stopPropagation()}>
+            <div className="modal-title">New Auto-Distribution Workflow</div>
+            <div style={{ fontSize:12, color:'var(--text3)', marginBottom:18, lineHeight:1.5 }}>
+              Choose where you post first (source), then where CCC OS should auto-distribute it.
+            </div>
+
+            {/* Source platform */}
+            <div className="form-row">
+              <label className="form-label">Source Platform <span style={{ color:'var(--text3)', fontWeight:400 }}>(where you post first)</span></label>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                {PLATFORM_DEFS.filter(p => !p.comingSoon).map(p => {
+                  const sel = wfForm.source === p.id;
+                  const conn = connections.find(c => c.platform === p.id && c.connected);
+                  return (
+                    <div key={p.id} onClick={() => setWfForm(f => ({ ...f, source: p.id }))}
+                      style={{ display:'flex', alignItems:'center', gap:9, padding:'9px 12px', background: sel ? 'var(--accent3)' : 'var(--surface)', border:`1px solid ${sel ? 'var(--accent)' : 'var(--border)'}`, borderRadius:'var(--r-sm)', cursor:'pointer', transition:'all .12s' }}>
+                      <div style={{ width:16, height:16, borderRadius:'50%', border:`2px solid ${sel ? 'var(--accent)' : 'var(--border2)'}`, background: sel ? 'var(--accent)' : 'transparent', display:'flex', alignItems:'center', justifyContent:'center', fontSize:9, color:'#fff', flexShrink:0 }}>{sel ? '●' : ''}</div>
+                      <span style={{ fontSize:15 }}>{p.icon}</span>
+                      <span style={{ fontSize:12, fontWeight:600, color:'var(--text)', flex:1 }}>{p.name}</span>
+                      {!conn && <span style={{ fontSize:10, color:'var(--amber)' }}>Not connected</span>}
+                      {conn && <span style={{ fontSize:10, color:'var(--green)' }}>● Live</span>}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Destination platforms */}
+            <div className="form-row">
+              <label className="form-label">Distribute To <span style={{ color:'var(--text3)', fontWeight:400 }}>(auto-post to these)</span></label>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                {PLATFORM_DEFS.filter(p => !p.comingSoon && p.id !== wfForm.source).map(p => {
+                  const sel = wfForm.dests.includes(p.id);
+                  const conn = connections.find(c => c.platform === p.id && c.connected);
+                  return (
+                    <div key={p.id} onClick={() => toggleWfDest(p.id)}
+                      style={{ display:'flex', alignItems:'center', gap:9, padding:'9px 12px', background: sel ? 'var(--accent3)' : 'var(--surface)', border:`1px solid ${sel ? 'var(--accent)' : 'var(--border)'}`, borderRadius:'var(--r-sm)', cursor:'pointer', transition:'all .12s' }}>
+                      <div style={{ width:16, height:16, borderRadius:4, border:`1px solid ${sel ? 'var(--accent)' : 'var(--border2)'}`, background: sel ? 'var(--accent)' : 'transparent', display:'flex', alignItems:'center', justifyContent:'center', fontSize:10, color:'#fff', flexShrink:0 }}>{sel ? '✓' : ''}</div>
+                      <span style={{ fontSize:15 }}>{p.icon}</span>
+                      <span style={{ fontSize:12, fontWeight:600, color:'var(--text)', flex:1 }}>{p.name}</span>
+                      {!conn && <span style={{ fontSize:10, color:'var(--amber)' }}>Not connected</span>}
+                      {conn && <span style={{ fontSize:10, color:'var(--green)' }}>● Live</span>}
+                    </div>
+                  );
+                })}
+                {!wfForm.source && (
+                  <div style={{ gridColumn:'1/-1', fontSize:11.5, color:'var(--text3)', padding:'8px 0' }}>
+                    Pick a source platform first to see destinations.
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Optional label */}
+            <div className="form-row">
+              <label className="form-label">Label <span style={{ color:'var(--text3)', fontWeight:400 }}>(optional)</span></label>
+              <input className="form-input" placeholder={wfForm.source ? `${PLATFORM_DEFS.find(p=>p.id===wfForm.source)?.name || wfForm.source} → auto` : 'e.g. YouTube → everywhere'} value={wfForm.label} onChange={e => setWfForm(f => ({ ...f, label: e.target.value }))} />
+            </div>
+
+            {/* Preview */}
+            {wfForm.source && wfForm.dests.length > 0 && (
+              <div style={{ background:'var(--accent3)', border:'1px solid rgba(108,71,255,.2)', borderRadius:'var(--r-sm)', padding:'10px 14px', marginBottom:14, display:'flex', alignItems:'center', gap:10, fontSize:12 }}>
+                <span style={{ fontSize:16 }}>{PLATFORM_DEFS.find(p=>p.id===wfForm.source)?.icon}</span>
+                <strong style={{ color:'var(--text)' }}>{PLATFORM_DEFS.find(p=>p.id===wfForm.source)?.name}</strong>
+                <span style={{ color:'var(--accent2)', fontWeight:700 }}>→</span>
+                <div style={{ display:'flex', gap:5, flexWrap:'wrap' }}>
+                  {wfForm.dests.map(d => <DestBadge key={d} id={d} />)}
+                </div>
+                <span style={{ color:'var(--text3)', marginLeft:'auto' }}>will auto-distribute</span>
+              </div>
+            )}
+
+            <div className="modal-acts">
+              <button className="btn btn-ghost" onClick={() => { setShowAddWorkflow(false); setWfForm({ source:'', dests:[], label:'' }); }}>Cancel</button>
+              <button className="btn btn-primary" onClick={handleAddWorkflow}>
+                <I n="zap" s={13} /> Create Workflow
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Add / Edit Repurpose Rule Modal ── */}
+      {showAddRule && (
+        <div className="modal-overlay" onClick={() => { setShowAddRule(false); setEditingRule(null); }}>
+          <div className="modal modal-lg" onClick={e => e.stopPropagation()}>
+            <div className="modal-title">{editingRule ? '✏️ Edit Repurpose Rule' : '🔄 New Repurpose Rule'}</div>
+            <div style={{ fontSize:12, color:'var(--text3)', marginBottom:18, lineHeight:1.5 }}>
+              When a post publishes to the <strong style={{ color:'var(--text2)' }}>source</strong> platform, CCC OS will auto-schedule it to the <strong style={{ color:'var(--text2)' }}>destinations</strong> after a delay — with AI-adapted captions.
+            </div>
+
+            {/* Source platform */}
+            <div className="form-row">
+              <label className="form-label">Source Platform <span style={{ color:'var(--text3)', fontWeight:400 }}>(when this publishes…)</span></label>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                {PLATFORM_DEFS.map(p => {
+                  const sel = ruleForm.source_platform === p.id;
+                  const conn = connections.find(c => c.platform === p.id && c.connected);
+                  return (
+                    <div key={p.id} onClick={() => setRuleForm(f => ({ ...f, source_platform: p.id, dest_platforms: f.dest_platforms.filter(d => d !== p.id) }))}
+                      style={{ display:'flex', alignItems:'center', gap:9, padding:'9px 12px', background: sel ? 'var(--accent3)' : 'var(--surface)', border:`1px solid ${sel ? 'var(--accent)' : 'var(--border)'}`, borderRadius:'var(--r-sm)', cursor:'pointer', transition:'all .12s' }}>
+                      <div style={{ width:16, height:16, borderRadius:'50%', border:`2px solid ${sel ? 'var(--accent)' : 'var(--border2)'}`, background: sel ? 'var(--accent)' : 'transparent', display:'flex', alignItems:'center', justifyContent:'center', fontSize:9, color:'#fff', flexShrink:0 }}>{sel ? '●' : ''}</div>
+                      <span style={{ fontSize:15 }}>{p.icon}</span>
+                      <span style={{ fontSize:12, fontWeight:600, color:'var(--text)', flex:1 }}>{p.name}</span>
+                      {conn && <span style={{ fontSize:10, color:'var(--green)' }}>● Live</span>}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Destination platforms */}
+            <div className="form-row">
+              <label className="form-label">Auto-Schedule To <span style={{ color:'var(--text3)', fontWeight:400 }}>(…then post to these)</span></label>
+              {!ruleForm.source_platform && <div style={{ fontSize:11.5, color:'var(--text3)', padding:'6px 0' }}>Pick a source platform first.</div>}
+              {ruleForm.source_platform && (
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                  {PLATFORM_DEFS.filter(p => p.id !== ruleForm.source_platform).map(p => {
+                    const sel = ruleForm.dest_platforms.includes(p.id);
+                    const conn = connections.find(c => c.platform === p.id && c.connected);
+                    return (
+                      <div key={p.id} onClick={() => toggleRuleDest(p.id)}
+                        style={{ display:'flex', alignItems:'center', gap:9, padding:'9px 12px', background: sel ? 'var(--accent3)' : 'var(--surface)', border:`1px solid ${sel ? 'var(--accent)' : 'var(--border)'}`, borderRadius:'var(--r-sm)', cursor:'pointer', transition:'all .12s' }}>
+                        <div style={{ width:16, height:16, borderRadius:4, border:`1px solid ${sel ? 'var(--accent)' : 'var(--border2)'}`, background: sel ? 'var(--accent)' : 'transparent', display:'flex', alignItems:'center', justifyContent:'center', fontSize:10, color:'#fff', flexShrink:0 }}>{sel ? '✓' : ''}</div>
+                        <span style={{ fontSize:15 }}>{p.icon}</span>
+                        <span style={{ fontSize:12, fontWeight:600, color:'var(--text)', flex:1 }}>{p.name}</span>
+                        {conn && <span style={{ fontSize:10, color:'var(--green)' }}>● Connected</span>}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Delay + AI toggle */}
+            <div className="form-row-2">
+              <div>
+                <label className="form-label">Delay After Publish</label>
+                <select className="form-select" value={ruleForm.delay_hours} onChange={e => setRuleForm(f => ({ ...f, delay_hours: Number(e.target.value) }))}>
+                  {[0,1,2,4,6,12,24,48].map(h => <option key={h} value={h}>{h === 0 ? 'Immediately' : `${h} hour${h !== 1 ? 's' : ''}`}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="form-label">Caption Adaptation</label>
+                <div style={{ display:'flex', gap:8, marginTop:2 }}>
+                  {[{ v:1, lbl:'✦ AI-adapted', desc:'Rewrite per platform style' }, { v:0, lbl:'○ Copy as-is', desc:'Same caption on all' }].map(opt => (
+                    <div key={opt.v} onClick={() => setRuleForm(f => ({ ...f, adapt_captions: opt.v }))}
+                      style={{ flex:1, padding:'8px 10px', background: ruleForm.adapt_captions === opt.v ? 'var(--accent3)' : 'var(--surface)', border:`1px solid ${ruleForm.adapt_captions === opt.v ? 'var(--accent)' : 'var(--border)'}`, borderRadius:'var(--r-sm)', cursor:'pointer', transition:'all .12s' }}>
+                      <div style={{ fontSize:11.5, fontWeight:700, color: ruleForm.adapt_captions === opt.v ? 'var(--accent2)' : 'var(--text)' }}>{opt.lbl}</div>
+                      <div style={{ fontSize:10.5, color:'var(--text3)', marginTop:2 }}>{opt.desc}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Caption notes (only when AI is on) */}
+            {ruleForm.adapt_captions === 1 && (
+              <div className="form-row">
+                <label className="form-label">AI Caption Notes <span style={{ color:'var(--text3)', fontWeight:400 }}>(optional — hints for the AI)</span></label>
+                <input className="form-input" placeholder='e.g. "Always add 3 hashtags, keep it under 100 words, end with a question"' value={ruleForm.caption_notes} onChange={e => setRuleForm(f => ({ ...f, caption_notes: e.target.value }))} />
+              </div>
+            )}
+
+            {/* Preview */}
+            {ruleForm.source_platform && ruleForm.dest_platforms.length > 0 && (
+              <div style={{ background:'var(--accent3)', border:'1px solid rgba(108,71,255,.2)', borderRadius:'var(--r-sm)', padding:'10px 14px', marginBottom:14, display:'flex', alignItems:'center', gap:10, fontSize:12, flexWrap:'wrap' }}>
+                <span style={{ fontSize:16 }}>{PLATFORM_DEFS.find(p => p.id === ruleForm.source_platform)?.icon}</span>
+                <strong style={{ color:'var(--text)' }}>{PLATFORM_DEFS.find(p => p.id === ruleForm.source_platform)?.name}</strong>
+                <span style={{ color:'var(--accent2)', fontWeight:700 }}>→</span>
+                <div style={{ display:'flex', gap:5, flexWrap:'wrap' }}>
+                  {ruleForm.dest_platforms.map(d => <DestBadge key={d} id={d} />)}
+                </div>
+                <span style={{ color:'var(--text3)', fontSize:11 }}>after {ruleForm.delay_hours}h · {ruleForm.adapt_captions ? 'AI captions' : 'copy caption'}</span>
+              </div>
+            )}
+
+            <div className="modal-acts">
+              <button className="btn btn-ghost" onClick={() => { setShowAddRule(false); setEditingRule(null); }}>Cancel</button>
+              <button className="btn btn-primary" onClick={handleSaveRule}>
+                <I n="zap" s={13} /> {editingRule ? 'Save Changes' : 'Create Rule'}
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -1830,6 +3010,28 @@ function SchedulerRoom({ activeBrand }) {
                 );
               })}
             </div>
+            {/* Media URL — required when YouTube or Instagram is selected */}
+            {form.dests.some(d => d === 'youtube' || d === 'instagram') && (
+              <div className="form-row">
+                <label className="form-label">
+                  Media URL <span style={{ color:'var(--red)', fontWeight:700 }}>*</span>
+                  <span style={{ color:'var(--text3)', fontWeight:400, marginLeft:6 }}>
+                    {form.dests.includes('youtube') ? '(direct .mp4/.mov video link)' : '(direct image or .mp4 video link)'}
+                  </span>
+                </label>
+                <input
+                  className="form-input"
+                  placeholder="https://cdn.example.com/your-video.mp4"
+                  value={form.mediaUrl}
+                  onChange={e => setForm({...form, mediaUrl: e.target.value})}
+                />
+                <div style={{ fontSize:11, color:'var(--text3)', marginTop:5, lineHeight:1.5 }}>
+                  {form.dests.includes('youtube') && '▶ YouTube: must be a direct .mp4 or .mov URL. CCC streams it straight to YouTube. '}
+                  {form.dests.includes('instagram') && '📷 Instagram: image URL for a photo post, .mp4/.mov URL for a Reel.'}
+                </div>
+              </div>
+            )}
+
             <div style={{ background:'var(--accent3)', border:'1px solid rgba(108,71,255,.2)', borderRadius:'var(--r-sm)', padding:'10px 13px', marginBottom:14, fontSize:11.5, color:'var(--text2)' }}>
               💡 CCC OS will cross-post to all selected platforms at the scheduled time automatically.
             </div>
@@ -1842,6 +3044,48 @@ function SchedulerRoom({ activeBrand }) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function SchedulerLogTab({ activeBrand }) {
+  const [log, setLog] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    import('../lib/api').then(({ scheduler: s }) =>
+      s.log(activeBrand?.id).then(setLog).catch(() => {}).finally(() => setLoading(false))
+    );
+  }, [activeBrand?.id]);
+
+  if (loading) return <div className="loading"><I n="refresh" s={14} c="spin" /> Loading log...</div>;
+
+  const STATUS_ICON = { success:'✅', failed:'❌', skipped:'⏭', partial:'⚠️' };
+  const STATUS_COLOR = { success:'var(--green)', failed:'var(--red)', skipped:'var(--text3)', partial:'var(--amber)' };
+
+  return (
+    <div>
+      <div className="sec-hdr">
+        <div className="sec-title">Publish Log</div>
+        <span style={{ fontSize:11, color:'var(--text3)' }}>Last 50 publish attempts</span>
+      </div>
+      <div className="panel">
+        <table className="data-table">
+          <thead><tr><th>Platform</th><th>Status</th><th>Post</th><th>Error</th><th>Time</th></tr></thead>
+          <tbody>
+            {log.map(l => (
+              <tr key={l.id}>
+                <td><span className="tag">{l.platform}</span></td>
+                <td><span style={{ color:STATUS_COLOR[l.status]||'var(--text3)', fontWeight:700 }}>{STATUS_ICON[l.status]||'·'} {l.status}</span></td>
+                <td style={{ maxWidth:200, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', color:'var(--text2)', fontSize:12 }}>{l.post_id ? l.post_id.slice(0,12)+'...' : '—'}</td>
+                <td style={{ fontSize:11.5, color:'var(--red)', maxWidth:180, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{l.error_msg||'—'}</td>
+                <td style={{ fontSize:11, color:'var(--text3)' }}>{new Date(l.published_at).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {log.length === 0 && <div className="empty">No publish activity yet.</div>}
+      </div>
     </div>
   );
 }
@@ -1908,11 +3152,29 @@ export default function App() {
     }
   }, []);
 
-  // Load brands after auth
+  // Handle OAuth callback redirects (scheduler platform connections)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const oauthStatus = params.get('oauth');
+    const oauthPlatform = params.get('platform');
+    if (oauthStatus) {
+      window.history.replaceState({}, '', '/');
+      sessionStorage.setItem('oauth_result', JSON.stringify({ status: oauthStatus, platform: oauthPlatform }));
+      setPage('scheduler');
+    }
+  }, []);
+
+  // Load brands after auth — restore brand selected before OAuth redirect if applicable
   useEffect(() => {
     if (!user) return;
     api.brands.list().then(b => {
       setBrands(b);
+      const returnBrandId = sessionStorage.getItem('oauth_return_brand');
+      if (returnBrandId) {
+        sessionStorage.removeItem('oauth_return_brand');
+        const match = b.find(br => br.id === returnBrandId);
+        if (match) { setActiveBrand(match); return; }
+      }
       if (b.length > 0 && !activeBrand) setActiveBrand(b[0]);
     });
     // Load subscription
@@ -1996,6 +3258,7 @@ export default function App() {
     { id:'scheduler', label:'Scheduler', icon:'calendar' },
     { id:'data', label:'Data Room', icon:'data' },
     { id:'monetization', label:'Monetization', icon:'money' },
+    { id:'studio', label:'Content Studio', icon:'studio', badge:'NEW' },
     { id:'billing', label:'Plans & Billing', icon:'shield' },
   ];
 
@@ -2008,6 +3271,7 @@ export default function App() {
     data: 'Data Room',
     monetization: 'Monetization Room',
     billing: 'Plans & Billing',
+    studio: 'Content Studio',
   };
 
   const renderPage = () => {
@@ -2019,7 +3283,8 @@ export default function App() {
       case 'distribution': return <DistributionRoom {...props} />;
       case 'data': return <DataRoom {...props} />;
       case 'monetization': return <MonetizationRoom {...props} />;
-      case 'scheduler': return <SchedulerRoom {...props} />;
+      case 'scheduler': return <SchedulerRoom {...props} user={user} />;
+      case 'studio': return <ContentStudioRoom activeBrand={activeBrand} />;
       case 'billing-success':
         return (
           <SuccessScreen
@@ -2093,6 +3358,7 @@ export default function App() {
               <div key={item.id} className={`s-item ${page===item.id?'active':''}`} onClick={() => setPage(item.id)}>
                 <I n={item.icon} s={14} />
                 {item.label}
+                {item.badge && <span style={{ marginLeft:'auto', fontSize:9, fontWeight:700, background:'var(--accent)', color:'#fff', padding:'1px 5px', borderRadius:3, letterSpacing:'.05em' }}>{item.badge}</span>}
               </div>
             ))}
           </nav>
@@ -2123,7 +3389,7 @@ export default function App() {
                 )}
               </div>
             )}
-            {!subscription?.active && !subscription?.is_admin && (
+            {!subscription?.active && !subscription?.is_admin && user?.is_admin !== 1 && (
               <button className="btn btn-ghost" style={{ width:'100%', justifyContent:'center', fontSize:11.5, marginBottom:4, borderColor:'rgba(108,71,255,.35)', color:'var(--accent2)' }}
                 onClick={() => setPage('billing')}>
                 ⚡ Activate Plan

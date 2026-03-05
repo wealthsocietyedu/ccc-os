@@ -39,10 +39,15 @@ router.post('/register', async (req, res) => {
       INSERT INTO users (id, email, password, name, is_admin) VALUES (?, ?, ?, ?, ?)
     `).run(userId, email.toLowerCase(), hash, name, isAdmin);
 
+    // Elevate admin to operator tier immediately on registration
+    if (isAdmin) {
+      db.prepare("UPDATE users SET tier = 'operator' WHERE id = ?").run(userId);
+    }
+
     // Seed starter data for new user
     seedUserData(userId);
 
-    const token = signToken(userId, 'starter');
+    const token = signToken(userId, isAdmin ? 'operator' : 'starter');
     const user = db.prepare('SELECT id, email, name, tier, is_admin, created_at FROM users WHERE id = ?').get(userId);
 
     res.status(201).json({ token, user });
@@ -122,8 +127,6 @@ router.patch('/me', authenticate, async (req, res) => {
   }
 });
 
-module.exports = router;
-
 // POST /api/auth/make-admin — promote a user to admin (requires ADMIN_SECRET header)
 router.post('/make-admin', (req, res) => {
   const { email } = req.body;
@@ -141,3 +144,5 @@ router.post('/make-admin', (req, res) => {
   db.prepare("UPDATE users SET is_admin = 1, tier = 'operator', updated_at = datetime('now') WHERE id = ?").run(user.id);
   res.json({ success: true, message: `${email} is now an admin with Operator access` });
 });
+
+module.exports = router;
