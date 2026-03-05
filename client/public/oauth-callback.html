@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Connecting…</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #0a0a0f;
+      color: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+    }
+    .card {
+      text-align: center;
+      padding: 52px 44px 44px;
+      background: #111118;
+      border: 1px solid #1e1e2e;
+      border-radius: 18px;
+      max-width: 360px;
+      width: 90%;
+      box-shadow: 0 24px 64px rgba(0,0,0,.6);
+    }
+    .icon { font-size: 54px; margin-bottom: 22px; line-height: 1; }
+    .title {
+      font-size: 18px;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 10px;
+      letter-spacing: -.01em;
+    }
+    .sub {
+      font-size: 13.5px;
+      color: #888;
+      line-height: 1.55;
+      min-height: 40px;
+    }
+    .badge {
+      display: inline-block;
+      margin-top: 22px;
+      padding: 5px 14px;
+      border-radius: 100px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+    }
+    .badge.success { background: rgba(34,197,94,.15); color: #22c55e; border: 1px solid rgba(34,197,94,.25); }
+    .badge.error   { background: rgba(239,68,68,.12);  color: #f87171; border: 1px solid rgba(239,68,68,.2); }
+    .close-note { margin-top: 18px; font-size: 11px; color: #444; }
+    .spinner {
+      width: 40px; height: 40px;
+      border: 3px solid #1e1e2e;
+      border-top-color: #6c47ff;
+      border-radius: 50%;
+      animation: spin .8s linear infinite;
+      margin: 0 auto 22px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div id="spinner" class="spinner"></div>
+    <div class="icon" id="icon" style="display:none"></div>
+    <div class="title" id="title">Finishing up…</div>
+    <div class="sub"   id="sub">Exchanging tokens with the platform.</div>
+    <div id="badge"></div>
+    <div class="close-note">This window closes automatically.</div>
+  </div>
+
+  <script>
+    const params   = new URLSearchParams(window.location.search);
+    const status   = params.get('status');
+    const platform = params.get('platform') || '';
+    const reason   = params.get('reason')   || '';
+    const name     = platform
+      ? platform.charAt(0).toUpperCase() + platform.slice(1)
+      : 'Platform';
+
+    const spinner = document.getElementById('spinner');
+    const icon    = document.getElementById('icon');
+    const title   = document.getElementById('title');
+    const sub     = document.getElementById('sub');
+    const badge   = document.getElementById('badge');
+
+    function show(s) {
+      spinner.style.display = 'none';
+      icon.style.display    = 'block';
+
+      if (s === 'success') {
+        icon.textContent      = '✅';
+        title.textContent     = `${name} Connected!`;
+        sub.textContent       = 'Your account has been linked to CCC OS.';
+        badge.innerHTML       = '<span class="badge success">Connected</span>';
+      } else {
+        icon.textContent  = '❌';
+        title.textContent = 'Connection Failed';
+        const msg = reason
+          ? decodeURIComponent(reason).replace(/\+/g, ' ').slice(0, 160)
+          : 'Something went wrong. Verify your OAuth credentials in Railway.';
+        sub.textContent   = msg;
+        badge.innerHTML   = '<span class="badge error">Error</span>';
+      }
+    }
+
+    // If status is already in URL (redirect landed here directly), show it
+    if (status) {
+      show(status);
+
+      // 1. Notify the opener (main CCC OS window) via postMessage
+      try {
+        if (window.opener && !window.opener.closed) {
+          window.opener.postMessage(
+            { type: 'ccc_oauth_result', status, platform, reason },
+            window.location.origin   // same origin — safe
+          );
+        }
+      } catch (e) { /* cross-origin edge case — ignore */ }
+
+      // 2. Auto-close after user sees the result
+      setTimeout(() => {
+        try { window.close(); } catch (e) {}
+        // If window.close() is blocked (e.g. not opened by script), show manual close note
+      }, 2000);
+    }
+    // else: page loaded without params — nothing to do, spinner stays briefly then closes
+    else {
+      setTimeout(() => { try { window.close(); } catch(e) {} }, 3000);
+    }
+  </script>
+</body>
+</html>

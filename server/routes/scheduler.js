@@ -231,7 +231,7 @@ router.get('/oauth/:platform/callback', async (req, res) => {
 
   if (error) {
     console.error(`[OAuth] ${platform} error:`, error);
-    return res.redirect(`${CLIENT_URL}/?oauth=error&platform=${platform}`);
+    return res.redirect(`${CLIENT_URL}/oauth-callback.html?status=error&platform=${platform}&reason=${encodeURIComponent(error)}`);
   }
 
   // Verify state JWT to recover userId
@@ -241,7 +241,7 @@ router.get('/oauth/:platform/callback', async (req, res) => {
     userId = decoded.userId;
   } catch (err) {
     console.error('[OAuth] Invalid state JWT:', err.message);
-    return res.redirect(`${CLIENT_URL}/?oauth=error&platform=${platform}&reason=state_invalid`);
+    return res.redirect(`${CLIENT_URL}/oauth-callback.html?status=error&platform=${platform}&reason=state_invalid`);
   }
 
   const db = getDB();
@@ -404,12 +404,12 @@ router.get('/oauth/:platform/callback', async (req, res) => {
     }
 
     console.log(`[OAuth] ${platform} connected for user ${userId}`);
-    res.redirect(`${CLIENT_URL}/?oauth=success&platform=${platform}`);
+    res.redirect(`${CLIENT_URL}/oauth-callback.html?status=success&platform=${platform}`);
 
   } catch (err) {
     const reason = encodeURIComponent(err.response?.data?.error_description || err.message || 'unknown');
     console.error(`[OAuth] ${platform} token exchange failed:`, err.response?.data || err.message);
-    res.redirect(`${CLIENT_URL}/?oauth=error&platform=${platform}&reason=${reason}`);
+    res.redirect(`${CLIENT_URL}/oauth-callback.html?status=error&platform=${platform}&reason=${reason}`);
   }
 });
 

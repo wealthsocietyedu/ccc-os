@@ -2131,22 +2131,47 @@ function SchedulerRoom({ activeBrand, user }) {
 
   useEffect(() => { load(); }, [load]);
 
-  // Check for OAuth result after same-tab redirect returns
+  // Handle OAuth popup result — listens for postMessage from /oauth-callback.html
+  // Also handles the same-tab fallback (when popup was blocked) via sessionStorage
   useEffect(() => {
-    const raw = sessionStorage.getItem('oauth_result');
-    if (!raw) return;
-    sessionStorage.removeItem('oauth_result');
-    try {
-      const { status, platform } = JSON.parse(raw);
+    // Popup path: postMessage from oauth-callback.html
+    const onMessage = (evt) => {
+      if (evt.data?.type !== 'ccc_oauth_result') return;
+      const { status, platform } = evt.data;
+      const name = platform ? platform.charAt(0).toUpperCase() + platform.slice(1) : 'Platform';
       if (status === 'success') {
-        showToast(`✓ ${platform ? platform.charAt(0).toUpperCase() + platform.slice(1) : 'Platform'} connected successfully`, 'green');
+        showToast(`✓ ${name} connected!`, 'green');
         setTab('connect');
         load();
       } else {
-        showToast(`Connection failed for ${platform || 'platform'} — check your OAuth credentials`, 'red');
+        const reason = evt.data.reason ? ` — ${decodeURIComponent(evt.data.reason).replace(/\+/g,' ')}` : '';
+        showToast(`${name} connection failed${reason}`, 'red');
         setTab('connect');
       }
-    } catch(e) { /* ignore parse errors */ }
+      setConnecting(null);
+    };
+    window.addEventListener('message', onMessage);
+
+    // Same-tab fallback: if popup was blocked, server redirects back to /?oauth=...
+    // The App-level useEffect writes that to sessionStorage; read it here.
+    const raw = sessionStorage.getItem('oauth_result');
+    if (raw) {
+      sessionStorage.removeItem('oauth_result');
+      try {
+        const { status, platform } = JSON.parse(raw);
+        const name = platform ? platform.charAt(0).toUpperCase() + platform.slice(1) : 'Platform';
+        if (status === 'success') {
+          showToast(`✓ ${name} connected!`, 'green');
+          setTab('connect');
+          load();
+        } else {
+          showToast(`${name} connection failed — check OAuth credentials in Railway`, 'red');
+          setTab('connect');
+        }
+      } catch(e) { /* ignore */ }
+    }
+
+    return () => window.removeEventListener('message', onMessage);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -2154,28 +2179,52 @@ function SchedulerRoom({ activeBrand, user }) {
     setConnecting(platformId);
     try {
       const data = await api.scheduler.platforms.getOAuthUrl(platformId);
-      // Safety check — if the URL has an empty client_id, credentials aren't set up
-      // (this catches old server builds before the credential-check was added)
+
+      // If client_id is empty the server env vars aren't set — fall back to manual form
       const urlParams = new URL(data.oauth_url);
       const clientId = urlParams.searchParams.get('client_id');
-      if (!clientId || clientId.trim() === '') {
+      if (!clientId || !clientId.trim()) {
         setConnecting(null);
         setManualConnect({ platform: platformId, setupUrl: null });
         setManualForm({ handle:'', access_token:'' });
         return;
       }
-      // Save brand so we can restore it after the OAuth redirect lands back
-      if (activeBrand?.id) sessionStorage.setItem('oauth_return_brand', activeBrand.id);
-      // Same-tab redirect — never blocked by any browser popup blocker
-      window.location.href = data.oauth_url;
+
+      // ── Open OAuth popup (600×700, centered) ──────────────────────────────
+      const W = 600, H = 700;
+      const left = Math.round(window.screenX + (window.outerWidth  - W) / 2);
+      const top  = Math.round(window.screenY + (window.outerHeight - H) / 2);
+      const popup = window.open(
+        data.oauth_url,
+        'ccc_oauth',
+        `width=${W},height=${H},left=${left},top=${top},scrollbars=yes,resizable=yes,noopener=no`
+      );
+
+      if (!popup || popup.closed) {
+        // Popup blocked — fall back to same-tab redirect (existing sessionStorage flow handles result)
+        if (activeBrand?.id) sessionStorage.setItem('oauth_return_brand', activeBrand.id);
+        window.location.href = data.oauth_url;
+        return;
+      }
+
+      // Poll for popup close as a safety net in case postMessage misfires
+      const poll = setInterval(() => {
+        try {
+          if (popup.closed) {
+            clearInterval(poll);
+            setConnecting(null);
+            load(); // refresh connections regardless — if connected it'll show
+          }
+        } catch(e) { clearInterval(poll); }
+      }, 600);
+
     } catch(e) {
       setConnecting(null);
-      // If credentials aren't configured, open manual connect form instead
       if (e?.status === 422 || e?.error === 'oauth_not_configured') {
         setManualConnect({ platform: platformId, setupUrl: e?.setup_url });
         setManualForm({ handle:'', access_token:'' });
       } else {
-        showToast('Connection failed — check server is running', 'red');
+        showToast('Connection failed — is the server running?', 'red');
       }
     }
   };
