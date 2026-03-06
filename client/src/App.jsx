@@ -2051,11 +2051,11 @@ function ContentStudioRoom({ activeBrand }) {
 const PLATFORM_DEFS = [
   { id:'youtube',   name:'YouTube',       icon:'▶',  color:'#ff0000', comingSoon:false },
   { id:'instagram', name:'Instagram',     icon:'📷', color:'#e1306c', comingSoon:false },
+  { id:'facebook',  name:'Facebook',      icon:'ⓕ', color:'#1877f2', comingSoon:false },
   { id:'tiktok',    name:'TikTok',        icon:'♪',  color:'#69c9d0', comingSoon:false },
   { id:'twitter',   name:'X / Twitter',  icon:'𝕏',  color:'#1d9bf0', comingSoon:false },
   { id:'threads',   name:'Threads',       icon:'@',  color:'#aaaaaa', comingSoon:false },
-  { id:'facebook',  name:'Facebook',      icon:'ⓕ', color:'#1877f2', comingSoon:false },
-  { id:'linkedin',  name:'LinkedIn',      icon:'in', color:'#0a66c2', comingSoon:false },
+  { id:'linkedin',  name:'LinkedIn',      icon:'in', color:'#0a66c2', comingSoon:true  },
   { id:'pinterest', name:'Pinterest',     icon:'P',  color:'#e60023', comingSoon:false },
 ];
 

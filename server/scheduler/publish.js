@@ -8,8 +8,9 @@ const FormData = require('form-data');
 const { v4: uuid } = require('uuid');
 const { getDB } = require('../db');
 
-const GRAPH = 'https://graph.facebook.com/v21.0';
-const GRAPH_VIDEO = 'https://graph-video.facebook.com/v21.0';
+const GRAPH       = 'https://graph.facebook.com/v21.0';        // Facebook Pages API
+const GRAPH_VIDEO = 'https://graph-video.facebook.com/v21.0';   // Facebook chunked video upload
+const IG_GRAPH    = 'https://graph.instagram.com/v21.0';         // Instagram Platform API (instagram login flow)
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
 
@@ -120,12 +121,13 @@ async function publishToYouTube(conn, post) {
 }
 
 // ─── INSTAGRAM ────────────────────────────────────────────────────────────────
-// Ref: developers.facebook.com/docs/instagram-platform/instagram-graph-api/content-publishing
-// API base: graph.facebook.com/v21.0 (NOT graph.instagram.com — that is the
-//   Basic Display API which reached end-of-life on December 4, 2024)
+// Ref: developers.instagram.com/documentation/instagram-api/content-publishing
+// Auth flow: api.instagram.com/oauth/authorize (Instagram Platform API, launched July 2024)
+// API base: graph.instagram.com/v21.0  ← matches the auth flow from api.instagram.com
+//   (graph.facebook.com is for the Instagram Graph API via Facebook pages — different auth path)
 // Flow: POST /{ig-user-id}/media → poll status_code → POST /{ig-user-id}/media_publish
-// Required token: Instagram User Access Token with instagram_content_publish scope
-// conn.handle must be the numeric IG user ID (set during OAuth)
+// Token: Instagram User Access Token from api.instagram.com/oauth/access_token
+// conn.handle = numeric IG user ID returned in short-token exchange response (user_id field)
 // Rate limit: 25 API-published posts per 24-hour period
 
 async function publishToInstagram(conn, post) {
@@ -135,54 +137,53 @@ async function publishToInstagram(conn, post) {
     return { success: false, skipped: true, reason: 'Instagram requires a media URL (image or video/Reel).' };
   }
 
-  // conn.handle stores the numeric Instagram user ID, set during the OAuth callback
+  // conn.handle = numeric Instagram user ID stored during OAuth callback (shortResp.data.user_id)
   const igUserId = conn.handle;
-  if (!igUserId) throw new Error('Instagram user ID missing from connection. Reconnect the account to re-authorize.');
+  if (!igUserId) throw new Error('Instagram user ID missing from connection. Reconnect the account.');
 
   const caption = (post.caption || post.title || '').slice(0, 2200);
   const isVideo = isVideoUrl(mediaUrl);
 
-  // Step 1: Create a media container.
-  // For Reels: media_type=REELS + video_url. share_to_feed=true posts to both
-  // the Reels tab and the main feed. Video specs: H.264, 9:16 AR, 5–90s, 23–60fps.
-  // For images: image_url only — media_type defaults to IMAGE, no field needed.
+  // Step 1: Create a media container on graph.instagram.com.
+  // IMAGE: set image_url — media_type defaults to IMAGE.
+  // REELS: set media_type=REELS + video_url + share_to_feed=true to appear in both
+  //   Reels tab and main feed. Video specs: H.264, 9:16 AR, 5–90s, 23–60fps.
   const containerParams = { caption, access_token: conn.access_token };
   if (isVideo) {
-    containerParams.media_type = 'REELS';
-    containerParams.video_url = mediaUrl;
+    containerParams.media_type  = 'REELS';
+    containerParams.video_url   = mediaUrl;
     containerParams.share_to_feed = 'true';
   } else {
     containerParams.image_url = mediaUrl;
   }
 
-  const containerResp = await axios.post(`${GRAPH}/${igUserId}/media`, containerParams);
+  const containerResp = await axios.post(`${IG_GRAPH}/${igUserId}/media`, containerParams);
   const containerId = containerResp.data?.id;
   if (!containerId) throw new Error('Instagram did not return a media container ID.');
 
-  // Step 2: Poll the container's status_code until FINISHED.
-  // Videos require server-side processing; publishing before FINISHED returns 400.
-  // Possible values: FINISHED | IN_PROGRESS | ERROR | EXPIRED
+  // Step 2: Poll status_code until FINISHED (required for Reels — server-side processing).
+  // FINISHED | IN_PROGRESS | ERROR | EXPIRED
   if (isVideo) {
     await poll(async () => {
-      const statusResp = await axios.get(`${GRAPH}/${containerId}`, {
+      const statusResp = await axios.get(`${IG_GRAPH}/${containerId}`, {
         params: { fields: 'status_code', access_token: conn.access_token },
       });
       const code = statusResp.data?.status_code;
       if (code === 'FINISHED') return { done: true };
-      if (code === 'ERROR')   throw new Error('Instagram video processing failed (ERROR status). Check video specs.');
-      if (code === 'EXPIRED') throw new Error('Instagram media container expired before publishing.');
-      return { done: false }; // IN_PROGRESS — keep waiting
-    }, { interval: 5000, maxAttempts: 36 }); // up to 3 minutes
+      if (code === 'ERROR')    throw new Error('Instagram video processing failed (ERROR). Check video specs: H.264, 9:16, 5–90s.');
+      if (code === 'EXPIRED')  throw new Error('Instagram media container expired — try again.');
+      return { done: false }; // IN_PROGRESS
+    }, { interval: 5000, maxAttempts: 36 }); // wait up to 3 min
   }
 
-  // Step 3: Publish the container. Returns the published media object ID.
-  const publishResp = await axios.post(`${GRAPH}/${igUserId}/media_publish`, {
+  // Step 3: Publish the container. Returns the live media object ID.
+  const publishResp = await axios.post(`${IG_GRAPH}/${igUserId}/media_publish`, {
     creation_id: containerId,
     access_token: conn.access_token,
   });
 
   const mediaId = publishResp.data?.id;
-  if (!mediaId) throw new Error('Instagram media_publish succeeded but returned no media ID.');
+  if (!mediaId) throw new Error('Instagram media_publish returned no media ID.');
 
   console.log(`[Instagram] Published: ${mediaId}`);
   return { success: true, platform_post_id: mediaId };

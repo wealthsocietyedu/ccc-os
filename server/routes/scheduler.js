@@ -170,10 +170,14 @@ router.get('/oauth/:platform', (req, res) => {
       response_type: 'code',
       state,
     }),
-    facebook: `https://www.facebook.com/v19.0/dialog/oauth?` + new URLSearchParams({
+    facebook: `https://www.facebook.com/v21.0/dialog/oauth?` + new URLSearchParams({
       client_id: process.env.FACEBOOK_APP_ID,
       redirect_uri: redirectUri,
-      scope: 'pages_manage_posts,pages_read_engagement',
+      // pages_show_list — required to list managed pages in /me/accounts callback
+      // pages_manage_posts — publish text/link posts to page feed
+      // pages_read_engagement — read page metrics
+      // pages_manage_metadata — needed for video upload session on graph-video.facebook.com
+      scope: 'pages_show_list,pages_manage_posts,pages_read_engagement,pages_manage_metadata',
       response_type: 'code',
       state,
     }),
