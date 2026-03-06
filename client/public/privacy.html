@@ -1,0 +1,820 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Privacy Policy — Content Command Center OS</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #0a0a0f;
+      --surface:  #111118;
+      --surface2: #16161f;
+      --border:   #1e1e2e;
+      --border2:  #2a2a3d;
+      --text:     #e2e8f0;
+      --text2:    #94a3b8;
+      --text3:    #64748b;
+      --accent:   #6c47ff;
+      --accent2:  #a78bfa;
+      --green:    #22c55e;
+      --font-d:   'Syne', sans-serif;
+      --font-b:   'DM Sans', sans-serif;
+      --r:        12px;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-b);
+      font-size: 15px;
+      line-height: 1.7;
+      min-height: 100vh;
+    }
+
+    /* ── Top bar ── */
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: rgba(10, 10, 15, 0.85);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 40px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 56px;
+    }
+    .topbar-logo {
+      font-family: var(--font-d);
+      font-size: 15px;
+      font-weight: 800;
+      color: var(--text);
+      text-decoration: none;
+      letter-spacing: -.02em;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .topbar-logo span {
+      display: inline-block;
+      width: 24px;
+      height: 24px;
+      background: var(--accent);
+      border-radius: 6px;
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .topbar-back {
+      font-size: 12.5px;
+      color: var(--text3);
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      transition: color .15s;
+    }
+    .topbar-back:hover { color: var(--accent2); }
+
+    /* ── Hero ── */
+    .hero {
+      padding: 72px 40px 48px;
+      max-width: 780px;
+      margin: 0 auto;
+      border-bottom: 1px solid var(--border);
+    }
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(108, 71, 255, .12);
+      border: 1px solid rgba(108, 71, 255, .25);
+      border-radius: 100px;
+      padding: 4px 12px;
+      font-size: 11.5px;
+      font-weight: 600;
+      color: var(--accent2);
+      letter-spacing: .04em;
+      text-transform: uppercase;
+      margin-bottom: 20px;
+    }
+    .hero h1 {
+      font-family: var(--font-d);
+      font-size: 38px;
+      font-weight: 800;
+      color: var(--text);
+      letter-spacing: -.03em;
+      line-height: 1.1;
+      margin-bottom: 16px;
+    }
+    .hero-sub {
+      font-size: 16px;
+      color: var(--text2);
+      line-height: 1.65;
+      max-width: 600px;
+    }
+    .hero-meta {
+      margin-top: 28px;
+      display: flex;
+      gap: 24px;
+      flex-wrap: wrap;
+    }
+    .hero-meta-item {
+      font-size: 12px;
+      color: var(--text3);
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .hero-meta-item strong { color: var(--text2); font-weight: 500; }
+
+    /* ── Layout ── */
+    .layout {
+      max-width: 780px;
+      margin: 0 auto;
+      padding: 0 40px 80px;
+      display: grid;
+      grid-template-columns: 200px 1fr;
+      gap: 48px;
+      align-items: start;
+    }
+
+    /* ── TOC ── */
+    .toc {
+      position: sticky;
+      top: 72px;
+      padding: 24px 0;
+    }
+    .toc-title {
+      font-size: 10.5px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .1em;
+      color: var(--text3);
+      margin-bottom: 12px;
+    }
+    .toc a {
+      display: block;
+      font-size: 12.5px;
+      color: var(--text3);
+      text-decoration: none;
+      padding: 5px 0;
+      border-left: 2px solid var(--border);
+      padding-left: 12px;
+      transition: color .12s, border-color .12s;
+      line-height: 1.4;
+    }
+    .toc a:hover {
+      color: var(--accent2);
+      border-color: var(--accent);
+    }
+
+    /* ── Content ── */
+    .content {
+      padding-top: 40px;
+    }
+
+    .section {
+      margin-bottom: 52px;
+    }
+
+    .section-anchor {
+      display: block;
+      height: 80px;
+      margin-top: -80px;
+      visibility: hidden;
+    }
+
+    .section h2 {
+      font-family: var(--font-d);
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: -.02em;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .section-icon {
+      width: 30px;
+      height: 30px;
+      border-radius: 8px;
+      background: rgba(108, 71, 255, .14);
+      border: 1px solid rgba(108, 71, 255, .22);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      flex-shrink: 0;
+    }
+
+    .section p {
+      color: var(--text2);
+      margin-bottom: 14px;
+      font-size: 14.5px;
+    }
+    .section p:last-child { margin-bottom: 0; }
+
+    /* Cards */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      padding: 20px 22px;
+      margin: 18px 0;
+    }
+    .card-title {
+      font-family: var(--font-d);
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 10px;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+    }
+
+    /* Data table */
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13.5px;
+      margin: 14px 0;
+    }
+    .data-table th {
+      text-align: left;
+      font-size: 10.5px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: var(--text3);
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border);
+    }
+    .data-table td {
+      padding: 10px 12px;
+      color: var(--text2);
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+      line-height: 1.5;
+    }
+    .data-table tr:last-child td { border-bottom: none; }
+    .data-table td:first-child { color: var(--text); font-weight: 500; }
+
+    /* List */
+    .check-list {
+      list-style: none;
+      margin: 10px 0;
+    }
+    .check-list li {
+      font-size: 14px;
+      color: var(--text2);
+      padding: 5px 0 5px 22px;
+      position: relative;
+      line-height: 1.5;
+    }
+    .check-list li::before {
+      content: '✓';
+      position: absolute;
+      left: 0;
+      color: var(--green);
+      font-weight: 700;
+      font-size: 12px;
+    }
+
+    /* No-sell badge */
+    .no-sell {
+      background: rgba(34, 197, 94, .08);
+      border: 1px solid rgba(34, 197, 94, .2);
+      border-radius: var(--r);
+      padding: 18px 20px;
+      display: flex;
+      gap: 14px;
+      align-items: flex-start;
+      margin: 18px 0;
+    }
+    .no-sell-icon {
+      font-size: 24px;
+      line-height: 1;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+    .no-sell-text strong {
+      display: block;
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--green);
+      margin-bottom: 4px;
+    }
+    .no-sell-text span {
+      font-size: 13.5px;
+      color: var(--text2);
+      line-height: 1.55;
+    }
+
+    /* Steps */
+    .steps {
+      counter-reset: step;
+      margin: 14px 0;
+    }
+    .step {
+      display: flex;
+      gap: 14px;
+      padding: 14px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .step:last-child { border-bottom: none; }
+    .step-num {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: rgba(108, 71, 255, .15);
+      border: 1px solid rgba(108, 71, 255, .3);
+      color: var(--accent2);
+      font-family: var(--font-d);
+      font-size: 12px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+    .step-body strong {
+      display: block;
+      font-size: 13.5px;
+      color: var(--text);
+      font-weight: 600;
+      margin-bottom: 3px;
+    }
+    .step-body span {
+      font-size: 13px;
+      color: var(--text2);
+      line-height: 1.5;
+    }
+
+    /* Contact card */
+    .contact-card {
+      background: var(--surface2);
+      border: 1px solid var(--border2);
+      border-radius: var(--r);
+      padding: 20px 22px;
+      margin-top: 16px;
+    }
+    .contact-card a {
+      color: var(--accent2);
+      text-decoration: none;
+      font-weight: 500;
+    }
+    .contact-card a:hover { text-decoration: underline; }
+
+    /* ── Footer ── */
+    .footer {
+      border-top: 1px solid var(--border);
+      padding: 28px 40px;
+      max-width: 780px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .footer-copy {
+      font-size: 12px;
+      color: var(--text3);
+    }
+    .footer-links {
+      display: flex;
+      gap: 20px;
+    }
+    .footer-links a {
+      font-size: 12px;
+      color: var(--text3);
+      text-decoration: none;
+      transition: color .12s;
+    }
+    .footer-links a:hover { color: var(--accent2); }
+
+    /* ── Responsive ── */
+    @media (max-width: 680px) {
+      .topbar { padding: 0 20px; }
+      .hero   { padding: 48px 20px 36px; }
+      .hero h1 { font-size: 28px; }
+      .layout { grid-template-columns: 1fr; padding: 0 20px 60px; gap: 0; }
+      .toc    { display: none; }
+      .footer { padding: 24px 20px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Bar -->
+  <nav class="topbar">
+    <a class="topbar-logo" href="/">
+      <span>⚡</span> CCC OS
+    </a>
+    <a class="topbar-back" href="/">← Back to app</a>
+  </nav>
+
+  <!-- Hero -->
+  <header class="hero">
+    <div class="hero-badge">🔒 Legal</div>
+    <h1>Privacy Policy</h1>
+    <p class="hero-sub">
+      Content Command Center OS is built to help creators run their business — not to harvest their data.
+      Here's exactly what we collect, why, and how you stay in control.
+    </p>
+    <div class="hero-meta">
+      <div class="hero-meta-item">📅 <strong>Effective:</strong> March 6, 2026</div>
+      <div class="hero-meta-item">🏢 <strong>Operator:</strong> Content Command Center OS</div>
+      <div class="hero-meta-item">📧 <strong>Contact:</strong> leviacay@gmail.com</div>
+    </div>
+  </header>
+
+  <!-- Body -->
+  <div class="layout">
+
+    <!-- TOC -->
+    <aside class="toc">
+      <div class="toc-title">On this page</div>
+      <a href="#overview">Overview</a>
+      <a href="#data-collected">Data We Collect</a>
+      <a href="#oauth-tokens">OAuth &amp; Platform Tokens</a>
+      <a href="#how-we-use">How We Use Your Data</a>
+      <a href="#no-sell">We Don't Sell Data</a>
+      <a href="#third-parties">Third Parties</a>
+      <a href="#security">Security</a>
+      <a href="#retention">Data Retention</a>
+      <a href="#delete">Delete Your Account</a>
+      <a href="#children">Children's Privacy</a>
+      <a href="#changes">Policy Changes</a>
+      <a href="#contact">Contact Us</a>
+    </aside>
+
+    <!-- Content -->
+    <main class="content">
+
+      <div class="section">
+        <span class="section-anchor" id="overview"></span>
+        <h2><span class="section-icon">📋</span> Overview</h2>
+        <p>
+          Content Command Center OS ("CCC OS", "we", "us") is a content scheduling and distribution
+          platform. This Privacy Policy explains how we collect, use, and protect your information when
+          you use our service at <strong>ccc-os-production.up.railway.app</strong> and any associated domains.
+        </p>
+        <p>
+          By creating an account or connecting a social media platform, you agree to the practices
+          described in this policy.
+        </p>
+      </div>
+
+      <div class="section">
+        <span class="section-anchor" id="data-collected"></span>
+        <h2><span class="section-icon">📦</span> Data We Collect</h2>
+        <p>We collect only what's necessary to run the service:</p>
+
+        <div class="card">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Data</th>
+                <th>Why we collect it</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Email address</td>
+                <td>Account creation, login, and essential service communications</td>
+              </tr>
+              <tr>
+                <td>Name</td>
+                <td>Personalizing your dashboard experience</td>
+              </tr>
+              <tr>
+                <td>Hashed password</td>
+                <td>Securing your account (bcrypt — we never store plain-text passwords)</td>
+              </tr>
+              <tr>
+                <td>Brand &amp; content data</td>
+                <td>Your pillars, assets, ideas, and hooks — the core of the product</td>
+              </tr>
+              <tr>
+                <td>Scheduled posts</td>
+                <td>Publishing to connected platforms on your behalf at the time you set</td>
+              </tr>
+              <tr>
+                <td>Performance metrics</td>
+                <td>Analytics you manually log (views, followers, revenue) to power your data room</td>
+              </tr>
+              <tr>
+                <td>Platform OAuth tokens</td>
+                <td>See the section below — used only for publishing on your behalf</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p>
+          We do <strong>not</strong> use tracking pixels, behavioral analytics SDKs, or third-party
+          advertising tags. We do not collect device fingerprints, IP addresses beyond what your
+          browser sends in a normal request, or any data not listed above.
+        </p>
+      </div>
+
+      <div class="section">
+        <span class="section-anchor" id="oauth-tokens"></span>
+        <h2><span class="section-icon">🔑</span> OAuth &amp; Platform Tokens</h2>
+        <p>
+          When you click <strong>Connect</strong> on a social media platform (YouTube, Instagram,
+          Facebook, TikTok, X, Threads, Pinterest), you are redirected to that platform's official
+          login page. We never see your platform password.
+        </p>
+        <p>
+          After you authorize, the platform gives CCC OS an <strong>access token</strong> — a
+          cryptographic credential that lets us post to your account on your behalf. Here's how we
+          handle it:
+        </p>
+
+        <div class="card">
+          <ul class="check-list">
+            <li>Tokens are stored encrypted in our database, isolated per user account.</li>
+            <li>Tokens are used <em>only</em> to publish the specific content you schedule — nothing else.</li>
+            <li>We never read your followers list, messages, or any content beyond what's needed to publish.</li>
+            <li>You can revoke access at any time by clicking <strong>Disconnect</strong> in the Scheduler, or by revoking the app directly in the platform's settings.</li>
+            <li>Revoking in-app immediately deletes the stored token from our database.</li>
+          </ul>
+        </div>
+
+        <p>
+          Platform OAuth is subject to each platform's own privacy policy. We use the following platforms'
+          official APIs: YouTube Data API v3 (Google), Meta Graph API (Instagram &amp; Facebook),
+          TikTok Open API, X/Twitter OAuth 2.0, Threads API, LinkedIn UGC API, and Pinterest API v5.
+        </p>
+      </div>
+
+      <div class="section">
+        <span class="section-anchor" id="how-we-use"></span>
+        <h2><span class="section-icon">⚙️</span> How We Use Your Data</h2>
+        <p>Your data is used exclusively to power the CCC OS product features you interact with:</p>
+
+        <div class="card">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Feature</th>
+                <th>Data used</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Scheduler &amp; auto-publish</td>
+                <td>Scheduled posts, OAuth tokens, media URLs</td>
+              </tr>
+              <tr>
+                <td>Content pipeline</td>
+                <td>Assets, ideas, hooks, pillar structure</td>
+              </tr>
+              <tr>
+                <td>Data Room / Analytics</td>
+                <td>Performance metrics you log manually</td>
+              </tr>
+              <tr>
+                <td>Distribution engine</td>
+                <td>Platform connections, repurpose rules, workflow settings</td>
+              </tr>
+              <tr>
+                <td>Brand Deals tracker</td>
+                <td>Partner names, deal amounts, deadlines you enter</td>
+              </tr>
+              <tr>
+                <td>Weekly Review Ritual</td>
+                <td>Numbers and decisions you submit in the guided flow</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p>
+          We do not use your content data to train machine learning models, build advertising profiles,
+          benchmark against other users' data, or for any purpose other than running the features above.
+        </p>
+      </div>
+
+      <div class="section">
+        <span class="section-anchor" id="no-sell"></span>
+        <h2><span class="section-icon">🚫</span> We Don't Sell Your Data</h2>
+
+        <div class="no-sell">
+          <div class="no-sell-icon">🛡️</div>
+          <div class="no-sell-text">
+            <strong>We do not sell, rent, license, or trade your personal data. Ever.</strong>
+            <span>
+              Your email, content, performance metrics, platform tokens, and anything else you
+              store in CCC OS is yours. It will never be sold to data brokers, advertisers, or
+              any third party for commercial purposes.
+            </span>
+          </div>
+        </div>
+
+        <p>
+          This includes anonymized or aggregated forms of your data. We do not participate in
+          data marketplaces or share behavioral data with ad networks.
+        </p>
+      </div>
+
+      <div class="section">
+        <span class="section-anchor" id="third-parties"></span>
+        <h2><span class="section-icon">🔗</span> Third Parties</h2>
+        <p>CCC OS uses a small number of third-party services to operate:</p>
+
+        <div class="card">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Service</th>
+                <th>Purpose</th>
+                <th>Data shared</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Railway</td>
+                <td>Hosting &amp; deployment</td>
+                <td>Application data (hosted on their infrastructure)</td>
+              </tr>
+              <tr>
+                <td>Stripe</td>
+                <td>Payment processing</td>
+                <td>Payment info only — handled entirely by Stripe, we never see card numbers</td>
+              </tr>
+              <tr>
+                <td>Google (YouTube API)</td>
+                <td>YouTube publishing</td>
+                <td>OAuth tokens and video content for connected accounts only</td>
+              </tr>
+              <tr>
+                <td>Meta (Instagram &amp; Facebook API)</td>
+                <td>Instagram &amp; Facebook publishing</td>
+                <td>OAuth tokens and post content for connected accounts only</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p>
+          We do not share data with any other third parties. All services above are used solely to
+          deliver the core functionality of CCC OS.
+        </p>
+      </div>
+
+      <div class="section">
+        <span class="section-anchor" id="security"></span>
+        <h2><span class="section-icon">🔐</span> Security</h2>
+        <p>
+          We take reasonable technical and organizational measures to protect your data:
+        </p>
+        <div class="card">
+          <ul class="check-list">
+            <li>All traffic encrypted in transit via HTTPS (TLS 1.2+)</li>
+            <li>Passwords hashed with bcrypt (12 salt rounds) — never stored as plain text</li>
+            <li>Authentication via signed JWT tokens — no session cookies</li>
+            <li>API endpoints protected by authentication middleware on every request</li>
+            <li>OAuth tokens stored server-side only — never exposed to the browser</li>
+            <li>Database access isolated per user — all queries are user-scoped</li>
+          </ul>
+        </div>
+        <p>
+          No system is perfectly secure. If you discover a security vulnerability, please report it
+          to <a href="mailto:leviacay@gmail.com" style="color: var(--accent2); text-decoration: none;">leviacay@gmail.com</a>
+          and we will respond promptly.
+        </p>
+      </div>
+
+      <div class="section">
+        <span class="section-anchor" id="retention"></span>
+        <h2><span class="section-icon">📅</span> Data Retention</h2>
+        <p>
+          Your data is retained for as long as your account is active. If you delete your account,
+          all associated data — brands, content, analytics, OAuth tokens, and scheduled posts — is
+          permanently deleted from our database within 30 days.
+        </p>
+        <p>
+          We do not retain backups of deleted user data beyond our standard 30-day infrastructure
+          backup window. After that window, your data is unrecoverable.
+        </p>
+      </div>
+
+      <div class="section">
+        <span class="section-anchor" id="delete"></span>
+        <h2><span class="section-icon">🗑️</span> Delete Your Account</h2>
+        <p>
+          You have the right to delete your account and all associated data at any time.
+          Here's how:
+        </p>
+
+        <div class="card">
+          <div class="steps">
+            <div class="step">
+              <div class="step-num">1</div>
+              <div class="step-body">
+                <strong>Disconnect your platforms first</strong>
+                <span>In the Scheduler → Platforms tab, click Disconnect on each connected platform. This immediately revokes our access to your social accounts.</span>
+              </div>
+            </div>
+            <div class="step">
+              <div class="step-num">2</div>
+              <div class="step-body">
+                <strong>Request account deletion</strong>
+                <span>Send an email to <a href="mailto:leviacay@gmail.com" style="color: var(--accent2); text-decoration: none;">leviacay@gmail.com</a> with the subject line <strong>"Delete My Account"</strong> and the email address associated with your account.</span>
+              </div>
+            </div>
+            <div class="step">
+              <div class="step-num">3</div>
+              <div class="step-body">
+                <strong>Confirmation within 48 hours</strong>
+                <span>We'll confirm deletion and permanently remove all your data — brands, content, analytics, tokens, billing records, and account credentials — within 48 hours.</span>
+              </div>
+            </div>
+            <div class="step">
+              <div class="step-num">4</div>
+              <div class="step-body">
+                <strong>Revoke app access on each platform</strong>
+                <span>For extra assurance, go to Settings → Security on each connected platform (Google, Meta, TikTok, etc.) and revoke CCC OS app permissions directly. This is independent of our system.</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <p>
+          You can also submit a data access request (to receive a copy of all data we hold) using
+          the same email process above.
+        </p>
+      </div>
+
+      <div class="section">
+        <span class="section-anchor" id="children"></span>
+        <h2><span class="section-icon">👶</span> Children's Privacy</h2>
+        <p>
+          CCC OS is not directed at children under 13 years of age. We do not knowingly collect
+          personal information from children under 13. If you believe a child has created an account,
+          contact us at <a href="mailto:leviacay@gmail.com" style="color: var(--accent2); text-decoration: none;">leviacay@gmail.com</a>
+          and we will delete it promptly.
+        </p>
+      </div>
+
+      <div class="section">
+        <span class="section-anchor" id="changes"></span>
+        <h2><span class="section-icon">📝</span> Policy Changes</h2>
+        <p>
+          We may update this policy as the product evolves. When we make material changes, we'll
+          update the <strong>Effective Date</strong> at the top of this page. Continued use of CCC OS
+          after a policy update constitutes acceptance of the new terms.
+        </p>
+        <p>
+          We will not retroactively change how previously collected data is used without explicit
+          user consent.
+        </p>
+      </div>
+
+      <div class="section">
+        <span class="section-anchor" id="contact"></span>
+        <h2><span class="section-icon">✉️</span> Contact Us</h2>
+        <p>
+          Questions about this policy, data requests, or account deletion — reach out any time:
+        </p>
+        <div class="contact-card">
+          <p style="font-size: 13.5px; color: var(--text2); margin-bottom: 10px;">
+            <strong style="color: var(--text);">Content Command Center OS</strong><br />
+            Operated by Levi Acay
+          </p>
+          <p style="font-size: 13.5px; color: var(--text2);">
+            📧 Email: <a href="mailto:leviacay@gmail.com">leviacay@gmail.com</a><br />
+            🌐 App: <a href="https://ccc-os-production.up.railway.app">ccc-os-production.up.railway.app</a>
+          </p>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="footer-copy">© 2026 Content Command Center OS. All rights reserved.</div>
+    <div class="footer-links">
+      <a href="/">Back to App</a>
+      <a href="mailto:leviacay@gmail.com">Contact</a>
+    </div>
+  </footer>
+
+</body>
+</html>

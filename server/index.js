@@ -93,6 +93,9 @@ app.get('/api/health', (req, res) => {
 if (process.env.NODE_ENV === 'production') {
   const clientBuild = path.join(__dirname, '../client/dist');
   app.use(express.static(clientBuild));
+  app.get('/privacy', (req, res) => {
+    res.sendFile(path.join(clientBuild, 'privacy.html'));
+  });
   app.get('*', (req, res) => {
     if (!req.path.startsWith('/api')) {
       res.sendFile(path.join(clientBuild, 'index.html'));
