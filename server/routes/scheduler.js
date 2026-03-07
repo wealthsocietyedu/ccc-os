@@ -50,15 +50,10 @@ function upsertConnection(db, userId, platform, handle, accessToken, refreshToke
   }
 }
 
-// All routes require auth (except OAuth callbacks which verify JWT state)
-router.use(authenticate);
-// Note: requireSubscription is applied per-route below.
-// Platform connections and OAuth are free — subscription only gates post scheduling.
-
 // ─── PLATFORM CONNECTIONS ─────────────────────────────────────────────────────
 
 // GET /api/scheduler/platforms — list connected platforms for user
-router.get('/platforms', (req, res) => {
+router.get('/platforms', authenticate, (req, res) => {
   const db = getDB();
   const platforms = db.prepare(`
     SELECT * FROM platform_connections WHERE user_id = ? ORDER BY created_at ASC
@@ -68,7 +63,7 @@ router.get('/platforms', (req, res) => {
 
 // POST /api/scheduler/platforms/connect — store a platform connection
 // Admin: inserts a new row per handle (multi-account). Regular: one per platform.
-router.post('/platforms/connect', (req, res) => {
+router.post('/platforms/connect', authenticate, (req, res) => {
   const { platform, handle, access_token, refresh_token } = req.body;
   if (!platform) return res.status(400).json({ error: 'platform required' });
 
@@ -83,7 +78,7 @@ router.post('/platforms/connect', (req, res) => {
 });
 
 // DELETE /api/scheduler/platforms/:platform — disconnect all accounts for a platform (regular users)
-router.delete('/platforms/:platform', (req, res) => {
+router.delete('/platforms/:platform', authenticate, (req, res) => {
   const db = getDB();
   db.prepare(
     `UPDATE platform_connections SET connected = 0, access_token = '', refresh_token = '', updated_at = datetime('now') WHERE user_id = ? AND platform = ?`
@@ -92,7 +87,7 @@ router.delete('/platforms/:platform', (req, res) => {
 });
 
 // DELETE /api/scheduler/platforms/conn/:id — disconnect a specific account by row ID (admin multi-account)
-router.delete('/platforms/conn/:id', (req, res) => {
+router.delete('/platforms/conn/:id', authenticate, (req, res) => {
   const db = getDB();
   // Only the owner can disconnect their own connection
   const conn = db.prepare('SELECT id FROM platform_connections WHERE id = ? AND user_id = ?').get(req.params.id, req.userId);
@@ -129,7 +124,7 @@ const PLATFORM_SETUP_URLS = {
 };
 
 // GET /api/scheduler/oauth/:platform — get OAuth URL (JWT-signed state)
-router.get('/oauth/:platform', (req, res) => {
+router.get('/oauth/:platform', authenticate, (req, res) => {
   const { platform } = req.params;
 
   // Check credentials are configured before building OAuth URL
@@ -416,6 +411,13 @@ router.get('/oauth/:platform/callback', async (req, res) => {
     res.redirect(`${CLIENT_URL}/oauth-callback.html?status=error&platform=${platform}&reason=${reason}`);
   }
 });
+
+// All routes below require auth — the callback above is intentionally exempt
+// (it's called by the platform redirect, not by our frontend with a Bearer token;
+// authentication is done via the JWT state parameter instead)
+router.use(authenticate);
+// Note: requireSubscription is applied per-route below.
+// Platform connections and OAuth URL generation are free — scheduling posts is a paid feature.
 
 // ─── SCHEDULED POSTS ─────────────────────────────────────────────────────────
 // Subscription required from here down (creating & publishing posts is a paid feature)
