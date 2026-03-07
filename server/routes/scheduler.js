@@ -174,12 +174,14 @@ router.get('/oauth/:platform', authenticate, (req, res) => {
       prompt: 'consent',
       state,
     }),
-    instagram: `https://api.instagram.com/oauth/authorize?` + new URLSearchParams({
+    // Instagram Graph API auth goes through Facebook Login (NOT api.instagram.com).
+    // The Instagram Platform API (api.instagram.com) is for consumer accounts only and
+    // requires separate app review. For publishing via graph.facebook.com/{ig-user-id}/media
+    // we need a Facebook Page access token — so we auth the same way as Facebook.
+    instagram: `https://www.facebook.com/v21.0/dialog/oauth?` + new URLSearchParams({
       client_id: process.env.INSTAGRAM_APP_ID,
       redirect_uri: redirectUri,
-      // instagram_basic + instagram_content_publish were Basic Display API (EOL Dec 2024).
-      // New Instagram Platform API uses instagram_business_* scopes.
-      scope: 'instagram_business_basic,instagram_business_content_publish',
+      scope: 'instagram_basic,instagram_content_publish,pages_show_list,pages_manage_posts',
       response_type: 'code',
       state,
     }),
@@ -300,20 +302,38 @@ router.get('/oauth/:platform/callback', async (req, res) => {
       upsertConnection(db, userId, 'facebook', page.id, page.access_token, '', null);
 
     } else if (platform === 'instagram') {
-      // Short-lived token exchange — response includes numeric user_id we need for publishing
-      const formData = new URLSearchParams({ client_id: process.env.INSTAGRAM_APP_ID, client_secret: process.env.INSTAGRAM_APP_SECRET, grant_type: 'authorization_code', redirect_uri: redirectUri, code });
-      const shortResp = await axios.post('https://api.instagram.com/oauth/access_token', formData.toString(), { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
-      const shortToken = shortResp.data.access_token;
-      // CRITICAL: store the numeric IG user ID (not username) — publishToInstagram calls /{igUserId}/media
-      const igUserId = String(shortResp.data.user_id);
-      // Exchange for long-lived token (60-day expiry)
-      const longResp = await axios.get('https://graph.instagram.com/access_token', {
-        params: { grant_type: 'ig_exchange_token', client_secret: process.env.INSTAGRAM_APP_SECRET, access_token: shortToken },
+      // Instagram Graph API: auth via Facebook Login → get page access token → get IG Business Account ID
+      // Publishing uses graph.facebook.com/v21.0/{ig-user-id}/media which requires a page access token.
+      const tokenResp = await axios.get('https://graph.facebook.com/v21.0/oauth/access_token', {
+        params: { client_id: process.env.INSTAGRAM_APP_ID, client_secret: process.env.INSTAGRAM_APP_SECRET, redirect_uri: redirectUri, code },
       });
-      const longToken = longResp.data.access_token;
-      const expiresAt = new Date(Date.now() + (longResp.data.expires_in || 5184000) * 1000).toISOString();
-      // conn.handle = numeric IG user ID (required by graph.facebook.com/v21.0/{igUserId}/media)
-      upsertConnection(db, userId, 'instagram', igUserId, longToken, '', expiresAt);
+      const userToken = tokenResp.data.access_token;
+
+      // Get Facebook Pages managed by the user (each page has its own access token)
+      const pagesResp = await axios.get('https://graph.facebook.com/v21.0/me/accounts', {
+        params: { access_token: userToken },
+      });
+      const pages = pagesResp.data.data || [];
+      if (!pages.length) throw new Error('No Facebook Pages found. Connect your Instagram Business account to a Facebook Page first.');
+
+      // Find the first page with a connected Instagram Business/Creator account
+      let igAccountId = null;
+      let pageAccessToken = null;
+      for (const page of pages) {
+        const igResp = await axios.get(`https://graph.facebook.com/v21.0/${page.id}`, {
+          params: { fields: 'instagram_business_account', access_token: page.access_token },
+        });
+        if (igResp.data.instagram_business_account?.id) {
+          igAccountId = igResp.data.instagram_business_account.id;
+          pageAccessToken = page.access_token;
+          break;
+        }
+      }
+      if (!igAccountId) throw new Error('No Instagram Business/Creator account found. Convert your Instagram to Business or Creator and connect it to a Facebook Page.');
+
+      // conn.handle = numeric IG Business Account ID — publishToInstagram calls /{igAccountId}/media
+      // conn.access_token = page access token (long-lived, required by Graph API)
+      upsertConnection(db, userId, 'instagram', igAccountId, pageAccessToken, '', null);
 
     } else if (platform === 'linkedin') {
       // Exchange code for access token
