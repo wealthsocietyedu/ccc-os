@@ -119,7 +119,7 @@ router.delete('/platforms/conn/:id', authenticate, (req, res) => {
 // Credentials required for each platform OAuth
 const PLATFORM_CREDS = {
   youtube:   () => process.env.YOUTUBE_CLIENT_ID && process.env.YOUTUBE_CLIENT_SECRET,
-  instagram: () => process.env.INSTAGRAM_APP_ID && process.env.INSTAGRAM_APP_SECRET,
+  instagram: () => (process.env.FACEBOOK_APP_ID || process.env.INSTAGRAM_APP_ID) && (process.env.FACEBOOK_APP_SECRET || process.env.INSTAGRAM_APP_SECRET),
   facebook:  () => process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET,
   linkedin:  () => process.env.LINKEDIN_CLIENT_ID && process.env.LINKEDIN_CLIENT_SECRET,
   tiktok:    () => process.env.TIKTOK_CLIENT_KEY && process.env.TIKTOK_CLIENT_SECRET,
@@ -174,12 +174,10 @@ router.get('/oauth/:platform', authenticate, (req, res) => {
       prompt: 'consent',
       state,
     }),
-    // Instagram Graph API auth goes through Facebook Login (NOT api.instagram.com).
-    // The Instagram Platform API (api.instagram.com) is for consumer accounts only and
-    // requires separate app review. For publishing via graph.facebook.com/{ig-user-id}/media
-    // we need a Facebook Page access token — so we auth the same way as Facebook.
+    // Instagram Graph API auth goes through Facebook Login using the SAME Facebook app.
+    // Uses FACEBOOK_APP_ID (falls back to INSTAGRAM_APP_ID for legacy configs).
     instagram: `https://www.facebook.com/v21.0/dialog/oauth?` + new URLSearchParams({
-      client_id: process.env.INSTAGRAM_APP_ID,
+      client_id: process.env.FACEBOOK_APP_ID || process.env.INSTAGRAM_APP_ID,
       redirect_uri: redirectUri,
       scope: 'instagram_basic,instagram_content_publish,pages_show_list,pages_manage_posts',
       response_type: 'code',
@@ -303,9 +301,14 @@ router.get('/oauth/:platform/callback', async (req, res) => {
 
     } else if (platform === 'instagram') {
       // Instagram Graph API: auth via Facebook Login → get page access token → get IG Business Account ID
-      // Publishing uses graph.facebook.com/v21.0/{ig-user-id}/media which requires a page access token.
+      // Uses FACEBOOK_APP_ID/SECRET (same app as Facebook — Instagram Graph API is part of the same Meta app).
       const tokenResp = await axios.get('https://graph.facebook.com/v21.0/oauth/access_token', {
-        params: { client_id: process.env.INSTAGRAM_APP_ID, client_secret: process.env.INSTAGRAM_APP_SECRET, redirect_uri: redirectUri, code },
+        params: {
+          client_id: process.env.FACEBOOK_APP_ID || process.env.INSTAGRAM_APP_ID,
+          client_secret: process.env.FACEBOOK_APP_SECRET || process.env.INSTAGRAM_APP_SECRET,
+          redirect_uri: redirectUri,
+          code,
+        },
       });
       const userToken = tokenResp.data.access_token;
 
