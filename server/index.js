@@ -23,6 +23,10 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';
 
+// Trust Railway's reverse proxy — required for express-rate-limit to work correctly
+// without this it throws ERR_ERL_UNEXPECTED_X_FORWARDED_FOR and crashes
+app.set('trust proxy', 1);
+
 
 // ─── SECURITY ─────────────────────────────────────────────────────────────────
 app.use(helmet({
