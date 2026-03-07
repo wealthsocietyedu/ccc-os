@@ -83,6 +83,27 @@ app.post('/api/admin/reseed', authenticate, (req, res) => {
   }
 });
 
+// ─── META WEBHOOK VERIFICATION ────────────────────────────────────────────────
+// Required by Meta to verify ownership of the server before activating Instagram/Facebook products.
+// In Meta developer portal → Webhooks, set:
+//   Callback URL: https://ccc-os-production.up.railway.app/api/webhook/meta
+//   Verify Token: (whatever you set as META_WEBHOOK_VERIFY_TOKEN in Railway)
+app.get('/api/webhook/meta', (req, res) => {
+  const mode      = req.query['hub.mode'];
+  const token     = req.query['hub.verify_token'];
+  const challenge = req.query['hub.challenge'];
+  const expected  = process.env.META_WEBHOOK_VERIFY_TOKEN || 'ccc_webhook_verify';
+
+  if (mode === 'subscribe' && token === expected) {
+    console.log('[Webhook] Meta webhook verified');
+    return res.status(200).send(challenge);
+  }
+  res.status(403).json({ error: 'Webhook verification failed' });
+});
+
+// POST handler so Meta doesn't get 404s when it sends events
+app.post('/api/webhook/meta', (req, res) => res.sendStatus(200));
+
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({
