@@ -17,6 +17,22 @@ const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret';
 const SERVER_URL = process.env.SERVER_URL || 'http://localhost:3001';
 const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';
 
+// Strip stray quotes that Railway/some deployment UIs add around env var values
+// e.g. YOUTUBE_CLIENT_ID="\"abc\"" → "abc"
+[
+  'YOUTUBE_CLIENT_ID', 'YOUTUBE_CLIENT_SECRET',
+  'INSTAGRAM_APP_ID', 'INSTAGRAM_APP_SECRET',
+  'FACEBOOK_APP_ID',  'FACEBOOK_APP_SECRET',
+  'LINKEDIN_CLIENT_ID', 'LINKEDIN_CLIENT_SECRET',
+  'TIKTOK_CLIENT_KEY',  'TIKTOK_CLIENT_SECRET',
+  'TWITTER_CLIENT_ID',  'TWITTER_CLIENT_SECRET',
+  'PINTEREST_APP_ID',   'PINTEREST_APP_SECRET',
+].forEach(key => {
+  if (process.env[key]) {
+    process.env[key] = process.env[key].replace(/^["']+|["']+$/g, '').trim();
+  }
+});
+
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
 
 function upsertConnection(db, userId, platform, handle, accessToken, refreshToken, tokenExpires) {
