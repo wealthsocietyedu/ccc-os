@@ -177,7 +177,9 @@ router.get('/oauth/:platform', authenticate, (req, res) => {
     instagram: `https://api.instagram.com/oauth/authorize?` + new URLSearchParams({
       client_id: process.env.INSTAGRAM_APP_ID,
       redirect_uri: redirectUri,
-      scope: 'instagram_basic,instagram_content_publish',
+      // instagram_basic + instagram_content_publish were Basic Display API (EOL Dec 2024).
+      // New Instagram Platform API uses instagram_business_* scopes.
+      scope: 'instagram_business_basic,instagram_business_content_publish',
       response_type: 'code',
       state,
     }),
