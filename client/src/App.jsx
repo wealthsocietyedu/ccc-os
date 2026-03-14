@@ -42,6 +42,12 @@ const I = ({ n, s = 16, c = "" }) => {
     studio: "M15 10l4.553-2.069A1 1 0 0 1 21 8.87V15.13a1 1 0 0 1-1.447.9L15 14 M3 8h12a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V10a2 2 0 0 1 2-2z",
     shield: "M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z",
     review: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z M14 2v6h6 M16 13H8 M16 17H8 M10 9H8",
+    settings: "M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z",
+    bell: "M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9 M13.73 21a2 2 0 0 1-3.46 0",
+    user: "M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2 M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z",
+    upload: "M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4 M17 8l-5-5-5 5 M12 3v12",
+    globe: "M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z M2 12h20 M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z",
+    creditCard: "M1 4h22v16H1z M1 10h22",
   };
   const d = icons[n];
   if (!d) return <span style={{ fontSize: s, lineHeight: 1 }}>•</span>;
@@ -311,6 +317,63 @@ const STYLES = `
   @keyframes fadeDown { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
   @keyframes spin { to { transform: rotate(360deg); } }
   .spin { animation: spin 1s linear infinite; }
+
+  /* ── Settings Page ── */
+  .settings-layout { display: grid; grid-template-columns: 196px 1fr; gap: 24px; align-items: start; }
+  .settings-nav { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); overflow: hidden; position: sticky; top: 0; }
+  .settings-nav-item { display: flex; align-items: center; gap: 9px; padding: 10px 14px; cursor: pointer; font-size: 13px; font-weight: 500; color: var(--text3); border-left: 2px solid transparent; transition: all .13s; }
+  .settings-nav-item:hover { color: var(--text2); background: rgba(255,255,255,0.025); }
+  .settings-nav-item.active { color: var(--text); background: var(--accent3); border-left-color: var(--accent); }
+  .settings-nav-item.active svg { color: var(--accent2); }
+  .settings-nav-sep { height: 1px; background: var(--border); }
+  .settings-nav-item.danger { color: var(--red); }
+  .settings-nav-item.danger:hover { background: var(--red-d); }
+  .settings-nav-item.danger.active { color: var(--red); background: var(--red-d); border-left-color: var(--red); }
+  .settings-panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 24px; }
+  .settings-hdr { margin-bottom: 22px; padding-bottom: 16px; border-bottom: 1px solid var(--border); }
+  .settings-hdr-title { font-family: var(--font-d); font-size: 16px; font-weight: 800; color: var(--text); margin-bottom: 4px; }
+  .settings-hdr-sub { font-size: 12.5px; color: var(--text3); }
+  .settings-section { margin-bottom: 22px; }
+  .settings-section-label { font-size: 10px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--text3); margin-bottom: 12px; }
+
+  /* Toggle switch */
+  .toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 11px 0; border-bottom: 1px solid var(--border); }
+  .toggle-row:last-child { border-bottom: none; }
+  .toggle-info { flex: 1; }
+  .toggle-label { font-size: 13px; font-weight: 500; color: var(--text); margin-bottom: 2px; }
+  .toggle-desc { font-size: 11.5px; color: var(--text3); }
+  .toggle { width: 38px; height: 21px; background: var(--surface2); border-radius: 20px; cursor: pointer; position: relative; transition: background .18s; flex-shrink: 0; border: none; outline: none; }
+  .toggle.on { background: var(--accent); }
+  .toggle::after { content:''; position: absolute; top: 3px; left: 3px; width: 15px; height: 15px; background: white; border-radius: 50%; transition: transform .18s; }
+  .toggle.on::after { transform: translateX(17px); }
+
+  /* Avatar upload */
+  .avatar-upload { width: 80px; height: 80px; border-radius: 50%; background: var(--surface2); border: 2px dashed var(--border2); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: border-color .15s; flex-shrink: 0; }
+  .avatar-upload:hover { border-color: var(--accent); }
+  .avatar-upload-row { display: flex; align-items: center; gap: 18px; margin-bottom: 20px; }
+  .avatar-upload-hint { font-size: 11.5px; color: var(--text3); line-height: 1.6; }
+
+  /* Platform connect cards */
+  .platform-connect-card { display: flex; align-items: center; gap: 14px; padding: 14px 16px; background: var(--bg3); border: 1px solid var(--border); border-radius: var(--r-sm); margin-bottom: 10px; transition: border-color .13s; }
+  .platform-connect-card:hover { border-color: var(--border2); }
+  .platform-connect-card.connected { border-color: rgba(34,197,94,.2); background: rgba(34,197,94,.035); }
+  .platform-icon { width: 38px; height: 38px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 18px; }
+  .platform-connect-info { flex: 1; }
+  .platform-connect-name { font-size: 13.5px; font-weight: 700; color: var(--text); margin-bottom: 2px; }
+  .platform-connect-status { font-size: 11.5px; color: var(--text3); }
+  .platform-connect-status.live { color: var(--green); }
+
+  /* Billing placeholder */
+  .billing-placeholder { background: var(--bg3); border: 1px solid var(--border); border-radius: var(--r); padding: 28px; text-align: center; }
+  .billing-placeholder-icon { font-size: 36px; margin-bottom: 12px; }
+  .billing-placeholder-title { font-family: var(--font-d); font-size: 15px; font-weight: 700; color: var(--text); margin-bottom: 6px; }
+  .billing-placeholder-sub { font-size: 12.5px; color: var(--text3); line-height: 1.65; margin-bottom: 18px; }
+
+  /* Danger zone */
+  .danger-zone { border: 1px solid rgba(239,68,68,.22); border-radius: var(--r); padding: 20px; background: rgba(239,68,68,.04); }
+  .danger-zone-title { font-size: 13.5px; font-weight: 700; color: var(--red); margin-bottom: 5px; }
+  .danger-zone-desc { font-size: 12.5px; color: var(--text3); line-height: 1.6; margin-bottom: 16px; }
+  .danger-confirm-row { display: flex; align-items: center; gap: 12px; }
 `;
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
@@ -3139,6 +3202,341 @@ function SchedulerLogTab({ activeBrand }) {
   );
 }
 
+// ─── SETTINGS ROOM ────────────────────────────────────────────────────────────
+function SettingsRoom({ user }) {
+  const [tab, setTab] = useState('profile');
+  const [profile, setProfile] = useState({ name: user?.name || '', bio: '', timezone: 'America/Los_Angeles' });
+  const [notifs, setNotifs] = useState({ email: true, push: false, weekly: true, mentions: true, newDeals: false });
+  const [deleteConfirm, setDeleteConfirm] = useState('');
+
+  const TIMEZONES = [
+    'America/Los_Angeles', 'America/Denver', 'America/Chicago', 'America/New_York',
+    'America/Sao_Paulo', 'Europe/London', 'Europe/Paris', 'Europe/Berlin',
+    'Asia/Dubai', 'Asia/Kolkata', 'Asia/Singapore', 'Asia/Tokyo',
+    'Australia/Sydney', 'Pacific/Auckland',
+  ];
+
+  const PLATFORMS = [
+    { id: 'youtube',   label: 'YouTube',    icon: '▶', color: '#FF0000', bg: 'rgba(255,0,0,0.12)',     desc: 'Upload & schedule long-form videos' },
+    { id: 'instagram', label: 'Instagram',  icon: '📸', color: '#E1306C', bg: 'rgba(225,48,108,0.12)',  desc: 'Reels, Stories, feed posts' },
+    { id: 'tiktok',    label: 'TikTok',     icon: '🎵', color: '#69C9D0', bg: 'rgba(105,201,208,0.12)', desc: 'Short-form video publishing' },
+    { id: 'twitter',   label: 'Twitter / X', icon: '𝕏', color: '#aaaaaa', bg: 'rgba(170,170,170,0.10)', desc: 'Threads, posts, media' },
+    { id: 'linkedin',  label: 'LinkedIn',   icon: 'in', color: '#0A66C2', bg: 'rgba(10,102,194,0.12)',  desc: 'Professional content' },
+    { id: 'threads',   label: 'Threads',    icon: '@',  color: '#a855f7', bg: 'rgba(168,85,247,0.12)',  desc: 'Text & photo posts via Meta' },
+  ];
+
+  const TABS = [
+    { id: 'profile',   label: 'Profile',             icon: 'user' },
+    { id: 'notifs',    label: 'Notifications',        icon: 'bell' },
+    { id: 'platforms', label: 'Connected Platforms',  icon: 'link' },
+    { id: 'billing',   label: 'Billing',              icon: 'creditCard' },
+    { id: 'danger',    label: 'Danger Zone',          icon: 'alert', danger: true },
+  ];
+
+  const Toggle = ({ on, onToggle }) => (
+    <button className={`toggle ${on ? 'on' : ''}`} onClick={onToggle} aria-label="toggle" />
+  );
+
+  const renderTab = () => {
+    switch (tab) {
+      case 'profile': return (
+        <>
+          <div className="settings-hdr">
+            <div className="settings-hdr-title">Profile</div>
+            <div className="settings-hdr-sub">Your public creator identity across CCC OS.</div>
+          </div>
+
+          {/* Avatar */}
+          <div className="avatar-upload-row">
+            <div className="avatar-upload">
+              <I n="upload" s={20} c="" />
+            </div>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', marginBottom: 5 }}>Profile Photo</div>
+              <div className="avatar-upload-hint">
+                JPG or PNG, max 2 MB.<br />Recommended: 400×400 px.
+              </div>
+              <button className="btn btn-ghost btn-sm" style={{ marginTop: 8 }}>Upload photo</button>
+            </div>
+          </div>
+
+          <div className="divider" />
+
+          <div className="settings-section">
+            <div className="settings-section-label">Basic Info</div>
+            <div className="form-row-2">
+              <div>
+                <label className="form-label">Display Name</label>
+                <input
+                  className="form-input"
+                  value={profile.name}
+                  onChange={e => setProfile({ ...profile, name: e.target.value })}
+                  placeholder="Your name"
+                />
+              </div>
+              <div>
+                <label className="form-label">Email</label>
+                <input
+                  className="form-input"
+                  value={user?.email || ''}
+                  disabled
+                  style={{ opacity: 0.5, cursor: 'not-allowed' }}
+                />
+              </div>
+            </div>
+            <div className="form-row">
+              <label className="form-label">Bio / Tagline</label>
+              <textarea
+                className="form-textarea"
+                value={profile.bio}
+                onChange={e => setProfile({ ...profile, bio: e.target.value })}
+                placeholder="Content creator helping 100K+ people grow their brand..."
+                rows={3}
+              />
+            </div>
+          </div>
+
+          <div className="settings-section">
+            <div className="settings-section-label">Locale</div>
+            <div className="form-row" style={{ maxWidth: 280 }}>
+              <label className="form-label">Timezone</label>
+              <select
+                className="form-select"
+                value={profile.timezone}
+                onChange={e => setProfile({ ...profile, timezone: e.target.value })}
+              >
+                {TIMEZONES.map(tz => (
+                  <option key={tz} value={tz}>{tz.replace('_', ' ')}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+            <button className="btn btn-ghost">Cancel</button>
+            <button className="btn btn-primary"><I n="check" s={13} /> Save changes</button>
+          </div>
+        </>
+      );
+
+      case 'notifs': return (
+        <>
+          <div className="settings-hdr">
+            <div className="settings-hdr-title">Notifications</div>
+            <div className="settings-hdr-sub">Choose when and how CCC OS reaches you.</div>
+          </div>
+
+          <div className="settings-section">
+            <div className="settings-section-label">Email Alerts</div>
+            <div className="panel" style={{ padding: '4px 16px', background: 'var(--bg3)' }}>
+              {[
+                { key: 'email',   label: 'Email notifications',    desc: 'System alerts, publish confirmations, errors' },
+                { key: 'weekly',  label: 'Weekly digest',          desc: 'Your top content performance every Monday' },
+                { key: 'newDeals',label: 'New brand deal alerts',  desc: 'Get notified when a deal matches your niche' },
+              ].map(({ key, label, desc }) => (
+                <div key={key} className="toggle-row">
+                  <div className="toggle-info">
+                    <div className="toggle-label">{label}</div>
+                    <div className="toggle-desc">{desc}</div>
+                  </div>
+                  <Toggle on={notifs[key]} onToggle={() => setNotifs({ ...notifs, [key]: !notifs[key] })} />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="settings-section">
+            <div className="settings-section-label">In-App & Push</div>
+            <div className="panel" style={{ padding: '4px 16px', background: 'var(--bg3)' }}>
+              {[
+                { key: 'push',      label: 'Browser push notifications', desc: 'Real-time alerts in your browser' },
+                { key: 'mentions',  label: 'Comment & mention alerts',   desc: 'When your content gets traction' },
+              ].map(({ key, label, desc }) => (
+                <div key={key} className="toggle-row">
+                  <div className="toggle-info">
+                    <div className="toggle-label">{label}</div>
+                    <div className="toggle-desc">{desc}</div>
+                  </div>
+                  <Toggle on={notifs[key]} onToggle={() => setNotifs({ ...notifs, [key]: !notifs[key] })} />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <button className="btn btn-primary"><I n="check" s={13} /> Save preferences</button>
+          </div>
+        </>
+      );
+
+      case 'platforms': return (
+        <>
+          <div className="settings-hdr">
+            <div className="settings-hdr-title">Connected Platforms</div>
+            <div className="settings-hdr-sub">Authorize CCC OS to publish and pull analytics on your behalf.</div>
+          </div>
+
+          <div style={{ marginBottom: 18, padding: '10px 14px', background: 'var(--accent3)', border: '1px solid rgba(108,71,255,.2)', borderRadius: 'var(--r-sm)', fontSize: 12, color: 'var(--accent2)', display: 'flex', gap: 8, alignItems: 'center' }}>
+            <I n="zap" s={13} />
+            Connect your platforms from the <strong>Scheduler</strong> room — OAuth flows live there. Use this page to review which accounts are linked.
+          </div>
+
+          {PLATFORMS.map(p => (
+            <div key={p.id} className="platform-connect-card">
+              <div className="platform-icon" style={{ background: p.bg }}>
+                <span style={{ fontSize: 16, lineHeight: 1, fontWeight: 700, color: p.color, fontFamily: 'monospace' }}>{p.icon}</span>
+              </div>
+              <div className="platform-connect-info">
+                <div className="platform-connect-name">{p.label}</div>
+                <div className="platform-connect-status">Not connected · {p.desc}</div>
+              </div>
+              <button
+                className="btn btn-ghost btn-sm"
+                style={{ opacity: 0.6, cursor: 'not-allowed' }}
+                title="Connect from the Scheduler room"
+              >
+                Connect
+              </button>
+            </div>
+          ))}
+
+          <div style={{ fontSize: 11.5, color: 'var(--text3)', marginTop: 10 }}>
+            Platform OAuth is managed per brand in the <button className="btn btn-ghost btn-sm" style={{ padding: '2px 8px', fontSize: 11 }}>Scheduler room ↗</button>
+          </div>
+        </>
+      );
+
+      case 'billing': return (
+        <>
+          <div className="settings-hdr">
+            <div className="settings-hdr-title">Billing</div>
+            <div className="settings-hdr-sub">Manage your subscription and payment methods.</div>
+          </div>
+
+          <div className="billing-placeholder">
+            <div className="billing-placeholder-icon">💳</div>
+            <div className="billing-placeholder-title">Billing managed in Plans & Billing</div>
+            <div className="billing-placeholder-sub">
+              Your subscription details, invoices, and upgrade options<br />
+              are available in the dedicated billing module.
+            </div>
+            <button className="btn btn-primary">
+              <I n="shield" s={13} /> Open Plans & Billing
+            </button>
+          </div>
+
+          <div style={{ marginTop: 18 }}>
+            <div className="settings-section-label" style={{ marginBottom: 12 }}>Quick summary</div>
+            <div className="panel" style={{ padding: '4px 16px', background: 'var(--bg3)' }}>
+              {[
+                ['Current plan',   'Operator (Admin)'],
+                ['Billing cycle',  '—'],
+                ['Next invoice',   '—'],
+                ['Payment method', '—'],
+              ].map(([k, v]) => (
+                <div key={k} className="stat-row">
+                  <span className="stat-k">{k}</span>
+                  <span className="stat-v">{v}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      );
+
+      case 'danger': return (
+        <>
+          <div className="settings-hdr">
+            <div className="settings-hdr-title" style={{ color: 'var(--red)' }}>Danger Zone</div>
+            <div className="settings-hdr-sub">Irreversible actions. Proceed with extreme caution.</div>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+
+            <div className="danger-zone">
+              <div className="danger-zone-title">Export your data</div>
+              <div className="danger-zone-desc">
+                Download a full JSON export of all your brands, content, analytics, and settings before making any destructive changes.
+              </div>
+              <button className="btn btn-ghost" style={{ color: 'var(--text2)' }}>
+                <I n="upload" s={13} /> Export data (coming soon)
+              </button>
+            </div>
+
+            <div className="danger-zone">
+              <div className="danger-zone-title">Delete all data for active brand</div>
+              <div className="danger-zone-desc">
+                Permanently removes all content, ideas, hooks, campaigns, and analytics for the currently selected brand. This cannot be undone.
+              </div>
+              <button className="btn btn-danger">
+                <I n="trash" s={13} /> Delete brand data
+              </button>
+            </div>
+
+            <div className="danger-zone">
+              <div className="danger-zone-title">Delete account</div>
+              <div className="danger-zone-desc">
+                Permanently delete your CCC OS account, all brands, all data, and cancel any active subscription. This action is <strong style={{ color: 'var(--red)' }}>irreversible</strong>.
+              </div>
+              <div className="danger-confirm-row">
+                <input
+                  className="form-input"
+                  style={{ maxWidth: 280, borderColor: deleteConfirm === 'DELETE' ? 'var(--red)' : undefined }}
+                  placeholder='Type "DELETE" to confirm'
+                  value={deleteConfirm}
+                  onChange={e => setDeleteConfirm(e.target.value)}
+                />
+                <button
+                  className="btn btn-danger"
+                  disabled={deleteConfirm !== 'DELETE'}
+                  style={{ opacity: deleteConfirm === 'DELETE' ? 1 : 0.45, cursor: deleteConfirm === 'DELETE' ? 'pointer' : 'not-allowed' }}
+                >
+                  <I n="trash" s={13} /> Delete my account
+                </button>
+              </div>
+            </div>
+
+          </div>
+        </>
+      );
+
+      default: return null;
+    }
+  };
+
+  return (
+    <div className="page">
+      <div style={{ marginBottom: 22 }}>
+        <div style={{ fontFamily: 'var(--font-d)', fontSize: 20, fontWeight: 800, color: 'var(--text)', marginBottom: 4 }}>Settings</div>
+        <div style={{ fontSize: 12.5, color: 'var(--text3)' }}>Manage your account, preferences, and connected platforms.</div>
+      </div>
+
+      <div className="settings-layout">
+        {/* Left nav */}
+        <div className="settings-nav">
+          {TABS.map((t, i) => (
+            <div key={t.id}>
+              {t.danger && <div className="settings-nav-sep" />}
+              <div
+                className={`settings-nav-item ${tab === t.id ? 'active' : ''} ${t.danger ? 'danger' : ''}`}
+                onClick={() => setTab(t.id)}
+              >
+                <I n={t.icon} s={14} />
+                {t.label}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Right panel */}
+        <div className="settings-panel">
+          {renderTab()}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
 export default function App() {
   const [user, setUser] = useState(null);
@@ -3309,6 +3707,7 @@ export default function App() {
     { id:'monetization', label:'Monetization', icon:'money' },
     { id:'studio', label:'Content Studio', icon:'studio', badge:'NEW' },
     { id:'billing', label:'Plans & Billing', icon:'shield' },
+    { id:'settings', label:'Settings', icon:'settings' },
   ];
 
   const PAGE_TITLES = {
@@ -3321,6 +3720,7 @@ export default function App() {
     monetization: 'Monetization Room',
     billing: 'Plans & Billing',
     studio: 'Content Studio',
+    settings: 'Settings',
   };
 
   const renderPage = () => {
@@ -3334,6 +3734,7 @@ export default function App() {
       case 'monetization': return <MonetizationRoom {...props} />;
       case 'scheduler': return <SchedulerRoom {...props} user={user} />;
       case 'studio': return <ContentStudioRoom activeBrand={activeBrand} />;
+      case 'settings': return <SettingsRoom user={user} />;
       case 'billing-success':
         return (
           <SuccessScreen
