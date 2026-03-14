@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback, useRef, createContext, useContext } from 'react';
 import * as api from './lib/api.js';
 import { PricingPage, BillingManagement, UpgradePrompt, SuccessScreen } from './pages/Billing.jsx';
+import { useContentStore } from './lib/store/useContentStore.ts';
 
 // ─── AUTH CONTEXT ─────────────────────────────────────────────────────────────
 const AuthCtx = createContext(null);
@@ -537,21 +538,41 @@ function QuickAddModal({ activeBrand, pillars, onClose, onSave }) {
 }
 
 // ─── PIPELINE BOARD ───────────────────────────────────────────────────────────
-function PipelineBoard({ assets, onCardClick }) {
+function PipelineBoard({ onCardClick }) {
+  // Read from global content store; shows mock data on first load,
+  // then real API data once ProductionRoom syncs it via setItems().
+  const { items, moveContentStatus } = useContentStore();
   const COLS = ['Idea','Scripted','Filming','Scheduled','Published','Repurposed'];
+
+  const handleDrop = (e, col) => {
+    const id = e.dataTransfer.getData('text/plain');
+    if (id) moveContentStatus(id, col);
+  };
+
   return (
     <div className="pipeline">
       {COLS.map(col => {
-        const cards = assets.filter(a => a.status === col);
+        const cards = items.filter(a => a.status === col);
         return (
-          <div className="pipe-col" key={col}>
+          <div
+            className="pipe-col"
+            key={col}
+            onDragOver={e => e.preventDefault()}
+            onDrop={e => handleDrop(e, col)}
+          >
             <div className="pipe-col-hdr">
               <span className="pipe-col-lbl">{col}</span>
               <span className="pipe-col-cnt">{cards.length}</span>
             </div>
             <div className="pipe-cards">
               {cards.slice(0,5).map(c => (
-                <div className="pipe-card" key={c.id} onClick={() => onCardClick && onCardClick(c)}>
+                <div
+                  className="pipe-card"
+                  key={c.id}
+                  draggable
+                  onDragStart={e => e.dataTransfer.setData('text/plain', c.id)}
+                  onClick={() => onCardClick && onCardClick(c)}
+                >
                   <div className="pipe-card-title">{c.title}</div>
                   <div className="pipe-card-meta">
                     <span className="badge badge-format">{c.format}</span>
@@ -560,7 +581,11 @@ function PipelineBoard({ assets, onCardClick }) {
                   </div>
                 </div>
               ))}
-              {cards.length===0 && <div style={{color:'var(--text3)',fontSize:10.5,textAlign:'center',padding:'10px 0'}}>Empty</div>}
+              {cards.length===0 && (
+                <div style={{ color:'var(--text3)', fontSize:10.5, textAlign:'center', padding:'14px 0', opacity:.6 }}>
+                  Drop here
+                </div>
+              )}
             </div>
           </div>
         );
@@ -619,7 +644,7 @@ function CommandCenter({ activeBrand, setPage }) {
         <div className="sec-title"><I n="production" s={14} /> Production Pipeline</div>
         <button className="btn btn-ghost btn-sm" onClick={() => setPage('production')}><I n="arrow" s={12} /> View All</button>
       </div>
-      <PipelineBoard assets={assets} />
+      <PipelineBoard />
 
       <div className="grid-2">
         {/* Platform Tracker */}
@@ -1197,7 +1222,6 @@ function RepurposeTracker({ activeBrand, assets }) {
 
 function ProductionRoom({ activeBrand }) {
   const [tab, setTab] = useState('pipeline');
-  const [assets, setAssets] = useState([]);
   const [ideas, setIdeas] = useState([]);
   const [hooks, setHooks] = useState([]);
   const [pillars, setPillars] = useState([]);
@@ -1206,6 +1230,9 @@ function ProductionRoom({ activeBrand }) {
   const [form, setForm] = useState({ title:'', format:'Short Form Video', platform:'TikTok', status:'Idea', funnel_stage:'TOFU', hook:'', cta:'', pillar_id:'' });
   const [ideaForm, setIdeaForm] = useState({ title:'', format:'Short Form Video', hook_angle:'', priority:'Medium', status:'Raw Idea' });
 
+  // ── Content store: Kanban reads from here; API data syncs into it ────────
+  const { items: assets, setItems, addContent } = useContentStore();
+
   useEffect(() => {
     if (!activeBrand) return;
     Promise.all([
@@ -1213,14 +1240,21 @@ function ProductionRoom({ activeBrand }) {
       api.production.ideas.list({ brandId: activeBrand.id }),
       api.production.hooks.list({ brandId: activeBrand.id }),
       api.brands.pillars.list(activeBrand.id),
-    ]).then(([a,i,h,p]) => { setAssets(a); setIdeas(i); setHooks(h); setPillars(p); });
+    ]).then(([a,i,h,p]) => {
+      // Sync real data into the store; Kanban re-renders automatically.
+      // Fall back to mock data if the brand has no assets yet.
+      if (a && a.length > 0) setItems(a);
+      setIdeas(i); setHooks(h); setPillars(p);
+    });
   }, [activeBrand?.id]);
 
   const saveAsset = async () => {
     if (!form.title.trim()) return;
-    await api.production.assets.create({ brand_id: activeBrand.id, ...form });
+    const created = await api.production.assets.create({ brand_id: activeBrand.id, ...form });
+    // Optimistically add to store so Kanban updates immediately.
+    addContent({ ...form, id: created?.id, brand_id: activeBrand.id, scheduledDate: null, pillar: '' });
     const a = await api.production.assets.list({ brandId: activeBrand.id });
-    setAssets(a);
+    if (a && a.length > 0) setItems(a);
     setAdding(false);
     setForm({ title:'', format:'Short Form Video', platform:'TikTok', status:'Idea', funnel_stage:'TOFU', hook:'', cta:'', pillar_id:'' });
   };
@@ -1246,7 +1280,7 @@ function ProductionRoom({ activeBrand }) {
 
       {tab === 'pipeline' && (
         <>
-          <PipelineBoard assets={assets} />
+          <PipelineBoard />
           <div className="panel">
             <div className="sec-title" style={{ marginBottom:14 }}>All Assets ({assets.length})</div>
             <table className="data-table">
