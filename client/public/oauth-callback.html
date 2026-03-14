@@ -78,9 +78,14 @@
     const status   = params.get('status');
     const platform = params.get('platform') || '';
     const reason   = params.get('reason')   || '';
-    const name     = platform
-      ? platform.charAt(0).toUpperCase() + platform.slice(1)
-      : 'Platform';
+    // Google auth login passes these extra fields back to the parent window
+    const authToken = params.get('token')  || '';
+    const authUserRaw = params.get('user') || '';
+    let authUser = null;
+    try { if (authUserRaw) authUser = JSON.parse(decodeURIComponent(authUserRaw)); } catch (_) {}
+
+    const isGoogleAuth = platform === 'google_auth';
+    const displayName  = isGoogleAuth ? 'Google' : (platform ? platform.charAt(0).toUpperCase() + platform.slice(1) : 'Platform');
 
     const spinner = document.getElementById('spinner');
     const icon    = document.getElementById('icon');
@@ -93,16 +98,18 @@
       icon.style.display    = 'block';
 
       if (s === 'success') {
-        icon.textContent      = '✅';
-        title.textContent     = `${name} Connected!`;
-        sub.textContent       = 'Your account has been linked to CCC OS.';
-        badge.innerHTML       = '<span class="badge success">Connected</span>';
+        icon.textContent  = isGoogleAuth ? '🎉' : '✅';
+        title.textContent = isGoogleAuth ? `Welcome${authUser?.name ? ', ' + authUser.name.split(' ')[0] : ''}!` : `${displayName} Connected!`;
+        sub.textContent   = isGoogleAuth ? 'Signing you into CCC OS…' : 'Your account has been linked to CCC OS.';
+        badge.innerHTML   = `<span class="badge success">${isGoogleAuth ? 'Signed in' : 'Connected'}</span>`;
       } else {
         icon.textContent  = '❌';
-        title.textContent = 'Connection Failed';
+        title.textContent = isGoogleAuth ? 'Sign-in Failed' : 'Connection Failed';
         const msg = reason
           ? decodeURIComponent(reason).replace(/\+/g, ' ').slice(0, 160)
-          : 'Something went wrong. Verify your OAuth credentials in Railway.';
+          : isGoogleAuth
+            ? 'Google sign-in failed. Please try again.'
+            : 'Something went wrong. Verify your OAuth credentials in Railway.';
         sub.textContent   = msg;
         badge.innerHTML   = '<span class="badge error">Error</span>';
       }
@@ -116,7 +123,9 @@
       try {
         if (window.opener && !window.opener.closed) {
           window.opener.postMessage(
-            { type: 'ccc_oauth_result', status, platform, reason },
+            // For google_auth: include token + user so AuthScreen can complete login
+            // For platform OAuth: just status/platform (existing behaviour)
+            { type: 'ccc_oauth_result', status, platform, reason, token: authToken || undefined, user: authUser || undefined },
             window.location.origin   // same origin — safe
           );
         }

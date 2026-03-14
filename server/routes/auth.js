@@ -2,6 +2,8 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const { v4: uuidv4 } = require('uuid');
+const jwt = require('jsonwebtoken');
+const axios = require('axios');
 const { getDB, seedUserData } = require('../db');
 const { signToken, authenticate } = require('../middleware/auth');
 
@@ -124,6 +126,103 @@ router.patch('/me', authenticate, async (req, res) => {
     res.json({ user: updated });
   } catch (err) {
     res.status(500).json({ error: 'Update failed' });
+  }
+});
+
+// ─── GOOGLE OAUTH ─────────────────────────────────────────────────────────────
+// Uses GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET env vars.
+// In Railway, set these to the same values as YOUTUBE_CLIENT_ID/SECRET if you're
+// using the same Google Cloud OAuth client — just add the userinfo scope in GCC.
+// Required redirect URI to whitelist in Google Cloud Console:
+//   https://ccc-os-production.up.railway.app/api/auth/google/callback
+
+// GET /api/auth/google — kick off Google Sign-In popup
+router.get('/google', (req, res) => {
+  const clientId = process.env.GOOGLE_CLIENT_ID || process.env.YOUTUBE_CLIENT_ID;
+  if (!clientId) {
+    return res.status(500).send('GOOGLE_CLIENT_ID env var not set');
+  }
+
+  // Short-lived JWT state to prevent CSRF
+  const state = jwt.sign({ type: 'google_auth', ts: Date.now() }, process.env.JWT_SECRET, { expiresIn: '10m' });
+  const redirectUri = `${process.env.SERVER_URL}/api/auth/google/callback`;
+
+  const url = 'https://accounts.google.com/o/oauth2/v2/auth?' + new URLSearchParams({
+    client_id: clientId,
+    redirect_uri: redirectUri,
+    response_type: 'code',
+    scope: 'openid email profile',
+    access_type: 'offline',
+    prompt: 'select_account',
+    state,
+  });
+
+  res.redirect(url);
+});
+
+// GET /api/auth/google/callback — exchange code, find or create user, redirect to popup handler
+router.get('/google/callback', async (req, res) => {
+  const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';
+  const { code, state, error } = req.query;
+
+  const fail = (msg) =>
+    res.redirect(`${CLIENT_URL}/oauth-callback.html?status=error&platform=google_auth&reason=${encodeURIComponent(msg)}`);
+
+  if (error || !code) return fail(error || 'Google sign-in was cancelled');
+
+  try {
+    // Verify CSRF state
+    jwt.verify(state, process.env.JWT_SECRET);
+
+    const clientId     = process.env.GOOGLE_CLIENT_ID     || process.env.YOUTUBE_CLIENT_ID;
+    const clientSecret = process.env.GOOGLE_CLIENT_SECRET || process.env.YOUTUBE_CLIENT_SECRET;
+    const redirectUri  = `${process.env.SERVER_URL}/api/auth/google/callback`;
+
+    // Exchange code for tokens
+    const tokenResp = await axios.post(
+      'https://oauth2.googleapis.com/token',
+      new URLSearchParams({ code, client_id: clientId, client_secret: clientSecret, redirect_uri: redirectUri, grant_type: 'authorization_code' }),
+      { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+    );
+    const { access_token } = tokenResp.data;
+
+    // Fetch Google profile
+    const { data: profile } = await axios.get('https://www.googleapis.com/oauth2/v3/userinfo', {
+      headers: { Authorization: `Bearer ${access_token}` },
+    });
+    const { email, name, picture } = profile;
+    if (!email) return fail('Could not retrieve email from Google account');
+
+    // Find or create user
+    const db = getDB();
+    let user = db.prepare('SELECT id, email, name, tier, is_admin, created_at FROM users WHERE email = ?').get(email.toLowerCase());
+
+    if (!user) {
+      const userId  = uuidv4();
+      const isAdmin = process.env.ADMIN_EMAIL && email.toLowerCase() === process.env.ADMIN_EMAIL.toLowerCase() ? 1 : 0;
+
+      // Store sentinel for password — Google users cannot log in via email+password
+      db.prepare('INSERT INTO users (id, email, password, name, is_admin) VALUES (?, ?, ?, ?, ?)')
+        .run(userId, email.toLowerCase(), '__GOOGLE_OAUTH__', name || email.split('@')[0], isAdmin);
+
+      if (isAdmin) {
+        db.prepare("UPDATE users SET tier = 'operator' WHERE id = ?").run(userId);
+      }
+
+      seedUserData(userId);
+      user = db.prepare('SELECT id, email, name, tier, is_admin, created_at FROM users WHERE id = ?').get(userId);
+    }
+
+    // Issue 30-day JWT
+    const token = signToken(user.id, user.tier);
+
+    // Redirect to oauth-callback.html — the popup script postMessages token back to parent
+    const userPayload = encodeURIComponent(JSON.stringify({ ...user, avatar: picture || null }));
+    res.redirect(`${CLIENT_URL}/oauth-callback.html?status=success&platform=google_auth&token=${encodeURIComponent(token)}&user=${userPayload}`);
+
+  } catch (err) {
+    console.error('Google auth callback error:', err.response?.data || err.message);
+    fail('Authentication failed — please try again');
   }
 });
 

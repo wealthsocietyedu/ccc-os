@@ -208,11 +208,24 @@ const STYLES = `
   .auth-card { background: var(--bg2); border: 1px solid var(--border2); border-radius: 18px; padding: 36px; width: 100%; max-width: 420px; }
   .auth-logo { font-family: var(--font-d); font-size: 22px; font-weight: 800; color: var(--text); margin-bottom: 6px; }
   .auth-logo span { color: var(--accent2); }
-  .auth-sub { font-size: 13px; color: var(--text3); margin-bottom: 28px; }
+  .auth-sub { font-size: 13px; color: var(--text3); margin-bottom: 22px; }
   .auth-tabs { display: flex; gap: 0; margin-bottom: 22px; border-bottom: 1px solid var(--border); }
   .auth-tab { padding: 8px 18px; font-size: 13px; font-weight: 600; cursor: pointer; color: var(--text3); border: none; background: none; font-family: var(--font-b); border-bottom: 2px solid transparent; transition: all .13s; margin-bottom: -1px; }
   .auth-tab.active { color: var(--accent2); border-bottom-color: var(--accent); }
   .auth-error { background: var(--red-d); border: 1px solid rgba(239,68,68,.25); border-radius: var(--r-sm); padding: 10px 14px; font-size: 13px; color: var(--red); margin-bottom: 14px; }
+  .auth-google-btn { width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px; padding: 10px 16px; background: #fff; border: 1px solid #dadce0; border-radius: var(--r-sm); font-family: var(--font-b); font-size: 13.5px; font-weight: 600; color: #3c4043; cursor: pointer; transition: background .13s, box-shadow .13s; margin-bottom: 18px; }
+  .auth-google-btn:hover { background: #f8f9fa; box-shadow: 0 1px 6px rgba(0,0,0,.2); }
+  .auth-google-btn:disabled { opacity: .55; cursor: not-allowed; }
+  .auth-divider { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; color: var(--text3); font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; }
+  .auth-divider::before, .auth-divider::after { content:''; flex: 1; height: 1px; background: var(--border); }
+
+  /* ── Sidebar user avatar ── */
+  .s-user { display: flex; align-items: center; gap: 9px; padding: 12px 18px 10px; border-bottom: 1px solid var(--border); }
+  .s-avatar { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-family: var(--font-d); font-size: 11px; font-weight: 800; color: white; flex-shrink: 0; text-transform: uppercase; background: var(--accent); overflow: hidden; }
+  .s-avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+  .s-user-info { min-width: 0; }
+  .s-user-name { font-size: 12.5px; font-weight: 700; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 140px; }
+  .s-user-email { font-size: 10.5px; color: var(--text3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 140px; }
 
   /* ── Distribution Room ── */
   .funnel-card { background: var(--bg3); border: 1px solid var(--border); border-radius: var(--r); padding: 16px; margin-bottom: 12px; }
@@ -390,11 +403,49 @@ const STATUS_C = { Idea:'#555578', Approved:'#6C47FF', Scripted:'#22d3ee', Filmi
 const PILLAR_C = ['#6C47FF','#FF6B35','#22d3ee','#22c55e','#f59e0b','#e879f9','#fb7185','#34d399'];
 
 // ─── AUTH SCREEN ──────────────────────────────────────────────────────────────
+// Google logo SVG (official brand mark)
+const GoogleLogo = () => (
+  <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
+    <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4"/>
+    <path d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.258c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z" fill="#34A853"/>
+    <path d="M3.964 10.707A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.707V4.961H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.039l3.007-2.332z" fill="#FBBC05"/>
+    <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.961L3.964 7.293C4.672 5.163 6.656 3.58 9 3.58z" fill="#EA4335"/>
+  </svg>
+);
+
 function AuthScreen({ onAuth }) {
   const [mode, setMode] = useState('login');
   const [form, setForm] = useState({ name: '', email: '', password: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+
+  // Listen for Google OAuth postMessage from the popup window
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.data?.type !== 'ccc_oauth_result') return;
+      if (e.data.platform !== 'google_auth') return;
+      setGoogleLoading(false);
+      if (e.data.status === 'success' && e.data.token) {
+        localStorage.setItem('ccc_token', e.data.token);
+        onAuth(e.data.user || { name: 'User', email: '' });
+      } else {
+        setError(e.data.reason ? decodeURIComponent(e.data.reason) : 'Google sign-in failed. Try again.');
+      }
+    };
+    window.addEventListener('message', handler);
+    return () => window.removeEventListener('message', handler);
+  }, [onAuth]);
+
+  const handleGoogleLogin = () => {
+    setGoogleLoading(true);
+    setError('');
+    const popup = window.open('/api/auth/google', 'ccc-google-auth', 'width=500,height=640,scrollbars=yes,resizable=yes');
+    // Detect if popup was closed without completing OAuth
+    const checkClosed = setInterval(() => {
+      if (popup?.closed) { clearInterval(checkClosed); setGoogleLoading(false); }
+    }, 800);
+  };
 
   const submit = async (e) => {
     e.preventDefault();
@@ -418,6 +469,7 @@ function AuthScreen({ onAuth }) {
       <div className="auth-card">
         <div className="auth-logo">Content <span>Command Center</span></div>
         <div className="auth-sub">The operating system for content businesses.</div>
+
         <div className="auth-tabs">
           {['login','register'].map(m => (
             <button key={m} className={`auth-tab ${mode===m?'active':''}`} onClick={() => { setMode(m); setError(''); }}>
@@ -425,7 +477,20 @@ function AuthScreen({ onAuth }) {
             </button>
           ))}
         </div>
+
+        {/* ── Google Sign-In ── */}
+        <button className="auth-google-btn" onClick={handleGoogleLogin} disabled={googleLoading || loading}>
+          {googleLoading
+            ? <><span className="spin" style={{ width:16, height:16, borderRadius:'50%', border:'2px solid #dadce0', borderTopColor:'#4285F4', display:'inline-block' }} /> Signing in…</>
+            : <><GoogleLogo /> Continue with Google</>
+          }
+        </button>
+
+        <div className="auth-divider">or</div>
+
         {error && <div className="auth-error">{error}</div>}
+
+        {/* ── Email / Password form ── */}
         <form onSubmit={submit}>
           {mode === 'register' && (
             <div className="form-row">
@@ -441,10 +506,18 @@ function AuthScreen({ onAuth }) {
             <label className="form-label">Password</label>
             <input className="form-input" type="password" placeholder={mode === 'register' ? 'Min 8 characters' : '••••••••'} value={form.password} onChange={e => setForm({...form, password: e.target.value})} required />
           </div>
-          <button className="btn btn-primary" type="submit" style={{ width:'100%', justifyContent:'center', marginTop: 6 }} disabled={loading}>
-            {loading ? '...' : mode === 'login' ? 'Sign In' : 'Create Account & Start'}
+          <button className="btn btn-primary" type="submit" style={{ width:'100%', justifyContent:'center', marginTop: 6 }} disabled={loading || googleLoading}>
+            {loading ? '…' : mode === 'login' ? 'Sign In' : 'Create Account & Start'}
           </button>
         </form>
+
+        {/* ── Mode switch link ── */}
+        <div style={{ marginTop: 18, textAlign: 'center', fontSize: 12.5, color: 'var(--text3)' }}>
+          {mode === 'login'
+            ? <>Don't have an account? <button onClick={() => { setMode('register'); setError(''); }} style={{ background:'none', border:'none', color:'var(--accent2)', fontWeight:600, cursor:'pointer', fontFamily:'var(--font-b)', fontSize:12.5, padding:0 }}>Sign up free</button></>
+            : <>Already have an account? <button onClick={() => { setMode('login'); setError(''); }} style={{ background:'none', border:'none', color:'var(--accent2)', fontWeight:600, cursor:'pointer', fontFamily:'var(--font-b)', fontSize:12.5, padding:0 }}>Sign in</button></>
+          }
+        </div>
       </div>
     </div>
   );
@@ -3827,8 +3900,21 @@ export default function App() {
       <div className="app">
         {/* Sidebar */}
         <div className="sidebar">
-          <div className="s-logo">
-            <div className="s-logo-eyebrow">Levi Acay</div>
+          {/* ── User identity block ── */}
+          <div className="s-user">
+            <div className="s-avatar">
+              {user?.avatar
+                ? <img src={user.avatar} alt={user.name} referrerPolicy="no-referrer" />
+                : (user?.name || 'U').split(' ').slice(0,2).map(n => n[0]).join('').toUpperCase()
+              }
+            </div>
+            <div className="s-user-info">
+              <div className="s-user-name">{user?.name || 'Loading…'}</div>
+              <div className="s-user-email">{user?.email || ''}</div>
+            </div>
+          </div>
+
+          <div className="s-logo" style={{ borderBottom: 'none', paddingTop: 14, paddingBottom: 10 }}>
             <div className="s-logo-title">Content<br /><span className="s-logo-accent">Command Center</span></div>
           </div>
 
