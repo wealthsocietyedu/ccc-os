@@ -1,0 +1,45 @@
+name: Content Agent
+
+on:
+  # Run daily at 9 AM UTC
+  schedule:
+    - cron: '0 9 * * *'
+  # Allow manual trigger from the Actions tab
+  workflow_dispatch:
+
+permissions:
+  contents: write  # needed to commit the generated file back to the repo
+
+jobs:
+  generate-content:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run Claude content agent
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          # Tell Claude exactly what to do — reads CLAUDE.md automatically
+          prompt: |
+            Read CLAUDE.md for the project rules and content standards.
+            Read content-notes.md for today's topic, angle, and raw notes.
+
+            Generate the following and write everything to content-output/daily-script.md:
+
+            1. ONE YouTube script (800–1200 words) following the structure in CLAUDE.md
+            2. FIVE hook options (label them Hook 1 through Hook 5)
+            3. FIVE title options (label them Title 1 through Title 5)
+
+            Format the output clearly with markdown headers separating each section.
+            Overwrite content-output/daily-script.md completely — do not append.
+
+      - name: Commit generated content
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add content-output/daily-script.md
+          # Only commit if there's something new
+          git diff --cached --quiet || git commit -m "content-agent: daily script $(date -u +'%Y-%m-%d')"
+          git push

@@ -1,0 +1,51 @@
+name: Nightly Planner
+
+on:
+  # Run every night at 2 AM UTC
+  schedule:
+    - cron: '0 2 * * *'
+  # Allow manual trigger from the Actions tab
+  workflow_dispatch:
+
+permissions:
+  contents: write  # needed to commit updated TODO.md and nightly-plan.md
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run Claude planner agent
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            Read CLAUDE.md for project rules.
+            Read docs/context.md for the current project state and priorities.
+            Read TODO.md for the current task list.
+
+            Do two things:
+
+            1. Update TODO.md:
+               - Keep the P0 / P1 / P2 / Completed structure
+               - Add any new tasks that are implied by docs/context.md
+               - Move any items that appear to be done to the Completed section
+               - Keep the total open item count under 12
+               - Do not remove items unless they are clearly completed
+
+            2. Write reports/nightly-plan.md:
+               - Date header (today's date)
+               - 3–5 bullet points: what's in progress, what's blocked, what to focus on tomorrow
+               - Flag any P2 items that have been stale for a long time
+               - Keep it under 200 words — short and scannable
+               - Overwrite the file completely each run
+
+      - name: Commit planner output
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add TODO.md reports/nightly-plan.md
+          git diff --cached --quiet || git commit -m "nightly-planner: plan $(date -u +'%Y-%m-%d')"
+          git push
