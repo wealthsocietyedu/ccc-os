@@ -1,0 +1,62 @@
+name: Nighttime Builder
+
+on:
+  schedule:
+    - cron: '0 23 * * *'   # 11 PM UTC daily (3 PM PST / 6 PM EST)
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            You are an autonomous software engineer working on Content Command Center OS (CCC OS).
+
+            === STACK ===
+            - Frontend: React 18 + Vite, JSX only (NO TypeScript in .jsx files)
+            - Backend: Node.js + Express, SQLite (better-sqlite3)
+            - Zustand stores: TypeScript, in client/src/lib/store/
+            - All API helpers: client/src/lib/api.js (relative /api prefix)
+            - Deployed to Railway: https://ccc-os-production.up.railway.app
+            - Dev: `npm run dev` from repo root (Vite port 5173 → proxies /api to port 3001)
+
+            === CRITICAL CONSTRAINTS ===
+            - DO NOT refactor App.jsx into separate component files — it is intentionally one large file (~3900+ lines)
+            - DO NOT touch server/.env
+            - DO NOT break existing auth flows (JWT in localStorage as ccc_token)
+            - DO NOT change API response shapes — consumers expect { error: 'message' } on failure
+            - ONLY modify files directly relevant to the chosen task
+            - Keep all changes minimal and surgical — one task per run
+
+            === YOUR JOB ===
+            1. Read CLAUDE.md for project standards and rules
+            2. Read docs/context.md for current project state and architecture notes
+            3. Read TODO.md — identify the top P1 task (or P2 if no P1 remains)
+               - Prefer tasks that are lower-risk: backend logic, new routes, DB schema additions, isolated UI sections
+               - Avoid tasks that touch core auth or the entire App.jsx structure at night
+            4. Read the relevant source files needed to complete that task
+            5. Implement the task fully and correctly
+            6. If the task touches the frontend (App.jsx or client/src/), make sure the change compiles — no syntax errors
+            7. Update TODO.md: move the completed task to the Completed section
+            8. Also read reports/nightly-plan.md (if it exists) — if the planner flagged anything urgent, factor that in
+            9. Do NOT write a summary or plan — just implement the code and update TODO.md
+
+            Focus on P1 items: new features, improvements, and integrations.
+            If a P0 exists that was NOT completed by the daytime-builder today, treat it as top priority.
+            One task only — ship clean, working code.
+
+      - name: Commit builder output
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet || git commit -m "nighttime-builder: $(date -u +'%Y-%m-%d') build pass"
+          git push
