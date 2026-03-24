@@ -1,0 +1,14 @@
+# ── CCC OS — Nixpacks config for Smart Clipper ─────────────────────────────────
+# Tells Railway to install system tools needed for video processing
+
+[phases.setup]
+nixPkgs = ["ffmpeg", "yt-dlp", "python311"]
+aptPkgs = ["fonts-dejavu-core"]
+
+[phases.install]
+cmds = [
+  "pip3 install openai-whisper --break-system-packages || true"
+]
+
+[start]
+cmd = "node server/index.js"
