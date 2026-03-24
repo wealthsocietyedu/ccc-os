@@ -1,0 +1,2 @@
+import SmartClipper from './components/SmartClipper';
+{ id: 'smart-clipper', label: 'Smart Clipper', icon: '✂', component: SmartClipper }
