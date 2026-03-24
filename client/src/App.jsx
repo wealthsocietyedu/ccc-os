@@ -3820,7 +3820,9 @@ export default function App() {
     { id:'billing', label:'Plans & Billing', icon:'shield' },
     { id:'settings', label:'Settings', icon:'settings' },
   ];
-
+{ id:'ai-studio',     label:'AI Studio',     icon:'eye',  badge:'NEW' },
+{ id:'visual-engine', label:'Visual Engine', icon:'eye',  badge:'NEW' },
+{ id:'smart-clipper', label:'Smart Clipper', icon:'zap',  badge:'NEW' },
   const PAGE_TITLES = {
     dashboard: 'Command Center',
     strategy: 'Strategy Room',
@@ -3846,6 +3848,9 @@ export default function App() {
       case 'scheduler': return <SchedulerRoom {...props} user={user} />;
       case 'studio': return <ContentStudioRoom activeBrand={activeBrand} />;
       case 'settings': return <SettingsRoom user={user} />;
+      case 'ai-studio': return <AIStudio />;
+case 'visual-engine': return <VisualEngine />;
+case 'smart-clipper': return <SmartClipper />;
       case 'billing-success':
         return (
           <SuccessScreen

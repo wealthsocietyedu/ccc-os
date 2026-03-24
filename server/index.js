@@ -26,7 +26,14 @@ const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';
 // Trust Railway's reverse proxy — required for express-rate-limit to work correctly
 // without this it throws ERR_ERL_UNEXPECTED_X_FORWARDED_FOR and crashes
 app.set('trust proxy', 1);
+const aiStudioRoutes = require('./routes/aiStudio');
+app.use('/api/ai-studio', aiStudioRoutes);
 
+const visualEngineRoutes = require('./routes/visualEngine');
+app.use('/api/visual-engine', visualEngineRoutes);
+
+const smartClipperRoutes = require('./routes/smartClipper');
+app.use('/api/smart-clipper', smartClipperRoutes);
 
 // ─── SECURITY ─────────────────────────────────────────────────────────────────
 app.use(helmet({
