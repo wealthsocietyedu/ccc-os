@@ -1,14 +1,11 @@
-[build]
-  builder = "NIXPACKS"
-  buildCommand = "npm run install:all && npm run build"
+[phases.setup]
+nixPkgs = ["ffmpeg", "yt-dlp", "python311"]
+aptPkgs = ["fonts-dejavu-core"]
 
-[deploy]
-  startCommand = "npm start"
-  restartPolicyType = "ON_FAILURE"
-  restartPolicyMaxRetries = 3
-  healthcheckPath = "/api/health"
-  healthcheckTimeout = 30
+[phases.install]
+cmds = [
+  "pip3 install openai-whisper --break-system-packages || true"
+]
 
-[environments.production.variables]
-  NODE_ENV = "production"
-  DB_PATH = "/var/data/ccc_os.db"
+[start]
+cmd = "node server/index.js"

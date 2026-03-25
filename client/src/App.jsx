@@ -3,6 +3,9 @@ import { useState, useEffect, useCallback, useRef, createContext, useContext } f
 import * as api from './lib/api.js';
 import { PricingPage, BillingManagement, UpgradePrompt, SuccessScreen } from './pages/Billing.jsx';
 import { useContentStore } from './lib/store/useContentStore.ts';
+import { AIStudio } from './components/AIStudio.jsx';
+import { VisualEngine } from './components/VisualEngine.jsx';
+import { SmartClipper } from './components/SmartClipper.jsx';
 
 // ─── AUTH CONTEXT ─────────────────────────────────────────────────────────────
 const AuthCtx = createContext(null);
@@ -3817,6 +3820,9 @@ export default function App() {
     { id:'data', label:'Data Room', icon:'data' },
     { id:'monetization', label:'Monetization', icon:'money' },
     { id:'studio', label:'Content Studio', icon:'studio', badge:'NEW' },
+    { id:'ai-studio',      label:'AI Studio',      icon:'studio',   badge:'NEW' },
+    { id:'visual-engine',  label:'Visual Engine',  icon:'image',    badge:'NEW' },
+    { id:'smart-clipper',  label:'Smart Clipper',  icon:'scissors', badge:'NEW' },
     { id:'billing', label:'Plans & Billing', icon:'shield' },
     { id:'settings', label:'Settings', icon:'settings' },
   ];
@@ -3833,6 +3839,9 @@ export default function App() {
     monetization: 'Monetization Room',
     billing: 'Plans & Billing',
     studio: 'Content Studio',
+    'ai-studio':     'AI Studio',
+    'visual-engine': 'Visual Engine',
+    'smart-clipper': 'Smart Clipper',
     settings: 'Settings',
   };
 
@@ -3847,6 +3856,9 @@ export default function App() {
       case 'monetization': return <MonetizationRoom {...props} />;
       case 'scheduler': return <SchedulerRoom {...props} user={user} />;
       case 'studio': return <ContentStudioRoom activeBrand={activeBrand} />;
+      case 'ai-studio':     return <AIStudio activeBrand={activeBrand} />;
+      case 'visual-engine': return <VisualEngine activeBrand={activeBrand} />;
+      case 'smart-clipper': return <SmartClipper activeBrand={activeBrand} />;
       case 'settings': return <SettingsRoom user={user} />;
       case 'ai-studio': return <AIStudio />;
 case 'visual-engine': return <VisualEngine />;

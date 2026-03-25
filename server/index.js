@@ -15,6 +15,9 @@ const distributionRoutes = require('./routes/distribution');
 const dataRoutes = require('./routes/data');
 const billingRoutes = require('./routes/billing');
 const schedulerRoutes = require('./routes/scheduler');
+const studioRoutes = require('./routes/studio');
+const visualEngineRoutes = require('./routes/visual-engine');
+const clipperRoutes = require('./routes/clipper');
 const { startCron } = require('./scheduler/cron');
 const { getDB, reseedUserData } = require('./db');
 const { authenticate } = require('./middleware/auth');
@@ -74,6 +77,9 @@ app.use('/api/distribution', distributionRoutes);
 app.use('/api/data', dataRoutes);
 app.use('/api/billing', billingRoutes);
 app.use('/api/scheduler', schedulerRoutes);
+app.use('/api/ai-studio',     studioRoutes);
+app.use('/api/visual-engine', authenticate, visualEngineRoutes);
+app.use('/api/smart-clipper', authenticate, clipperRoutes);
 
 // ─── ADMIN ENDPOINTS ──────────────────────────────────────────────────────────
 
