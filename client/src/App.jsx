@@ -3,9 +3,9 @@ import { useState, useEffect, useCallback, useRef, createContext, useContext } f
 import * as api from './lib/api.js';
 import { PricingPage, BillingManagement, UpgradePrompt, SuccessScreen } from './pages/Billing.jsx';
 import { useContentStore } from './lib/store/useContentStore.ts';
-import { AIStudio } from './components/AIStudio.jsx';
-import { VisualEngine } from './components/VisualEngine.jsx';
-import { SmartClipper } from './components/SmartClipper.jsx';
+import AIStudio from './components/AIStudio.jsx';
+import VisualEngine from './components/VisualEngine.jsx';
+import SmartClipper from './components/SmartClipper.jsx';
 
 // ─── AUTH CONTEXT ─────────────────────────────────────────────────────────────
 const AuthCtx = createContext(null);
@@ -3826,9 +3826,6 @@ export default function App() {
     { id:'billing', label:'Plans & Billing', icon:'shield' },
     { id:'settings', label:'Settings', icon:'settings' },
   ];
-{ id:'ai-studio',     label:'AI Studio',     icon:'eye',  badge:'NEW' },
-{ id:'visual-engine', label:'Visual Engine', icon:'eye',  badge:'NEW' },
-{ id:'smart-clipper', label:'Smart Clipper', icon:'zap',  badge:'NEW' },
   const PAGE_TITLES = {
     dashboard: 'Command Center',
     strategy: 'Strategy Room',
@@ -3860,9 +3857,6 @@ export default function App() {
       case 'visual-engine': return <VisualEngine activeBrand={activeBrand} />;
       case 'smart-clipper': return <SmartClipper activeBrand={activeBrand} />;
       case 'settings': return <SettingsRoom user={user} />;
-      case 'ai-studio': return <AIStudio />;
-case 'visual-engine': return <VisualEngine />;
-case 'smart-clipper': return <SmartClipper />;
       case 'billing-success':
         return (
           <SuccessScreen
