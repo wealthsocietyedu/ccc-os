@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Terms of Service — Content Command Center OS</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #0a0a0f;
+      --surface:  #111118;
+      --surface2: #16161f;
+      --border:   #1e1e2e;
+      --border2:  #2a2a3d;
+      --text:     #e2e8f0;
+      --text2:    #94a3b8;
+      --text3:    #64748b;
+      --accent:   #6c47ff;
+      --accent2:  #a78bfa;
+      --green:    #22c55e;
+      --font-d:   'Syne', sans-serif;
+      --font-b:   'DM Sans', sans-serif;
+      --r:        12px;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-b);
+      font-size: 15px;
+      line-height: 1.7;
+      min-height: 100vh;
+    }
+
+    /* ── Top bar ── */
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: rgba(10, 10, 15, 0.85);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 40px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 56px;
+    }
+    .topbar-logo {
+      font-family: var(--font-d);
+      font-size: 15px;
+      font-weight: 800;
+      color: var(--text);
+      text-decoration: none;
+      letter-spacing: -.02em;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .topbar-logo span {
+      display: inline-block;
+      width: 24px;
+      height: 24px;
+      background: var(--accent);
+      border-radius: 6px;
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .topbar-back {
+      font-size: 12.5px;
+      color: var(--text3);
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      transition: color .15s;
+    }
+    .topbar-back:hover { color: var(--accent2); }
+
+    /* ── Hero ── */
+    .hero {
+      padding: 72px 40px 48px;
+      max-width: 780px;
+      margin: 0 auto;
+      border-bottom: 1px solid var(--border);
+    }
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(108, 71, 255, .12);
+      border: 1px solid rgba(108, 71, 255, .25);
+      border-radius: 100px;
+      padding: 4px 12px;
+      font-size: 11.5px;
+      font-weight: 600;
+      color: var(--accent2);
+      letter-spacing: .04em;
+      text-transform: uppercase;
+      margin-bottom: 20px;
+    }
+    .hero h1 {
+      font-family: var(--font-d);
+      font-size: 38px;
+      font-weight: 800;
+      color: var(--text);
+      letter-spacing: -.03em;
+      line-height: 1.1;
+      margin-bottom: 16px;
+    }
+    .hero-sub {
+      font-size: 16px;
+      color: var(--text2);
+      line-height: 1.65;
+      max-width: 600px;
+    }
+    .hero-meta {
+      margin-top: 28px;
+      display: flex;
+      gap: 24px;
+      flex-wrap: wrap;
+    }
+    .hero-meta-item {
+      font-size: 12px;
+      color: var(--text3);
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .hero-meta-item strong { color: var(--text2); font-weight: 500; }
+
+    /* ── Layout ── */
+    .layout {
+      max-width: 780px;
+      margin: 0 auto;
+      padding: 0 40px 80px;
+      display: grid;
+      grid-template-columns: 200px 1fr;
+      gap: 48px;
+      align-items: start;
+    }
+
+    /* ── TOC ── */
+    .toc {
+      position: sticky;
+      top: 72px;
+      padding: 24px 0;
+    }
+    .toc-title {
+      font-size: 10.5px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .1em;
+      color: var(--text3);
+      margin-bottom: 12px;
+    }
+    .toc a {
+      display: block;
+      font-size: 12.5px;
+      color: var(--text3);
+      text-decoration: none;
+      padding: 5px 0;
+      border-left: 2px solid var(--border);
+      padding-left: 12px;
+      transition: color .12s, border-color .12s;
+      line-height: 1.4;
+    }
+    .toc a:hover {
+      color: var(--accent2);
+      border-color: var(--accent);
+    }
+
+    /* ── Content ── */
+    .content {
+      padding-top: 40px;
+    }
+
+    .section {
+      margin-bottom: 52px;
+    }
+
+    .section-anchor {
+      display: block;
+      height: 80px;
+      margin-top: -80px;
+      visibility: hidden;
+    }
+
+    .section h2 {
+      font-family: var(--font-d);
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: -.02em;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .section-icon {
+      width: 30px;
+      height: 30px;
+      border-radius: 8px;
+      background: rgba(108, 71, 255, .14);
+      border: 1px solid rgba(108, 71, 255, .22);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      flex-shrink: 0;
+    }
+
+    .section p {
+      color: var(--text2);
+      margin-bottom: 14px;
+      font-size: 14.5px;
+    }
+    .section p:last-child { margin-bottom: 0; }
+
+    /* Cards */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      padding: 20px 22px;
+      margin: 18px 0;
+    }
+    .card-title {
+      font-family: var(--font-d);
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 10px;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+    }
+
+    /* List */
+    .check-list {
+      list-style: none;
+      margin: 10px 0;
+    }
+    .check-list li {
+      font-size: 14px;
+      color: var(--text2);
+      padding: 5px 0 5px 22px;
+      position: relative;
+      line-height: 1.5;
+    }
+    .check-list li::before {
+      content: '✓';
+      position: absolute;
+      left: 0;
+      color: var(--green);
+      font-weight: 700;
+      font-size: 12px;
+    }
+
+    /* Bullet list */
+    .bullet-list {
+      list-style: none;
+      margin: 10px 0;
+    }
+    .bullet-list li {
+      font-size: 14px;
+      color: var(--text2);
+      padding: 5px 0 5px 22px;
+      position: relative;
+      line-height: 1.5;
+    }
+    .bullet-list li::before {
+      content: '–';
+      position: absolute;
+      left: 0;
+      color: var(--text3);
+      font-weight: 700;
+    }
+
+    /* Contact card */
+    .contact-card {
+      background: var(--surface2);
+      border: 1px solid var(--border2);
+      border-radius: var(--r);
+      padding: 20px 22px;
+      margin-top: 16px;
+    }
+    .contact-card a {
+      color: var(--accent2);
+      text-decoration: none;
+      font-weight: 500;
+    }
+    .contact-card a:hover { text-decoration: underline; }
+
+    /* ── Footer ── */
+    .footer {
+      border-top: 1px solid var(--border);
+      padding: 28px 40px;
+      max-width: 780px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .footer-copy {
+      font-size: 12px;
+      color: var(--text3);
+    }
+    .footer-links {
+      display: flex;
+      gap: 20px;
+    }
+    .footer-links a {
+      font-size: 12px;
+      color: var(--text3);
+      text-decoration: none;
+      transition: color .12s;
+    }
+    .footer-links a:hover { color: var(--accent2); }
+
+    /* ── Responsive ── */
+    @media (max-width: 680px) {
+      .topbar { padding: 0 20px; }
+      .hero   { padding: 48px 20px 36px; }
+      .hero h1 { font-size: 28px; }
+      .layout { grid-template-columns: 1fr; padding: 0 20px 60px; gap: 0; }
+      .toc    { display: none; }
+      .footer { padding: 24px 20px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Bar -->
+  <nav class="topbar">
+    <a class="topbar-logo" href="/">
+      <span>⚡</span> CCC OS
+    </a>
+    <a class="topbar-back" href="/">← Back to app</a>
+  </nav>
+
+  <!-- Hero -->
+  <header class="hero">
+    <div class="hero-badge">📄 Legal</div>
+    <h1>Terms of Service</h1>
+    <p class="hero-sub">
+      These terms govern your use of Content Command Center OS. Please read them carefully before creating an account or using the service.
+    </p>
+    <div class="hero-meta">
+      <div class="hero-meta-item">📅 <strong>Effective:</strong> March 2026</div>
+      <div class="hero-meta-item">🏢 <strong>Operator:</strong> Levi Acay</div>
+      <div class="hero-meta-item">📧 <strong>Contact:</strong> support@ccc-os.com</div>
+    </div>
+  </header>
+
+  <!-- Body -->
+  <div class="layout">
+
+    <!-- TOC -->
+    <aside class="toc">
+      <div class="toc-title">On this page</div>
+      <a href="#acceptance">Acceptance of Terms</a>
+      <a href="#description">Description of Service</a>
+      <a href="#accounts">User Accounts</a>
+      <a href="#subscription">Subscription &amp; Payment</a>
+      <a href="#acceptable-use">Acceptable Use</a>
+      <a href="#ip">Intellectual Property</a>
+      <a href="#termination">Termination</a>
+      <a href="#disclaimer">Disclaimer of Warranties</a>
+      <a href="#liability">Limitation of Liability</a>
+      <a href="#governing-law">Governing Law</a>
+      <a href="#changes">Changes to Terms</a>
+      <a href="#contact">Contact</a>
+    </aside>
+
+    <!-- Content -->
+    <main class="content">
+
+      <div class="section">
+        <span class="section-anchor" id="acceptance"></span>
+        <h2><span class="section-icon">✅</span> Acceptance of Terms</h2>
+        <p>
+          By accessing or using Content Command Center OS ("CCC OS", "the Service", "we", "us"), you agree to be bound by these Terms of Service. If you do not agree to these terms, do not use the Service.
+        </p>
+        <p>
+          These terms apply to all users of CCC OS, including visitors, registered users, and paying subscribers. Your continued use of the Service after any updates to these terms constitutes acceptance of the revised terms.
+        </p>
+      </div>
+
+      <div class="section">
+        <span class="section-anchor" id="description"></span>
+        <h2><span class="section-icon">🚀</span> Description of Service</h2>
+        <p>
+          Content Command Center OS is a SaaS platform for content creators to manage, plan, and optimize their social media content strategy.
+        </p>
+        <p>
+          The Service includes tools for content pipeline management, scheduling and publishing to connected social media platforms, analytics tracking, brand management, and related features as made available from time to time. Feature availability may vary by subscription plan.
+        </p>
+      </div>
+
+      <div class="section">
+        <span class="section-anchor" id="accounts"></span>
+        <h2><span class="section-icon">👤</span> User Accounts</h2>
+        <p>To use CCC OS you must create an account. By doing so, you agree to the following:</p>
+
+        <div class="card">
+          <ul class="check-list">
+            <li>You must provide accurate, current, and complete information during registration.</li>
+            <li>You are responsible for maintaining the confidentiality of your account credentials.</li>
+            <li>You are responsible for all activity that occurs under your account.</li>
+            <li>One account per user — creating multiple accounts to circumvent restrictions is prohibited.</li>
+            <li>You must notify us immediately of any unauthorized use of your account at <a href="mailto:support@ccc-os.com" style="color: var(--accent2); text-decoration: none;">support@ccc-os.com</a>.</li>
+          </ul>
+        </div>
+
+        <p>
+          We reserve the right to suspend or terminate accounts that provide false information, violate these terms, or engage in any activity that harms the Service or other users.
+        </p>
+      </div>
+
+      <div class="section">
+        <span class="section-anchor" id="subscription"></span>
+        <h2><span class="section-icon">💳</span> Subscription &amp; Payment</h2>
+        <p>
+          Access to paid features of CCC OS requires an active subscription. The following terms apply to all billing:
+        </p>
+
+        <div class="card">
+          <ul class="check-list">
+            <li>All payments are processed securely via <strong>Stripe</strong>. We never store your payment card details.</li>
+            <li>Subscriptions <strong>auto-renew</strong> at the end of each billing period unless cancelled before the renewal date.</li>
+            <li>You may cancel your subscription at any time via your account settings. Access continues until the end of the paid period.</li>
+            <li>Refunds are at the company's discretion. Requests made within <strong>7 days</strong> of a charge will be considered on a case-by-case basis.</li>
+            <li>Prices are subject to change with reasonable advance notice.</li>
+          </ul>
+        </div>
+
+        <p>
+          To request a refund or dispute a charge, contact us at <a href="mailto:support@ccc-os.com" style="color: var(--accent2); text-decoration: none;">support@ccc-os.com</a>.
+        </p>
+      </div>
+
+      <div class="section">
+        <span class="section-anchor" id="acceptable-use"></span>
+        <h2><span class="section-icon">⚖️</span> Acceptable Use</h2>
+        <p>
+          You agree to use CCC OS only for lawful purposes. The following activities are strictly prohibited:
+        </p>
+
+        <div class="card">
+          <ul class="bullet-list">
+            <li>Using the Service for any illegal activity or to violate any applicable laws or regulations.</li>
+            <li>Scraping, crawling, or otherwise extracting data from the Service by automated means without written permission.</li>
+            <li>Reverse engineering, decompiling, or attempting to extract the source code of the Service.</li>
+            <li>Sharing account credentials with others or allowing unauthorized users access to your account.</li>
+            <li>Uploading or distributing malware, viruses, or any harmful code through the Service.</li>
+            <li>Attempting to gain unauthorized access to any part of the Service or its infrastructure.</li>
+            <li>Using the Service in a way that could damage, disable, or impair its availability or performance.</li>
+          </ul>
+        </div>
+
+        <p>
+          Violation of these acceptable use terms may result in immediate suspension or termination of your account without refund.
+        </p>
+      </div>
+
+      <div class="section">
+        <span class="section-anchor" id="ip"></span>
+        <h2><span class="section-icon">©️</span> Intellectual Property</h2>
+        <p>
+          The rights to content and platform are clearly divided:
+        </p>
+
+        <div class="card">
+          <ul class="check-list">
+            <li><strong>Your content is yours.</strong> All content you create, upload, or generate using CCC OS — including scripts, hooks, titles, brand assets, and scheduled posts — remains your property. We claim no ownership over your content.</li>
+            <li><strong>The platform is ours.</strong> CCC OS, including its software, design, features, and infrastructure, is owned by Levi Acay. All rights reserved.</li>
+            <li>By using the Service, you grant us a limited license to process and store your content solely to provide the features you use.</li>
+            <li>You may not copy, reproduce, or distribute any part of the CCC OS platform without explicit written permission.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="section">
+        <span class="section-anchor" id="termination"></span>
+        <h2><span class="section-icon">🔚</span> Termination</h2>
+        <p>
+          Either party may terminate the relationship at any time:
+        </p>
+
+        <div class="card">
+          <ul class="bullet-list">
+            <li><strong>By us:</strong> We may suspend or terminate your account immediately if you violate these Terms of Service, engage in fraudulent activity, or if required by law. We will attempt to notify you where possible.</li>
+            <li><strong>By you:</strong> You may delete your account at any time via <strong>Settings → Danger Zone → Delete Account</strong>. Upon deletion, your data will be permanently removed within 30 days.</li>
+          </ul>
+        </div>
+
+        <p>
+          Upon termination, your right to use the Service ceases immediately. Provisions of these terms that by their nature should survive termination — including intellectual property rights, disclaimers, and limitations of liability — will remain in effect.
+        </p>
+      </div>
+
+      <div class="section">
+        <span class="section-anchor" id="disclaimer"></span>
+        <h2><span class="section-icon">⚠️</span> Disclaimer of Warranties</h2>
+        <p>
+          The Service is provided <strong>"as is"</strong> and <strong>"as available"</strong> without warranties of any kind, either express or implied.
+        </p>
+        <p>
+          We do not warrant that the Service will be uninterrupted, error-free, secure, or free of viruses or other harmful components. We do not warrant that the results obtained from use of the Service will be accurate or reliable. Your use of the Service is at your sole risk.
+        </p>
+        <p>
+          To the fullest extent permitted by applicable law, we disclaim all warranties, including implied warranties of merchantability, fitness for a particular purpose, and non-infringement.
+        </p>
+      </div>
+
+      <div class="section">
+        <span class="section-anchor" id="liability"></span>
+        <h2><span class="section-icon">🛡️</span> Limitation of Liability</h2>
+        <p>
+          To the fullest extent permitted by law, Levi Acay and Content Command Center OS shall not be liable for any indirect, incidental, special, consequential, or punitive damages arising from your use of or inability to use the Service.
+        </p>
+        <p>
+          This includes, without limitation, damages for loss of profits, data, goodwill, or other intangible losses — even if we have been advised of the possibility of such damages. Our total liability to you for any claims arising under these terms shall not exceed the amount you paid us in the 3 months preceding the claim.
+        </p>
+      </div>
+
+      <div class="section">
+        <span class="section-anchor" id="governing-law"></span>
+        <h2><span class="section-icon">⚖️</span> Governing Law</h2>
+        <p>
+          These Terms of Service are governed by and construed in accordance with the laws of the <strong>United States</strong>, without regard to its conflict of law provisions.
+        </p>
+        <p>
+          Any disputes arising from these terms or your use of the Service shall be resolved through binding arbitration or in the courts of competent jurisdiction in the United States, as applicable.
+        </p>
+      </div>
+
+      <div class="section">
+        <span class="section-anchor" id="changes"></span>
+        <h2><span class="section-icon">📝</span> Changes to Terms</h2>
+        <p>
+          We may update these Terms of Service as the product evolves. When we make material changes, we will update the <strong>Effective Date</strong> at the top of this page and notify users via email or in-app notice where appropriate.
+        </p>
+        <p>
+          Continued use of the Service after changes are posted constitutes your acceptance of the revised terms. If you do not agree to the updated terms, you should stop using the Service and delete your account.
+        </p>
+      </div>
+
+      <div class="section">
+        <span class="section-anchor" id="contact"></span>
+        <h2><span class="section-icon">✉️</span> Contact</h2>
+        <p>
+          Questions about these terms or the Service — reach out any time:
+        </p>
+        <div class="contact-card">
+          <p style="font-size: 13.5px; color: var(--text2); margin-bottom: 10px;">
+            <strong style="color: var(--text);">Content Command Center OS</strong><br />
+            Operated by Levi Acay
+          </p>
+          <p style="font-size: 13.5px; color: var(--text2);">
+            📧 Email: <a href="mailto:support@ccc-os.com">support@ccc-os.com</a><br />
+            🌐 App: <a href="https://ccc-os-production.up.railway.app">ccc-os-production.up.railway.app</a>
+          </p>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="footer-copy">© 2026 Content Command Center OS. All rights reserved.</div>
+    <div class="footer-links">
+      <a href="/">Back to App</a>
+      <a href="/privacy">Privacy Policy</a>
+      <a href="mailto:support@ccc-os.com">Contact</a>
+    </div>
+  </footer>
+
+</body>
+</html>

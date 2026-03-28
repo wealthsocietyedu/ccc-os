@@ -126,6 +126,9 @@ if (process.env.NODE_ENV === 'production') {
   app.get('/privacy', (req, res) => {
     res.sendFile(path.join(clientBuild, 'privacy.html'));
   });
+  app.get('/terms', (req, res) => {
+    res.sendFile(path.join(clientBuild, 'terms.html'));
+  });
   app.get('*', (req, res) => {
     if (!req.path.startsWith('/api')) {
       res.sendFile(path.join(clientBuild, 'index.html'));
