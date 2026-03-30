@@ -6,6 +6,7 @@ import { useContentStore } from './lib/store/useContentStore.ts';
 import AIStudio from './components/AIStudio.jsx';
 import VisualEngine from './components/VisualEngine.jsx';
 import SmartClipper from './components/SmartClipper.jsx';
+import CarouselPromptGenerator from './components/CarouselPromptGenerator.jsx';
 
 // ─── AUTH CONTEXT ─────────────────────────────────────────────────────────────
 const AuthCtx = createContext(null);
@@ -3823,6 +3824,7 @@ export default function App() {
     { id:'ai-studio',      label:'AI Studio',      icon:'studio',   badge:'NEW' },
     { id:'visual-engine',  label:'Visual Engine',  icon:'image',    badge:'NEW' },
     { id:'smart-clipper',  label:'Smart Clipper',  icon:'scissors', badge:'NEW' },
+    { id:'carousel-prompts', label:'Carousel Prompts', icon:'studio', badge:'NEW' },
     { id:'billing', label:'Plans & Billing', icon:'shield' },
     { id:'settings', label:'Settings', icon:'settings' },
   ];
@@ -3839,6 +3841,7 @@ export default function App() {
     'ai-studio':     'AI Studio',
     'visual-engine': 'Visual Engine',
     'smart-clipper': 'Smart Clipper',
+    'carousel-prompts': 'Carousel Prompts',
     settings: 'Settings',
   };
 
@@ -3856,6 +3859,7 @@ export default function App() {
       case 'ai-studio':     return <AIStudio activeBrand={activeBrand} />;
       case 'visual-engine': return <VisualEngine activeBrand={activeBrand} />;
       case 'smart-clipper': return <SmartClipper activeBrand={activeBrand} />;
+      case 'carousel-prompts': return <CarouselPromptGenerator />;
       case 'settings': return <SettingsRoom user={user} />;
       case 'billing-success':
         return (
