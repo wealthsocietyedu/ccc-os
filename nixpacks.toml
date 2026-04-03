@@ -1,8 +1,0 @@
-[phases.setup]
-nixPkgs = ["ffmpeg", "yt-dlp", "python3", "python3Packages.pip"]
-
-[phases.install]
-cmds = ["pip3 install openai-whisper --break-system-packages", "cd server && npm install", "cd ../client && npm install"]
-
-[start]
-cmd = "npm start"

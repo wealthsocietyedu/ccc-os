@@ -1,10 +1,12 @@
 [phases.setup]
-nixPkgs = ["ffmpeg", "yt-dlp", "python311"]
+nixPkgs = ["ffmpeg", "yt-dlp", "python3", "python3Packages.pip"]
 aptPkgs = ["fonts-dejavu-core"]
 
 [phases.install]
 cmds = [
-  "pip3 install openai-whisper --break-system-packages || true"
+  "pip3 install openai-whisper --break-system-packages || true",
+  "cd server && npm install",
+  "cd ../client && npm install && npm run build"
 ]
 
 [start]
