@@ -99,6 +99,29 @@ function runMigrations(db) {
   } catch (err) {
     console.error('[Migration] repurpose_rules creation failed:', err.message);
   }
+
+  // Migration: create flows table if missing
+  try {
+    const exists = db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='flows'`).get();
+    if (!exists) {
+      db.exec(`
+        CREATE TABLE flows (
+          id          INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id     TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          name        TEXT NOT NULL,
+          description TEXT NOT NULL DEFAULT '',
+          nodes       TEXT NOT NULL DEFAULT '[]',
+          run_count   INTEGER NOT NULL DEFAULT 0,
+          created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+          updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+        CREATE INDEX IF NOT EXISTS idx_flows_user ON flows(user_id);
+      `);
+      console.log('[Migration] flows table created');
+    }
+  } catch (err) {
+    console.error('[Migration] flows table creation failed:', err.message);
+  }
 }
 
 // ─── SEED DATA ────────────────────────────────────────────────────────────────

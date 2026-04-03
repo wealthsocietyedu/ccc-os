@@ -7,6 +7,7 @@ import AIStudio from './components/AIStudio.jsx';
 import VisualEngine from './components/VisualEngine.jsx';
 import SmartClipper from './components/SmartClipper.jsx';
 import CarouselPromptGenerator from './components/CarouselPromptGenerator.jsx';
+import ContentFlow from './components/ContentFlow';
 
 // ─── AUTH CONTEXT ─────────────────────────────────────────────────────────────
 const AuthCtx = createContext(null);
@@ -3825,6 +3826,7 @@ export default function App() {
     { id:'visual-engine',  label:'Visual Engine',  icon:'image',    badge:'NEW' },
     { id:'smart-clipper',  label:'Smart Clipper',  icon:'scissors', badge:'NEW' },
     { id:'carousel-prompts', label:'Carousel Prompts', icon:'studio', badge:'NEW' },
+    { id:'content-flow', label:'Content Flow', icon:'zap', badge:'NEW' },
     { id:'billing', label:'Plans & Billing', icon:'shield' },
     { id:'settings', label:'Settings', icon:'settings' },
   ];
@@ -3860,6 +3862,7 @@ export default function App() {
       case 'visual-engine': return <VisualEngine activeBrand={activeBrand} />;
       case 'smart-clipper': return <SmartClipper activeBrand={activeBrand} />;
       case 'carousel-prompts': return <CarouselPromptGenerator />;
+      case 'content-flow': return <ContentFlow />;
       case 'settings': return <SettingsRoom user={user} />;
       case 'billing-success':
         return (
