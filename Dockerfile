@@ -4,6 +4,8 @@ RUN apk add --no-cache \
     ffmpeg \
     python3 \
     py3-pip \
+    make \
+    g++ \
     && pip3 install yt-dlp --break-system-packages
 
 WORKDIR /app
