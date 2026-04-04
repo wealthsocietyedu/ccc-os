@@ -1,8 +1,0 @@
-providers = ["node"]
-
-[phases.setup]
-nixPkgs = ["ffmpeg", "yt-dlp", "python3"]
-aptPkgs = ["fonts-dejavu-core"]
-
-[start]
-cmd = "node server/index.js"
