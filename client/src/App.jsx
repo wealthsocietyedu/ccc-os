@@ -8,6 +8,7 @@ import VisualEngine from './components/VisualEngine.jsx';
 import SmartClipper from './components/SmartClipper.jsx';
 import CarouselPromptGenerator from './components/CarouselPromptGenerator.jsx';
 import ContentFlow from './components/ContentFlow';
+import VideoDownloader from './components/VideoDownloader';
 
 // ─── AUTH CONTEXT ─────────────────────────────────────────────────────────────
 const AuthCtx = createContext(null);
@@ -3822,6 +3823,7 @@ export default function App() {
     { id:'data', label:'Data Room', icon:'data' },
     { id:'monetization', label:'Monetization', icon:'money' },
     { id:'studio', label:'Content Studio', icon:'studio', badge:'NEW' },
+    { id:'video-downloader', label:'Video Downloader', icon:'download', badge:'NEW' },
     { id:'ai-studio',      label:'AI Studio',      icon:'studio',   badge:'NEW' },
     { id:'visual-engine',  label:'Visual Engine',  icon:'image',    badge:'NEW' },
     { id:'smart-clipper',  label:'Smart Clipper',  icon:'scissors', badge:'NEW' },
@@ -3862,6 +3864,7 @@ export default function App() {
       case 'visual-engine': return <VisualEngine activeBrand={activeBrand} />;
       case 'smart-clipper': return <SmartClipper activeBrand={activeBrand} />;
       case 'carousel-prompts': return <CarouselPromptGenerator />;
+      case 'video-downloader': return <VideoDownloader />;
       case 'content-flow': return <ContentFlow />;
       case 'settings': return <SettingsRoom user={user} />;
       case 'billing-success':
