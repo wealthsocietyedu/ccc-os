@@ -55,6 +55,7 @@ const I = ({ n, s = 16, c = "" }) => {
     upload: "M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4 M17 8l-5-5-5 5 M12 3v12",
     globe: "M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z M2 12h20 M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z",
     creditCard: "M1 4h22v16H1z M1 10h22",
+    download: "M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4 M17 8l-5 5 5 5 M12 3v12",
   };
   const d = icons[n];
   if (!d) return <span style={{ fontSize: s, lineHeight: 1 }}>•</span>;
