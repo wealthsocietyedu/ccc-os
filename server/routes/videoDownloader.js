@@ -45,8 +45,9 @@ router.post('/info', async (req, res) => {
       '--no-playlist',
       '--no-warnings',
       '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-      '--extractor-args', 'youtube:player_client=web',
+      '--extractor-args', 'youtube:player_client=web,android',
       '--add-headers', 'Accept-Language:en-US,en;q=0.9',
+      '--impersonate', 'chrome',
       url.trim()
     ];
 
@@ -120,8 +121,9 @@ router.post('/download', async (req, res) => {
       '--no-playlist',
       '--no-warnings',
       '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-      '--extractor-args', 'youtube:player_client=web',
+      '--extractor-args', 'youtube:player_client=web,android',
       '--add-headers', 'Accept-Language:en-US,en;q=0.9',
+      '--impersonate', 'chrome',
       '-o', `${tmpFile}.%(ext)s`,
     ];
 
