@@ -2,248 +2,351 @@ const express = require('express');
 const router = express.Router();
 const Anthropic = require('@anthropic-ai/sdk');
 
+// ─── Clients & Config ─────────────────────────────────────────────────────────
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-// ─── Generate LTX-2 Video Prompt ─────────────────────────────────────────────
-router.post('/video-prompt', async (req, res) => {
-  const { subject, mood, platform, shotStyle, duration, extraDetails } = req.body;
+const KIE_API_KEY = process.env.KIE_API_KEY;
+const KIE_BASE_URL = 'https://api.kie.ai/api/v1';
 
-  if (!subject) {
-    return res.status(400).json({ error: 'Subject is required' });
-  }
+const BLOTATO_API_KEY = process.env.BLOTATO_API_KEY;
+const BLOTATO_BASE_URL = 'https://api.blotato.com';
 
-  try {
-    const platformGuide = {
-      reels: 'vertical 9:16, fast-paced, eye-catching first frame, optimized for mobile',
-      youtube: 'cinematic 16:9, slower pacing, rich background detail, professional grade',
-      tiktok: 'vertical 9:16, energetic motion, bright and saturated, trendy aesthetic',
-      shorts: 'vertical 9:16, punchy and immediate, high contrast, quick motion',
-      general: 'versatile 16:9, balanced pacing, clean composition'
-    };
+// ─── Poll Helper ──────────────────────────────────────────────────────────────
+// Polls a kie.ai job every 4 seconds for up to 2 minutes.
+// Returns the final job object when status is terminal, or throws on timeout.
+async function pollKieJob(taskId, endpoint) {
+  const INTERVAL_MS = 4000;
+  const MAX_ATTEMPTS = 30; // 30 × 4s = 120s = 2 minutes
+  const TERMINAL = ['completed', 'failed', 'error'];
 
-    const shotGuide = {
-      closeup: 'extreme close-up shot, tight framing, shallow depth of field, bokeh background',
-      medium: 'medium shot, subject centered, balanced negative space',
-      wide: 'wide establishing shot, environmental context, sweeping scale',
-      overhead: 'overhead top-down shot, flat lay perspective, geometric composition',
-      cinematic: 'cinematic dolly shot, slow push in, anamorphic lens flare, film grain'
-    };
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    await new Promise(resolve => setTimeout(resolve, INTERVAL_MS));
 
-    const moodGuide = {
-      dark: 'dark moody atmosphere, deep shadows, low-key lighting, noir aesthetic',
-      bright: 'bright airy feel, soft natural light, clean whites, optimistic tone',
-      warm: 'warm golden hour light, amber tones, cozy intimate atmosphere',
-      dramatic: 'dramatic high contrast, chiaroscuro lighting, intense shadows',
-      minimal: 'minimalist clean aesthetic, neutral tones, negative space, zen-like calm',
-      energetic: 'high energy dynamic motion, vibrant saturated colors, kinetic feel'
-    };
-
-    const systemPrompt = `You are a professional cinematographer and AI video prompt engineer specializing in LTX-2 video generation. 
-
-Your job is to write a single, flowing paragraph prompt that will generate stunning cinematic B-roll footage using LTX-2.
-
-LTX-2 PROMPT RULES:
-- Single flowing paragraph ONLY — no bullet points, no line breaks
-- Maximum 200 words
-- Start directly with the main action or subject
-- Include: main action, specific movements, appearances, camera work, lighting, environment
-- Use cinematographic language (dolly, rack focus, shallow DOF, lens flare, etc.)
-- Be literal and precise — describe exactly what should appear visually
-- Think like a director writing a shot description
-
-OUTPUT: Return ONLY the prompt text. Nothing else. No preamble, no explanation, no quotes.`;
-
-    const userMessage = `Create an LTX-2 video generation prompt for:
-
-Subject: ${subject}
-Mood/Atmosphere: ${moodGuide[mood] || mood || 'cinematic and professional'}
-Platform: ${platformGuide[platform] || platform || 'versatile 16:9'}
-Shot Style: ${shotGuide[shotStyle] || shotStyle || 'cinematic medium shot'}
-Duration feel: ${duration || '6-8 seconds of smooth motion'}
-${extraDetails ? `Additional details: ${extraDetails}` : ''}
-
-Write the complete LTX-2 prompt now:`;
-
-    const message = await client.messages.create({
-      model: 'claude-opus-4-5',
-      max_tokens: 400,
-      messages: [{ role: 'user', content: userMessage }],
-      system: systemPrompt
-    });
-
-    const prompt = message.content[0].text.trim();
-
-    // Also generate a negative prompt
-    const negativePrompt = 'shaky, glitchy, low quality, worst quality, deformed, distorted, disfigured, motion smear, motion artifacts, fused fingers, bad anatomy, weird hands, ugly, transition, static, blurry, overexposed, underexposed';
-
-    res.json({
-      success: true,
-      prompt,
-      negativePrompt,
-      metadata: {
-        subject,
-        mood,
-        platform,
-        shotStyle,
-        duration,
-        ltxPlaygroundUrl: 'https://app.ltx.studio/ltx-2-playground/t2v'
+    const response = await fetch(`${KIE_BASE_URL}${endpoint}/${taskId}`, {
+      headers: {
+        Authorization: `Bearer ${KIE_API_KEY}`,
+        'Content-Type': 'application/json'
       }
     });
 
-  } catch (error) {
-    console.error('Video prompt generation error:', error);
-    res.status(500).json({ error: 'Failed to generate video prompt', details: error.message });
-  }
-});
-
-// ─── Generate AI Image via Pollinations (Free, No API Key) ───────────────────
-router.post('/generate-image', async (req, res) => {
-  const { prompt, style, aspectRatio, enhance } = req.body;
-
-  if (!prompt) {
-    return res.status(400).json({ error: 'Prompt is required' });
-  }
-
-  try {
-    // First enhance the prompt with Claude if requested
-    let finalPrompt = prompt;
-
-    if (enhance) {
-      const enhanceMessage = await client.messages.create({
-        model: 'claude-opus-4-5',
-        max_tokens: 300,
-        messages: [{
-          role: 'user',
-          content: `Enhance this image prompt for maximum visual impact and quality. Make it more detailed, specific, and cinematic. Add lighting details, style references, and technical photo/art terms.
-
-Original prompt: ${prompt}
-Style: ${style || 'photorealistic'}
-
-Return ONLY the enhanced prompt. No explanation.`
-        }]
-      });
-      finalPrompt = enhanceMessage.content[0].text.trim();
+    if (!response.ok) {
+      throw new Error(`kie.ai poll failed: ${response.status} ${response.statusText}`);
     }
 
-    // Style modifiers for Pollinations
-    const styleModifiers = {
-      photorealistic: 'photorealistic, 8k, professional photography, sharp focus, detailed',
-      cinematic: 'cinematic shot, film photography, dramatic lighting, movie still, 4k',
-      artistic: 'digital art, artstation, trending, concept art, highly detailed',
-      minimal: 'minimalist, clean, white background, studio lighting, product photography',
-      dark: 'dark aesthetic, moody, dramatic shadows, noir, high contrast',
-      vibrant: 'vibrant colors, bright, saturated, dynamic, energetic'
-    };
+    const data = await response.json();
+    const status = (data.status || '').toLowerCase();
 
-    const styleAdd = styleModifiers[style] || styleModifiers.photorealistic;
-    const enhancedForPollinations = `${finalPrompt}, ${styleAdd}`;
-
-    // Aspect ratio dimensions
-    const dimensions = {
-      '1:1': { width: 1024, height: 1024 },
-      '16:9': { width: 1280, height: 720 },
-      '9:16': { width: 720, height: 1280 },
-      '4:3': { width: 1024, height: 768 },
-      '3:4': { width: 768, height: 1024 }
-    };
-
-    const { width, height } = dimensions[aspectRatio] || dimensions['16:9'];
-
-    // Pollinations.ai - completely free image generation
-    const seed = Math.floor(Math.random() * 999999);
-    const encodedPrompt = encodeURIComponent(enhancedForPollinations);
-    const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=${width}&height=${height}&seed=${seed}&nologo=true&enhance=false`;
-
-    res.json({
-      success: true,
-      imageUrl,
-      originalPrompt: prompt,
-      enhancedPrompt: finalPrompt,
-      fullPrompt: enhancedForPollinations,
-      metadata: {
-        width,
-        height,
-        aspectRatio: aspectRatio || '16:9',
-        style: style || 'photorealistic',
-        seed,
-        provider: 'Pollinations AI (Free)'
-      }
-    });
-
-  } catch (error) {
-    console.error('Image generation error:', error);
-    res.status(500).json({ error: 'Failed to generate image', details: error.message });
+    if (TERMINAL.includes(status)) {
+      return data;
+    }
   }
-});
 
-// ─── Generate Multiple Image Variations ──────────────────────────────────────
-router.post('/generate-variations', async (req, res) => {
-  const { prompt, style, aspectRatio, count = 4 } = req.body;
+  throw new Error(`kie.ai job ${taskId} timed out after 2 minutes`);
+}
+
+// ─── POST /generate-image ─────────────────────────────────────────────────────
+// Submits a Nano Banana 2 image generation job. Returns taskId immediately.
+router.post('/generate-image', async (req, res) => {
+  const { prompt, negativePrompt, aspectRatio = '16:9', style } = req.body;
 
   if (!prompt) {
     return res.status(400).json({ error: 'Prompt is required' });
   }
 
   try {
-    const styleModifiers = {
-      photorealistic: 'photorealistic, 8k, professional photography, sharp focus',
-      cinematic: 'cinematic shot, film photography, dramatic lighting, movie still',
-      artistic: 'digital art, artstation, concept art, highly detailed',
-      minimal: 'minimalist, clean, studio lighting, product photography',
-      dark: 'dark aesthetic, moody, dramatic shadows, noir',
-      vibrant: 'vibrant colors, bright, saturated, dynamic'
-    };
-
-    const styleAdd = styleModifiers[style] || styleModifiers.photorealistic;
-    const fullPrompt = `${prompt}, ${styleAdd}`;
-
-    const dimensions = {
-      '1:1': { width: 1024, height: 1024 },
-      '16:9': { width: 1280, height: 720 },
-      '9:16': { width: 720, height: 1280 },
-      '4:3': { width: 1024, height: 768 }
-    };
-
-    const { width, height } = dimensions[aspectRatio] || dimensions['16:9'];
-    const encodedPrompt = encodeURIComponent(fullPrompt);
-
-    const variations = Array.from({ length: Math.min(count, 6) }, (_, i) => {
-      const seed = Math.floor(Math.random() * 999999);
-      return {
-        id: i + 1,
-        imageUrl: `https://image.pollinations.ai/prompt/${encodedPrompt}?width=${width}&height=${height}&seed=${seed}&nologo=true`,
-        seed
-      };
+    const response = await fetch(`${KIE_BASE_URL}/image/generate`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${KIE_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'nano-banana-2',
+        prompt,
+        negative_prompt: negativePrompt || '',
+        aspect_ratio: aspectRatio,
+        style: style || 'photorealistic',
+        n: 1
+      })
     });
 
-    res.json({
-      success: true,
-      variations,
-      prompt: fullPrompt,
-      metadata: { width, height, style }
-    });
+    if (!response.ok) {
+      const err = await response.text();
+      return res.status(response.status).json({ error: 'kie.ai image submission failed', details: err });
+    }
 
+    const data = await response.json();
+    res.json({ success: true, taskId: data.task_id || data.taskId, provider: 'Nano Banana 2' });
   } catch (error) {
-    console.error('Variations error:', error);
-    res.status(500).json({ error: 'Failed to generate variations', details: error.message });
+    console.error('generate-image error:', error);
+    res.status(500).json({ error: 'Failed to submit image job', details: error.message });
   }
 });
 
-// ─── Smart Prompt Builder (from content brief) ───────────────────────────────
+// ─── GET /image-status/:taskId ────────────────────────────────────────────────
+// Polls kie.ai for the current status of an image generation job.
+router.get('/image-status/:taskId', async (req, res) => {
+  const { taskId } = req.params;
+
+  try {
+    const response = await fetch(`${KIE_BASE_URL}/image/generate/${taskId}`, {
+      headers: {
+        Authorization: `Bearer ${KIE_API_KEY}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      const err = await response.text();
+      return res.status(response.status).json({ error: 'Failed to fetch image status', details: err });
+    }
+
+    const data = await response.json();
+    res.json({ success: true, ...data });
+  } catch (error) {
+    console.error('image-status error:', error);
+    res.status(500).json({ error: 'Failed to get image status', details: error.message });
+  }
+});
+
+// ─── POST /generate-variations ────────────────────────────────────────────────
+// Submits a Nano Banana 2 job requesting n=4 image variations. Returns taskId.
+router.post('/generate-variations', async (req, res) => {
+  const { prompt, negativePrompt, aspectRatio = '16:9', style } = req.body;
+
+  if (!prompt) {
+    return res.status(400).json({ error: 'Prompt is required' });
+  }
+
+  try {
+    const response = await fetch(`${KIE_BASE_URL}/image/generate`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${KIE_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'nano-banana-2',
+        prompt,
+        negative_prompt: negativePrompt || '',
+        aspect_ratio: aspectRatio,
+        style: style || 'photorealistic',
+        n: 4
+      })
+    });
+
+    if (!response.ok) {
+      const err = await response.text();
+      return res.status(response.status).json({ error: 'kie.ai variations submission failed', details: err });
+    }
+
+    const data = await response.json();
+    res.json({ success: true, taskId: data.task_id || data.taskId, provider: 'Nano Banana 2', variations: 4 });
+  } catch (error) {
+    console.error('generate-variations error:', error);
+    res.status(500).json({ error: 'Failed to submit variations job', details: error.message });
+  }
+});
+
+// ─── POST /generate-video ─────────────────────────────────────────────────────
+// Claude Opus writes the video prompt, then submits to Kling 2.1 text-to-video.
+// Returns taskId immediately.
+router.post('/generate-video', async (req, res) => {
+  const { subject, mood, platform, duration, extraDetails, rawPrompt } = req.body;
+
+  if (!subject && !rawPrompt) {
+    return res.status(400).json({ error: 'subject or rawPrompt is required' });
+  }
+
+  try {
+    let videoPrompt = rawPrompt;
+
+    if (!rawPrompt) {
+      const claudeRes = await client.messages.create({
+        model: 'claude-opus-4-5',
+        max_tokens: 300,
+        system: `You are a professional cinematographer writing prompts for Kling 2.1 AI video generation.
+Write a single flowing paragraph (under 200 words). Start immediately with the action or subject.
+Include: main subject, action, camera movement, lighting, mood, environment.
+Use cinematographic language. Return ONLY the prompt — no preamble, no quotes.`,
+        messages: [{
+          role: 'user',
+          content: `Write a Kling 2.1 video prompt for:
+Subject: ${subject}
+Mood: ${mood || 'cinematic and professional'}
+Platform: ${platform || 'YouTube 16:9'}
+Duration feel: ${duration || '5-8 seconds'}
+${extraDetails ? `Extra details: ${extraDetails}` : ''}
+
+Write the prompt now:`
+        }]
+      });
+
+      videoPrompt = claudeRes.content[0].text.trim();
+    }
+
+    const response = await fetch(`${KIE_BASE_URL}/kling-2.1/text-to-video`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${KIE_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        prompt: videoPrompt,
+        duration: duration || '5',
+        aspect_ratio: platform === 'reels' || platform === 'tiktok' || platform === 'shorts' ? '9:16' : '16:9'
+      })
+    });
+
+    if (!response.ok) {
+      const err = await response.text();
+      return res.status(response.status).json({ error: 'kie.ai video submission failed', details: err });
+    }
+
+    const data = await response.json();
+    res.json({
+      success: true,
+      taskId: data.task_id || data.taskId,
+      prompt: videoPrompt,
+      provider: 'Kling 2.1'
+    });
+  } catch (error) {
+    console.error('generate-video error:', error);
+    res.status(500).json({ error: 'Failed to submit video job', details: error.message });
+  }
+});
+
+// ─── GET /video-status/:taskId ────────────────────────────────────────────────
+// Polls kie.ai for the current status of a Kling 2.1 video job.
+router.get('/video-status/:taskId', async (req, res) => {
+  const { taskId } = req.params;
+
+  try {
+    const response = await fetch(`${KIE_BASE_URL}/kling-2.1/text-to-video/${taskId}`, {
+      headers: {
+        Authorization: `Bearer ${KIE_API_KEY}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      const err = await response.text();
+      return res.status(response.status).json({ error: 'Failed to fetch video status', details: err });
+    }
+
+    const data = await response.json();
+    res.json({ success: true, ...data });
+  } catch (error) {
+    console.error('video-status error:', error);
+    res.status(500).json({ error: 'Failed to get video status', details: error.message });
+  }
+});
+
+// ─── POST /generate-faceless-video ───────────────────────────────────────────
+// Claude writes the script, then submits to Blotato /v1/faceless-video.
+// Returns jobId immediately.
+router.post('/generate-faceless-video', async (req, res) => {
+  const { topic, niche, duration, tone, cta, rawScript } = req.body;
+
+  if (!topic && !rawScript) {
+    return res.status(400).json({ error: 'topic or rawScript is required' });
+  }
+
+  try {
+    let script = rawScript;
+
+    if (!rawScript) {
+      const claudeRes = await client.messages.create({
+        model: 'claude-opus-4-5',
+        max_tokens: 600,
+        system: `You are an expert faceless video scriptwriter. Write punchy, high-retention scripts for faceless content creators.
+Keep it engaging, direct, and formatted for voiceover. No stage directions — pure narration only.
+Return ONLY the script text.`,
+        messages: [{
+          role: 'user',
+          content: `Write a faceless video script for:
+Topic: ${topic}
+Niche: ${niche || 'general'}
+Duration: ${duration || '60 seconds'}
+Tone: ${tone || 'engaging and informative'}
+${cta ? `Call to action: ${cta}` : ''}
+
+Write the script now:`
+        }]
+      });
+
+      script = claudeRes.content[0].text.trim();
+    }
+
+    const response = await fetch(`${BLOTATO_BASE_URL}/v1/faceless-video`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${BLOTATO_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ script, topic, niche, duration })
+    });
+
+    if (!response.ok) {
+      const err = await response.text();
+      return res.status(response.status).json({ error: 'Blotato faceless video submission failed', details: err });
+    }
+
+    const data = await response.json();
+    res.json({
+      success: true,
+      jobId: data.job_id || data.jobId || data.id,
+      script,
+      provider: 'Blotato'
+    });
+  } catch (error) {
+    console.error('generate-faceless-video error:', error);
+    res.status(500).json({ error: 'Failed to submit faceless video job', details: error.message });
+  }
+});
+
+// ─── GET /faceless-status/:jobId ─────────────────────────────────────────────
+// Polls Blotato for the current status of a faceless video job.
+router.get('/faceless-status/:jobId', async (req, res) => {
+  const { jobId } = req.params;
+
+  try {
+    const response = await fetch(`${BLOTATO_BASE_URL}/v1/faceless-video/${jobId}`, {
+      headers: {
+        Authorization: `Bearer ${BLOTATO_API_KEY}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      const err = await response.text();
+      return res.status(response.status).json({ error: 'Failed to fetch faceless video status', details: err });
+    }
+
+    const data = await response.json();
+    res.json({ success: true, ...data });
+  } catch (error) {
+    console.error('faceless-status error:', error);
+    res.status(500).json({ error: 'Failed to get faceless video status', details: error.message });
+  }
+});
+
+// ─── POST /build-prompt ───────────────────────────────────────────────────────
+// Claude Opus generates both an image prompt and a video prompt from a content brief.
 router.post('/build-prompt', async (req, res) => {
   const { contentTopic, niche, targetEmotion, contentType, platform } = req.body;
 
   if (!contentTopic) {
-    return res.status(400).json({ error: 'Content topic is required' });
+    return res.status(400).json({ error: 'contentTopic is required' });
   }
 
   try {
     const message = await client.messages.create({
       model: 'claude-opus-4-5',
-      max_tokens: 600,
+      max_tokens: 700,
       messages: [{
         role: 'user',
-        content: `You are a visual content strategist for social media creators. Generate both an image prompt AND a video prompt for this content brief.
+        content: `You are a visual content strategist for social media creators. Generate both an image prompt AND a video prompt from this content brief.
 
 Content Topic: ${contentTopic}
 Niche: ${niche || 'general lifestyle'}
@@ -253,8 +356,8 @@ Platform: ${platform || 'Instagram/YouTube'}
 
 Return ONLY valid JSON in this exact format:
 {
-  "imagePrompt": "detailed image generation prompt here",
-  "videoPrompt": "detailed LTX-2 video generation prompt here (single paragraph, under 200 words)",
+  "imagePrompt": "detailed Nano Banana 2 image generation prompt",
+  "videoPrompt": "Kling 2.1 video prompt — single paragraph, under 200 words, cinematic language",
   "visualDirection": "2-3 sentence description of the overall visual strategy",
   "colorPalette": ["color1", "color2", "color3"],
   "shotRecommendations": ["recommendation 1", "recommendation 2", "recommendation 3"]
@@ -267,17 +370,18 @@ Return ONLY valid JSON in this exact format:
     const parsed = JSON.parse(cleanJson);
 
     res.json({ success: true, ...parsed });
-
   } catch (error) {
-    console.error('Prompt builder error:', error);
+    console.error('build-prompt error:', error);
     res.status(500).json({ error: 'Failed to build prompts', details: error.message });
   }
 });
 
-// ─── Generate Storyboard from Topic or Script ────────────────────────────────
+// ─── POST /storyboard ─────────────────────────────────────────────────────────
+// Claude Opus acts as AI director, breaks input into scenes, then submits a
+// Nano Banana 2 image job per scene. Returns imageTaskId per scene.
 router.post('/storyboard', async (req, res) => {
   const { input, mode, platform, style, niche } = req.body;
-  // mode: 'quick' (topic/hook) or 'script' (full script text)
+  // mode: 'quick' (topic/hook) | 'script' (full script text)
 
   if (!input) {
     return res.status(400).json({ error: 'Input is required' });
@@ -291,20 +395,20 @@ router.post('/storyboard', async (req, res) => {
 
     const systemPrompt = `You are a professional film director and storyboard artist who creates visual production plans for social media content creators.
 
-Your job is to break content into cinematic scenes with detailed visual descriptions that can be used to generate AI images and video B-roll.
+Break content into cinematic scenes with detailed visual descriptions used to generate AI images via Nano Banana 2 and video B-roll via Kling 2.1.
 
 RULES:
-- Return ONLY valid JSON, no markdown, no explanation
+- Return ONLY valid JSON — no markdown, no explanation
 - Each scene must have a clear, specific visual description
-- Image prompts must be photorealistic and detailed (for Pollinations AI)
-- Video prompts must follow LTX-2 format: single paragraph, under 150 words, cinematic language
+- imagePrompt: photorealistic, detailed (for Nano Banana 2)
+- videoPrompt: Kling 2.1 format — single paragraph, under 150 words, cinematic language
 - Shot types: closeup, medium, wide, overhead, pov, cutaway
-- Keep scene count between 4-8 scenes
-- Duration per scene: 4-10 seconds typically`;
+- Scene count: 4–8 scenes
+- Duration per scene: 4–10 seconds`;
 
     const modeInstruction = mode === 'script'
-      ? `Parse this script into storyboard scenes. Each scene should represent a distinct visual moment or section:\n\nSCRIPT:\n${input}`
-      : `Create a storyboard for this content topic/idea:\n\nTOPIC: ${input}\nNiche: ${niche || 'general'}\nPlatform: ${platform || 'YouTube'}`;
+      ? `Parse this script into storyboard scenes:\n\nSCRIPT:\n${input}`
+      : `Create a storyboard for this topic:\n\nTOPIC: ${input}\nNiche: ${niche || 'general'}\nPlatform: ${platform || 'YouTube'}`;
 
     const message = await client.messages.create({
       model: 'claude-opus-4-5',
@@ -314,28 +418,28 @@ RULES:
         role: 'user',
         content: `${modeInstruction}
 
-Visual style preference: ${style || 'cinematic, professional'}
+Visual style: ${style || 'cinematic, professional'}
 Aspect ratio: ${aspect}
 
-Return a JSON object in this EXACT format:
+Return JSON in this EXACT format:
 {
   "title": "Storyboard title",
-  "totalDuration": "estimated total duration e.g. 45-60 seconds",
+  "totalDuration": "e.g. 45-60 seconds",
   "visualTheme": "2 sentence overall visual direction",
-  "colorGrade": "e.g. warm golden tones, desaturated cool blues",
+  "colorGrade": "e.g. warm golden tones",
   "scenes": [
     {
       "sceneNumber": 1,
       "title": "Scene title",
       "duration": "6 seconds",
       "shotType": "closeup",
-      "visualDescription": "What the viewer sees on screen — be specific",
-      "scriptNote": "What's being said or the content purpose of this scene",
-      "imagePrompt": "Detailed photorealistic image generation prompt for this scene",
-      "videoPrompt": "LTX-2 cinematic video prompt for this scene — single paragraph under 150 words",
+      "visualDescription": "What the viewer sees — be specific",
+      "scriptNote": "What's being said or the content purpose",
+      "imagePrompt": "Detailed Nano Banana 2 image prompt for this scene",
+      "videoPrompt": "Kling 2.1 cinematic video prompt — single paragraph under 150 words",
       "mood": "e.g. warm and intimate",
-      "cameraMove": "e.g. slow dolly in, static, pan left",
-      "lightingNotes": "e.g. soft window light from left, golden hour"
+      "cameraMove": "e.g. slow dolly in",
+      "lightingNotes": "e.g. soft window light from left"
     }
   ]
 }`
@@ -346,23 +450,38 @@ Return a JSON object in this EXACT format:
     const cleanJson = responseText.replace(/```json\n?|\n?```/g, '').trim();
     const storyboard = JSON.parse(cleanJson);
 
-    // Generate Pollinations image URLs for each scene
-    const dimensions = aspect === '9:16'
-      ? { width: 720, height: 1280 }
-      : { width: 1280, height: 720 };
+    // Submit a Nano Banana 2 image job per scene
+    const scenesWithTasks = await Promise.all(
+      storyboard.scenes.map(async scene => {
+        try {
+          const imgRes = await fetch(`${KIE_BASE_URL}/image/generate`, {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${KIE_API_KEY}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              model: 'nano-banana-2',
+              prompt: scene.imagePrompt,
+              aspect_ratio: aspect,
+              style: style || 'photorealistic',
+              n: 1
+            })
+          });
 
-    const styleModifier = 'cinematic, professional photography, sharp focus, 4k, film still';
+          if (!imgRes.ok) {
+            return { ...scene, imageTaskId: null, imageError: `kie.ai error ${imgRes.status}` };
+          }
 
-    storyboard.scenes = storyboard.scenes.map(scene => {
-      const seed = Math.floor(Math.random() * 999999);
-      const fullImagePrompt = `${scene.imagePrompt}, ${styleModifier}`;
-      const encodedPrompt = encodeURIComponent(fullImagePrompt);
-      return {
-        ...scene,
-        imageUrl: `https://image.pollinations.ai/prompt/${encodedPrompt}?width=${dimensions.width}&height=${dimensions.height}&seed=${seed}&nologo=true`,
-        seed
-      };
-    });
+          const imgData = await imgRes.json();
+          return { ...scene, imageTaskId: imgData.task_id || imgData.taskId };
+        } catch (err) {
+          return { ...scene, imageTaskId: null, imageError: err.message };
+        }
+      })
+    );
+
+    storyboard.scenes = scenesWithTasks;
 
     res.json({
       success: true,
@@ -372,17 +491,19 @@ Return a JSON object in this EXACT format:
         platform,
         aspect,
         sceneCount: storyboard.scenes.length,
-        ltxPlaygroundUrl: 'https://app.ltx.studio/ltx-2-playground/t2v'
+        imageProvider: 'Nano Banana 2',
+        videoProvider: 'Kling 2.1'
       }
     });
-
   } catch (error) {
-    console.error('Storyboard generation error:', error);
+    console.error('storyboard error:', error);
     res.status(500).json({ error: 'Failed to generate storyboard', details: error.message });
   }
 });
 
-// ─── Regenerate a single storyboard scene ────────────────────────────────────
+// ─── POST /storyboard/regenerate-scene ───────────────────────────────────────
+// Regenerates one scene — Claude writes new visuals, then submits a fresh
+// Nano Banana 2 image job. Returns imageTaskId.
 router.post('/storyboard/regenerate-scene', async (req, res) => {
   const { scene, platform, style } = req.body;
 
@@ -396,7 +517,7 @@ router.post('/storyboard/regenerate-scene', async (req, res) => {
       max_tokens: 800,
       messages: [{
         role: 'user',
-        content: `Regenerate this storyboard scene with fresh visuals and a different creative angle. Keep the same scene purpose and duration but vary the visual approach.
+        content: `Regenerate this storyboard scene with a fresh, different creative angle. Keep the same scene purpose and duration but vary the visual approach entirely.
 
 Scene title: ${scene.title}
 Scene purpose: ${scene.scriptNote}
@@ -407,8 +528,8 @@ Style: ${style || 'cinematic'}
 Return ONLY valid JSON:
 {
   "visualDescription": "new visual description",
-  "imagePrompt": "new detailed image prompt",
-  "videoPrompt": "new LTX-2 video prompt",
+  "imagePrompt": "new detailed Nano Banana 2 image prompt",
+  "videoPrompt": "new Kling 2.1 video prompt",
   "mood": "mood description",
   "cameraMove": "camera movement",
   "lightingNotes": "lighting description"
@@ -420,24 +541,52 @@ Return ONLY valid JSON:
     const cleanJson = responseText.replace(/```json\n?|\n?```/g, '').trim();
     const updates = JSON.parse(cleanJson);
 
-    const platformAspect = { youtube: '16:9', reels: '9:16', tiktok: '9:16', shorts: '9:16', general: '16:9' };
+    const platformAspect = {
+      youtube: '16:9', reels: '9:16', tiktok: '9:16', shorts: '9:16', general: '16:9'
+    };
     const aspect = platformAspect[platform] || '16:9';
-    const dimensions = aspect === '9:16' ? { width: 720, height: 1280 } : { width: 1280, height: 720 };
-    const seed = Math.floor(Math.random() * 999999);
-    const encodedPrompt = encodeURIComponent(`${updates.imagePrompt}, cinematic, professional photography, 4k`);
+
+    // Submit fresh Nano Banana 2 image job
+    let imageTaskId = null;
+    let imageError = null;
+
+    try {
+      const imgRes = await fetch(`${KIE_BASE_URL}/image/generate`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${KIE_API_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: 'nano-banana-2',
+          prompt: updates.imagePrompt,
+          aspect_ratio: aspect,
+          style: style || 'photorealistic',
+          n: 1
+        })
+      });
+
+      if (imgRes.ok) {
+        const imgData = await imgRes.json();
+        imageTaskId = imgData.task_id || imgData.taskId;
+      } else {
+        imageError = `kie.ai error ${imgRes.status}`;
+      }
+    } catch (err) {
+      imageError = err.message;
+    }
 
     res.json({
       success: true,
       updatedScene: {
         ...scene,
         ...updates,
-        imageUrl: `https://image.pollinations.ai/prompt/${encodedPrompt}?width=${dimensions.width}&height=${dimensions.height}&seed=${seed}&nologo=true`,
-        seed
+        imageTaskId,
+        ...(imageError && { imageError })
       }
     });
-
   } catch (error) {
-    console.error('Scene regeneration error:', error);
+    console.error('regenerate-scene error:', error);
     res.status(500).json({ error: 'Failed to regenerate scene', details: error.message });
   }
 });
