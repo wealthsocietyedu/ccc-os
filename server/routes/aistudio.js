@@ -293,6 +293,8 @@ Write the script now:`
     }
 
     const data = await response.json();
+    console.log('Blotato response status:', response.status);
+    console.log('Blotato response body:', JSON.stringify(data));
     res.json({
       success: true,
       jobId: data.job_id || data.jobId || data.id,
@@ -300,8 +302,8 @@ Write the script now:`
       provider: 'Blotato'
     });
   } catch (error) {
-    console.error('generate-faceless-video error:', error);
-    res.status(500).json({ error: 'Failed to submit faceless video job', details: error.message });
+    console.error('Blotato error full:', error);
+    res.status(500).json({ error: 'Failed to submit faceless video job', details: error.message, stack: error.stack });
   }
 });
 
