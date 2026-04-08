@@ -246,59 +246,87 @@ router.get('/video-status/:taskId', async (req, res) => {
 // Claude writes the script, then submits to Blotato /v1/faceless-video.
 // Returns jobId immediately.
 router.post('/generate-faceless-video', async (req, res) => {
-  const { topic, niche, duration, tone, cta, rawScript } = req.body;
+  const { topic, niche, platform, style } = req.body;
 
-  if (!topic && !rawScript) {
-    return res.status(400).json({ error: 'topic or rawScript is required' });
+  if (!topic) {
+    return res.status(400).json({ error: 'topic is required' });
   }
 
   try {
-    let script = rawScript;
-
-    if (!rawScript) {
-      const claudeRes = await client.messages.create({
-        model: 'claude-opus-4-5',
-        max_tokens: 600,
-        system: `You are an expert faceless video scriptwriter. Write punchy, high-retention scripts for faceless content creators.
-Keep it engaging, direct, and formatted for voiceover. No stage directions — pure narration only.
-Return ONLY the script text.`,
-        messages: [{
-          role: 'user',
-          content: `Write a faceless video script for:
+    // Claude Opus writes a 4-scene video script in structured JSON
+    const claudeRes = await client.messages.create({
+      model: 'claude-opus-4-5',
+      max_tokens: 1200,
+      system: `You are an expert faceless video scriptwriter and visual director.
+Write punchy, high-retention 4-scene video scripts for faceless content creators.
+Each scene needs a cinematic image prompt for Nano Banana 2 and a short voiceover script.
+Return ONLY valid JSON — no markdown, no explanation.`,
+      messages: [{
+        role: 'user',
+        content: `Write a 4-scene faceless video script for:
 Topic: ${topic}
 Niche: ${niche || 'general'}
-Duration: ${duration || '60 seconds'}
-Tone: ${tone || 'engaging and informative'}
-${cta ? `Call to action: ${cta}` : ''}
+Style: ${style || 'engaging and informative'}
+Platform: ${platform || 'TikTok/Reels'}
 
-Write the script now:`
-        }]
-      });
+Return ONLY this JSON shape:
+{
+  "voiceName": "Brian (American, deep)",
+  "scenes": [
+    { "imagePrompt": "detailed cinematic Nano Banana 2 image prompt", "script": "voiceover narration for this scene" },
+    { "imagePrompt": "...", "script": "..." },
+    { "imagePrompt": "...", "script": "..." },
+    { "imagePrompt": "...", "script": "..." }
+  ]
+}`
+      }]
+    });
 
-      script = claudeRes.content[0].text.trim();
-    }
+    const rawJson = claudeRes.content[0].text.trim().replace(/```json\n?|\n?```/g, '').trim();
+    const scriptData = JSON.parse(rawJson);
 
-    const response = await fetch(`${BLOTATO_BASE_URL}/v1/faceless-video`, {
+    // Map scenes to Blotato format
+    const mappedScenes = scriptData.scenes.map(scene => ({
+      mediaSource: { aiPrompt: scene.imagePrompt },
+      script: scene.script
+    }));
+
+    const aspectRatio = platform === 'youtube' ? '16:9' : '9:16';
+
+    const response = await fetch('https://api.blotato.com/api/visuals', {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${BLOTATO_API_KEY}`,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ script, topic, niche, duration })
+      body: JSON.stringify({
+        templateId: '/base/v2/ai-story-video/5903fe43-514d-40ee-a060-0d6628c5f8fd/v1',
+        inputs: {
+          scenes: mappedScenes,
+          voiceName: scriptData.voiceName,
+          aiImageModel: 'fal-ai/nano-banana-2',
+          aspectRatio,
+          enableVoiceover: true
+        },
+        prompt: topic
+      })
     });
 
     if (!response.ok) {
       const err = await response.text();
-      return res.status(response.status).json({ error: 'Blotato faceless video submission failed', details: err });
+      console.error('Blotato submission failed:', response.status, err);
+      return res.status(response.status).json({ error: 'Blotato visual submission failed', details: err });
     }
 
     const data = await response.json();
     console.log('Blotato response status:', response.status);
     console.log('Blotato response body:', JSON.stringify(data));
+
     res.json({
       success: true,
-      jobId: data.job_id || data.jobId || data.id,
-      script,
+      jobId: data.id,
+      script: scriptData,
+      status: 'processing',
       provider: 'Blotato'
     });
   } catch (error) {
@@ -308,12 +336,12 @@ Write the script now:`
 });
 
 // ─── GET /faceless-status/:jobId ─────────────────────────────────────────────
-// Polls Blotato for the current status of a faceless video job.
+// Polls Blotato /api/visuals/:jobId and normalises status for the frontend.
 router.get('/faceless-status/:jobId', async (req, res) => {
   const { jobId } = req.params;
 
   try {
-    const response = await fetch(`${BLOTATO_BASE_URL}/v1/faceless-video/${jobId}`, {
+    const response = await fetch(`https://api.blotato.com/api/visuals/${jobId}`, {
       headers: {
         Authorization: `Bearer ${BLOTATO_API_KEY}`,
         'Content-Type': 'application/json'
@@ -326,7 +354,15 @@ router.get('/faceless-status/:jobId', async (req, res) => {
     }
 
     const data = await response.json();
-    res.json({ success: true, ...data });
+    const blotatoStatus = (data.status || '').toLowerCase();
+
+    if (blotatoStatus === 'done') {
+      return res.json({ success: true, status: 'completed', videoUrl: data.mediaUrl });
+    }
+    if (blotatoStatus.includes('failed')) {
+      return res.json({ success: true, status: 'failed', blotatoStatus: data.status });
+    }
+    res.json({ success: true, status: 'processing', blotatoStatus: data.status });
   } catch (error) {
     console.error('faceless-status error:', error);
     res.status(500).json({ error: 'Failed to get faceless video status', details: error.message });
