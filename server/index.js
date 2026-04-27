@@ -20,6 +20,8 @@ const visualEngineRoutes = require('./routes/visual-engine');
 const clipperRoutes = require('./routes/clipper');
 const contentFlowRoutes = require('./routes/contentFlow');
 const videoDownloaderRoutes = require('./routes/videoDownloader');
+const csvImportRoutes = require('./routes/csvImport');
+const advisorRoutes = require('./routes/advisor');
 const { startCron } = require('./scheduler/cron');
 const { getDB, reseedUserData } = require('./db');
 const { authenticate } = require('./middleware/auth');
@@ -76,6 +78,8 @@ app.use('/api/visual-engine', authenticate, visualEngineRoutes);
 app.use('/api/smart-clipper', authenticate, clipperRoutes);
 app.use('/api/flows', authenticate, contentFlowRoutes);
 app.use('/api/video-downloader', videoDownloaderRoutes);
+app.use('/api/csv-import', csvImportRoutes);
+app.use('/api/advisor', advisorRoutes);
 
 // ─── ADMIN ENDPOINTS ──────────────────────────────────────────────────────────
 

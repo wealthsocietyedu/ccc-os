@@ -385,6 +385,32 @@ const initSchema = (db) => {
     );
     CREATE INDEX IF NOT EXISTS idx_brand_deals_user ON brand_deals(user_id);
     CREATE INDEX IF NOT EXISTS idx_brand_deals_brand ON brand_deals(brand_id);
+
+    -- ─── ADVISOR MEMORY ───────────────────────────────────────────────────────
+    CREATE TABLE IF NOT EXISTS advisor_memory (
+      id           TEXT PRIMARY KEY,
+      user_id      TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      memory_type  TEXT NOT NULL DEFAULT 'general',
+      content      TEXT NOT NULL,
+      metadata     TEXT NOT NULL DEFAULT '{}',
+      created_at   TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_advisor_memory_user ON advisor_memory(user_id);
+    CREATE INDEX IF NOT EXISTS idx_advisor_memory_type ON advisor_memory(memory_type);
+
+    -- ─── ADVISOR CONVERSATIONS ────────────────────────────────────────────────
+    CREATE TABLE IF NOT EXISTS advisor_conversations (
+      id           TEXT PRIMARY KEY,
+      user_id      TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      session_type TEXT NOT NULL DEFAULT 'chat',
+      messages     TEXT NOT NULL DEFAULT '[]',
+      summary      TEXT NOT NULL DEFAULT '',
+      brand_id     TEXT REFERENCES brands(id) ON DELETE SET NULL,
+      created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at   TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_advisor_convos_user ON advisor_conversations(user_id);
+    CREATE INDEX IF NOT EXISTS idx_advisor_convos_brand ON advisor_conversations(brand_id);
   `);
 
   console.log('✅ Database schema initialized');
