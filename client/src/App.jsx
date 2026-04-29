@@ -5,6 +5,7 @@ import { PricingPage, BillingManagement, UpgradePrompt, SuccessScreen } from './
 import { useContentStore } from './lib/store/useContentStore.ts';
 import AIStudio from './components/AIStudio.jsx';
 import ContentAdvisor from './components/ContentAdvisor.jsx';
+import XPublisher from './components/XPublisher.jsx';
 import VisualEngine from './components/VisualEngine.jsx';
 import SmartClipper from './components/SmartClipper.jsx';
 import CarouselPromptGenerator from './components/CarouselPromptGenerator.jsx';
@@ -60,6 +61,7 @@ const I = ({ n, s = 16, c = "" }) => {
     image: "M21 19V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2z M8.5 10a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z M21 15l-5-5L5 21",
     scissors: "M6 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6z M6 15a3 3 0 1 0 0 6 3 3 0 0 0 0-6z M20 4L8.12 15.88M14.47 14.48L20 20M8.12 8.12L12 12",
     advisor: "M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z",
+    xpublisher: "M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.737-8.858L1.25 2.25H8.08l4.253 5.622 5.911-5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z",
   };
   const d = icons[n];
   if (!d) return <span style={{ fontSize: s, lineHeight: 1 }}>•</span>;
@@ -3831,6 +3833,7 @@ export default function App() {
     { id:'video-downloader', label:'Video Downloader', icon:'download', badge:'NEW' },
     { id:'ai-studio',      label:'AI Studio',      icon:'studio',   badge:'NEW' },
     { id:'content-advisor', label:'Content Advisor', icon:'advisor',  badge:'NEW' },
+    { id:'x-publisher', label:'X Publisher', icon:'xpublisher', badge:'NEW' },
     { id:'visual-engine',  label:'Visual Engine',  icon:'image',    badge:'NEW' },
     { id:'smart-clipper',  label:'Smart Clipper',  icon:'scissors', badge:'NEW' },
     { id:'carousel-prompts', label:'Carousel Prompts', icon:'studio', badge:'NEW' },
@@ -3850,6 +3853,7 @@ export default function App() {
     studio: 'Content Studio',
     'ai-studio':     'AI Studio',
     'content-advisor': 'Content Advisor',
+    'x-publisher': 'X Publisher',
     'visual-engine': 'Visual Engine',
     'smart-clipper': 'Smart Clipper',
     'carousel-prompts': 'Carousel Prompts',
@@ -3869,6 +3873,7 @@ export default function App() {
       case 'studio': return <ContentStudioRoom activeBrand={activeBrand} />;
       case 'ai-studio':     return <AIStudio activeBrand={activeBrand} />;
       case 'content-advisor': return <ContentAdvisor activeBrand={activeBrand} />;
+      case 'x-publisher': return <XPublisher activeBrand={activeBrand} />;
       case 'visual-engine': return <VisualEngine activeBrand={activeBrand} />;
       case 'smart-clipper': return <SmartClipper activeBrand={activeBrand} />;
       case 'carousel-prompts': return <CarouselPromptGenerator />;
