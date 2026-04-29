@@ -411,6 +411,56 @@ const initSchema = (db) => {
     );
     CREATE INDEX IF NOT EXISTS idx_advisor_convos_user ON advisor_conversations(user_id);
     CREATE INDEX IF NOT EXISTS idx_advisor_convos_brand ON advisor_conversations(brand_id);
+
+    -- ─── X ACCOUNTS ──────────────────────────────────────────────────────────────
+    CREATE TABLE IF NOT EXISTS x_accounts (
+      id              TEXT PRIMARY KEY,
+      user_id         TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      display_name    TEXT NOT NULL DEFAULT '',
+      username        TEXT NOT NULL DEFAULT '',
+      api_key         TEXT NOT NULL,
+      api_secret      TEXT NOT NULL,
+      access_token    TEXT NOT NULL,
+      access_secret   TEXT NOT NULL,
+      is_active       INTEGER NOT NULL DEFAULT 1,
+      slot            INTEGER NOT NULL DEFAULT 1,
+      created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    -- ─── X POST QUEUE ─────────────────────────────────────────────────────────────
+    CREATE TABLE IF NOT EXISTS x_posts (
+      id              TEXT PRIMARY KEY,
+      user_id         TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      account_id      TEXT NOT NULL REFERENCES x_accounts(id) ON DELETE CASCADE,
+      content         TEXT NOT NULL,
+      mode            TEXT NOT NULL DEFAULT 'manual',
+      status          TEXT NOT NULL DEFAULT 'draft',
+      scheduled_at    TEXT,
+      posted_at       TEXT,
+      tweet_id        TEXT,
+      error_message   TEXT,
+      idea_id         TEXT REFERENCES ideas(id) ON DELETE SET NULL,
+      created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    -- ─── X AUTOPILOT CONFIG ───────────────────────────────────────────────────────
+    CREATE TABLE IF NOT EXISTS x_autopilot (
+      id              TEXT PRIMARY KEY,
+      user_id         TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      account_id      TEXT NOT NULL REFERENCES x_accounts(id) ON DELETE CASCADE,
+      is_active       INTEGER NOT NULL DEFAULT 0,
+      schedule_days   TEXT NOT NULL DEFAULT '["monday","wednesday","friday"]',
+      schedule_time   TEXT NOT NULL DEFAULT '09:00',
+      content_direction TEXT NOT NULL DEFAULT '',
+      pillar_id       TEXT REFERENCES pillars(id) ON DELETE SET NULL,
+      timezone        TEXT NOT NULL DEFAULT 'America/Chicago',
+      last_posted_at  TEXT,
+      created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at      TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE(account_id)
+    );
   `);
 
   console.log('✅ Database schema initialized');
