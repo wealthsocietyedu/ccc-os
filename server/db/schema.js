@@ -418,8 +418,7 @@ const initSchema = (db) => {
       user_id         TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       display_name    TEXT NOT NULL DEFAULT '',
       username        TEXT NOT NULL DEFAULT '',
-      api_key         TEXT NOT NULL,
-      api_secret      TEXT NOT NULL,
+      x_user_id       TEXT,
       access_token    TEXT NOT NULL,
       access_secret   TEXT NOT NULL,
       is_active       INTEGER NOT NULL DEFAULT 1,
@@ -461,9 +460,26 @@ const initSchema = (db) => {
       updated_at      TEXT NOT NULL DEFAULT (datetime('now')),
       UNIQUE(account_id)
     );
+
+    -- ─── OAUTH TEMP TOKENS ────────────────────────────────────────────────────────
+    -- Stores request tokens during OAuth flow (deleted after use)
+    CREATE TABLE IF NOT EXISTS oauth_temp_tokens (
+      oauth_token        TEXT PRIMARY KEY,
+      oauth_token_secret TEXT NOT NULL,
+      user_id            TEXT NOT NULL,
+      created_at         TEXT NOT NULL DEFAULT (datetime('now'))
+    );
   `);
 
   console.log('✅ Database schema initialized');
+
+  // Runtime migrations — safe to run on every startup
+  const migrations = [
+    "ALTER TABLE x_accounts ADD COLUMN x_user_id TEXT",
+  ];
+  for (const sql of migrations) {
+    try { db.prepare(sql).run(); } catch (e) { /* column already exists */ }
+  }
 
   // Init billing tables
   const { initBillingSchema } = require('./billing-schema');

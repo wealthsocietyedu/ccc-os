@@ -614,27 +614,49 @@ function AutopilotTab({ accounts }) {
 // ─── TAB 4: ACCOUNTS ──────────────────────────────────────────────────────────
 
 function AccountsTab({ accounts, onRefresh }) {
-  const [showAdd, setShowAdd] = useState(false);
-  const [form, setForm] = useState({ displayName: '', username: '', apiKey: '', apiSecret: '', accessToken: '', accessSecret: '' });
-  const [saving, setSaving] = useState(false);
+  const [connecting, setConnecting] = useState(false);
   const [testing, setTesting] = useState('');
   const [testResults, setTestResults] = useState({});
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
 
-  const save = async () => {
-    if (!form.apiKey || !form.apiSecret || !form.accessToken || !form.accessSecret) {
-      setError('All 4 credentials are required'); return;
-    }
-    setSaving(true); setError('');
+  const connectAccount = async () => {
+    setConnecting(true);
+    setError('');
+
+    let authUrl;
     try {
-      await apiFetch('/accounts', form);
-      setSuccess('Account added');
-      setForm({ displayName: '', username: '', apiKey: '', apiSecret: '', accessToken: '', accessSecret: '' });
-      setShowAdd(false);
-      onRefresh();
-    } catch (e) { setError(e.message); }
-    finally { setSaving(false); }
+      const d = await apiFetch('/auth/start', undefined, 'GET');
+      authUrl = d.authUrl;
+    } catch (e) {
+      setError(e.message || 'Failed to start OAuth flow');
+      setConnecting(false);
+      return;
+    }
+
+    const popup = window.open(authUrl, 'x_oauth', 'width=600,height=700,left=200,top=100');
+
+    const handleMessage = (e) => {
+      const t = e.data?.type;
+      if (t !== 'X_AUTH_SUCCESS' && t !== 'X_AUTH_DENIED' && t !== 'X_AUTH_ERROR') return;
+      window.removeEventListener('message', handleMessage);
+      setConnecting(false);
+      if (t === 'X_AUTH_SUCCESS') {
+        onRefresh();
+      } else {
+        setError(t === 'X_AUTH_DENIED' ? 'Authorization denied on X' : (e.data.error || 'Authorization failed'));
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+
+    // Clean up if popup closes without sending message
+    const pollClosed = setInterval(() => {
+      if (!popup || popup.closed) {
+        clearInterval(pollClosed);
+        window.removeEventListener('message', handleMessage);
+        setConnecting(false);
+      }
+    }, 500);
   };
 
   const test = async (id) => {
@@ -689,65 +711,25 @@ function AccountsTab({ accounts, onRefresh }) {
         );
       })}
 
-      {/* Add account */}
+      {/* Connect button */}
       {accounts.length < 5 && (
-        <div>
-          {!showAdd ? (
-            <Btn onClick={() => setShowAdd(true)} label={`Add Account (${accounts.length}/5)`} icon="+" variant="secondary" />
-          ) : (
-            <div style={S.panel}>
-              <div style={{ ...S.label, marginBottom: '14px' }}>Add X Account</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                  <div>
-                    <div style={S.label}>Display Name</div>
-                    <input value={form.displayName} onChange={e => setForm(p => ({ ...p, displayName: e.target.value }))} placeholder="e.g. Main Account" style={S.input} />
-                  </div>
-                  <div>
-                    <div style={S.label}>Username (optional)</div>
-                    <input value={form.username} onChange={e => setForm(p => ({ ...p, username: e.target.value }))} placeholder="without @" style={S.input} />
-                  </div>
-                </div>
-
-                <div style={{ padding: '10px', background: '#0A1A0A', border: '1px solid #1A3A1A', borderRadius: '8px', fontSize: '12px', color: '#4ADE80', fontFamily: 'DM Mono, monospace' }}>
-                  ⚠️ Never share these credentials. They are stored securely in your database.
-                </div>
-
-                {[
-                  ['apiKey', 'API Key'],
-                  ['apiSecret', 'API Key Secret'],
-                  ['accessToken', 'Access Token'],
-                  ['accessSecret', 'Access Token Secret'],
-                ].map(([field, label]) => (
-                  <div key={field}>
-                    <div style={S.label}>{label}</div>
-                    <input
-                      type="password"
-                      value={form[field]}
-                      onChange={e => setForm(p => ({ ...p, [field]: e.target.value }))}
-                      placeholder={`Enter ${label}`}
-                      style={S.input}
-                    />
-                  </div>
-                ))}
-
-                <div style={{ display: 'flex', gap: '10px' }}>
-                  <Btn onClick={save} loading={saving} label="Add Account" icon="+" />
-                  <Btn onClick={() => { setShowAdd(false); setError(''); }} label="Cancel" icon="×" variant="secondary" />
-                </div>
-                <Err msg={error} />
-                {success && <div style={{ color: '#4ADE80', fontSize: '13px', fontFamily: 'DM Mono, monospace' }}>✅ {success}</div>}
-              </div>
-            </div>
-          )}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <Btn
+            onClick={connectAccount}
+            loading={connecting}
+            label={connecting ? 'Waiting for authorization…' : `Connect X Account (${accounts.length}/5)`}
+            icon="𝕏"
+            variant="secondary"
+          />
+          <Err msg={error} />
         </div>
       )}
 
-      {accounts.length === 0 && !showAdd && (
+      {accounts.length === 0 && !connecting && (
         <div style={{ ...S.panel, textAlign: 'center', padding: '40px' }}>
           <div style={{ fontSize: '32px', marginBottom: '12px' }}>𝕏</div>
           <div style={{ color: '#E5E7EB', fontSize: '15px', fontFamily: 'Sora, sans-serif', marginBottom: '8px' }}>No accounts connected yet</div>
-          <div style={{ color: '#6B7280', fontSize: '13px', fontFamily: 'Sora, sans-serif' }}>Add up to 5 X accounts to start posting</div>
+          <div style={{ color: '#6B7280', fontSize: '13px', fontFamily: 'Sora, sans-serif' }}>Click "Connect X Account" to authorize via X</div>
         </div>
       )}
     </div>
