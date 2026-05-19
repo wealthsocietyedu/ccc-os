@@ -3,14 +3,7 @@ import { useState, useEffect, useCallback, useRef, createContext, useContext } f
 import * as api from './lib/api.js';
 import { PricingPage, BillingManagement, UpgradePrompt, SuccessScreen } from './pages/Billing.jsx';
 import { useContentStore } from './lib/store/useContentStore.ts';
-import AIStudio from './components/AIStudio.jsx';
-import ContentAdvisor from './components/ContentAdvisor.jsx';
-import XPublisher from './components/XPublisher.jsx';
-import VisualEngine from './components/VisualEngine.jsx';
-import SmartClipper from './components/SmartClipper.jsx';
-import CarouselPromptGenerator from './components/CarouselPromptGenerator.jsx';
-import ContentFlow from './components/ContentFlow';
-import VideoDownloader from './components/VideoDownloader';
+import { MODULES } from './modules.js';
 
 // ─── AUTH CONTEXT ─────────────────────────────────────────────────────────────
 const AuthCtx = createContext(null);
@@ -3830,14 +3823,7 @@ export default function App() {
     { id:'data', label:'Data Room', icon:'data' },
     { id:'monetization', label:'Monetization', icon:'money' },
     { id:'studio', label:'Content Studio', icon:'studio', badge:'NEW' },
-    { id:'video-downloader', label:'Video Downloader', icon:'download', badge:'NEW' },
-    { id:'ai-studio',      label:'AI Studio',      icon:'studio',   badge:'NEW' },
-    { id:'content-advisor', label:'Content Advisor', icon:'advisor',  badge:'NEW' },
-    { id:'x-publisher', label:'X Publisher', icon:'xpublisher', badge:'NEW' },
-    { id:'visual-engine',  label:'Visual Engine',  icon:'image',    badge:'NEW' },
-    { id:'smart-clipper',  label:'Smart Clipper',  icon:'scissors', badge:'NEW' },
-    { id:'carousel-prompts', label:'Carousel Prompts', icon:'studio', badge:'NEW' },
-    { id:'content-flow', label:'Content Flow', icon:'zap', badge:'NEW' },
+    ...MODULES,
     { id:'billing', label:'Plans & Billing', icon:'shield' },
     { id:'settings', label:'Settings', icon:'settings' },
   ];
@@ -3857,6 +3843,7 @@ export default function App() {
     'visual-engine': 'Visual Engine',
     'smart-clipper': 'Smart Clipper',
     'carousel-prompts': 'Carousel Prompts',
+  'channel-downloader': 'Channel Downloader',
     settings: 'Settings',
   };
 
@@ -3871,14 +3858,11 @@ export default function App() {
       case 'monetization': return <MonetizationRoom {...props} />;
       case 'scheduler': return <SchedulerRoom {...props} user={user} />;
       case 'studio': return <ContentStudioRoom activeBrand={activeBrand} />;
-      case 'ai-studio':     return <AIStudio activeBrand={activeBrand} />;
-      case 'content-advisor': return <ContentAdvisor activeBrand={activeBrand} />;
-      case 'x-publisher': return <XPublisher activeBrand={activeBrand} />;
-      case 'visual-engine': return <VisualEngine activeBrand={activeBrand} />;
-      case 'smart-clipper': return <SmartClipper activeBrand={activeBrand} />;
-      case 'carousel-prompts': return <CarouselPromptGenerator />;
-      case 'video-downloader': return <VideoDownloader />;
-      case 'content-flow': return <ContentFlow />;
+      default: {
+        const mod = MODULES.find(m => m.id === page);
+        if (mod) { const Comp = mod.component; return <Comp {...mod.props(activeBrand, user)} />; }
+        return null;
+      }
       case 'settings': return <SettingsRoom user={user} />;
       case 'billing-success':
         return (
@@ -3928,7 +3912,7 @@ export default function App() {
             onSubscribe={handleSubscribe}
           />
         );
-      default: return <div className="page"><div className="empty">Coming soon.</div></div>;
+
     }
   };
 

@@ -23,6 +23,7 @@ const videoDownloaderRoutes = require('./routes/videoDownloader');
 const csvImportRoutes = require('./routes/csvImport');
 const advisorRoutes = require('./routes/advisor');
 const xPublisherRoutes = require('./routes/xPublisher');
+const channelDownloaderRoutes = require('./routes/channelDownloader');
 const { startCron } = require('./scheduler/cron');
 const { getDB, reseedUserData } = require('./db');
 const { authenticate } = require('./middleware/auth');
@@ -82,6 +83,7 @@ app.use('/api/video-downloader', videoDownloaderRoutes);
 app.use('/api/csv-import', csvImportRoutes);
 app.use('/api/advisor', advisorRoutes);
 app.use('/api/x-publisher', xPublisherRoutes);
+app.use('/api/channel-downloader', channelDownloaderRoutes);
 
 // ─── ADMIN ENDPOINTS ──────────────────────────────────────────────────────────
 
