@@ -11,3 +11,4 @@ dist/
 client/dist/
 .DS_Store
 *.log
+.claude/launch.json

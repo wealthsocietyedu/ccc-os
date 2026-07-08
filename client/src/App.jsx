@@ -399,6 +399,49 @@ const STYLES = `
   /* ── Input placeholders ── */
   input::placeholder, textarea::placeholder { color: var(--text3); }
   select option { background: var(--bg2); color: var(--text); }
+
+  /* ── Command Center Dashboard (scoped) ── */
+  .cc-dashboard {
+    --cc-bg: #F7F8FA; --cc-surface: #FFFFFF; --cc-border: #EEF0F3;
+    --cc-text: #16151A; --cc-text2: #6B7280; --cc-text3: #9CA3AF;
+    --cc-radius: 16px; --cc-radius-sm: 10px;
+    --cc-shadow: 0 1px 3px rgba(16,24,40,0.06), 0 1px 2px rgba(16,24,40,0.04);
+    background: var(--cc-bg); padding: 32px; min-height: 100%; flex: 1; overflow-y: auto;
+  }
+
+  .cc-dashboard .kpi-card { background: var(--cc-surface); border-radius: var(--cc-radius); box-shadow: var(--cc-shadow); border: 1px solid var(--cc-border); padding: 20px; }
+  .cc-dashboard .kpi-icon, .cc-dashboard .kpi-glow { display: none; }
+  .cc-dashboard .kpi-val { font-family: 'Sora', sans-serif; font-weight: 700; font-size: 30px; color: var(--cc-text); }
+  .cc-dashboard .kpi-label { font-family: 'DM Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--cc-text2); }
+  .cc-dashboard .kpi-delta { display: inline-flex; align-items: center; gap: 3px; background: rgba(61,158,140,0.12); color: var(--green); padding: 2px 8px; border-radius: 999px; font-family: 'DM Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; width: fit-content; }
+
+  .cc-dashboard .sec-title { font-family: 'Sora', sans-serif; font-weight: 600; font-size: 16px; color: var(--cc-text); }
+  .cc-dashboard .sec-title svg { display: none; }
+  .cc-dashboard .sec-title::before { content: ''; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+  .cc-dashboard .sec-title.cc-dot-accent::before { background: var(--accent); }
+  .cc-dashboard .sec-title.cc-dot-green::before { background: var(--green); }
+  .cc-dashboard .sec-title.cc-dot-accent2::before { background: var(--accent2); }
+
+  .cc-dashboard .pipe-col { background: var(--cc-surface); border: 1px solid var(--cc-border); border-radius: var(--cc-radius-sm); }
+  .cc-dashboard .pipe-col-lbl { font-family: 'Sora', sans-serif; font-weight: 600; font-size: 13px; color: var(--cc-text); text-transform: none; letter-spacing: normal; }
+  .cc-dashboard .pipe-col-cnt { background: var(--cc-bg); color: var(--cc-text2); font-family: 'DM Mono', monospace; font-size: 11px; }
+  .cc-dashboard .pipe-card { background: var(--cc-surface); border: 1px solid var(--cc-border); border-radius: var(--cc-radius-sm); box-shadow: none; transition: box-shadow .15s, border-color .15s; }
+  .cc-dashboard .pipe-card:hover { box-shadow: var(--cc-shadow); transform: none; }
+  .cc-dashboard .pipe-card-title { color: var(--cc-text); }
+
+  .cc-dashboard .panel { background: var(--cc-surface); border: 1px solid var(--cc-border); border-radius: var(--cc-radius); box-shadow: var(--cc-shadow); }
+  .cc-dashboard .platform-row, .cc-dashboard .performer-row { border-bottom: 1px solid var(--cc-border); transition: background .12s; }
+  .cc-dashboard .platform-row:hover, .cc-dashboard .performer-row:hover { background: var(--cc-bg); }
+  .cc-dashboard .platform-name, .cc-dashboard .performer-title { color: var(--cc-text); }
+  .cc-dashboard .pgrowth, .cc-dashboard .performer-score { font-family: 'DM Mono', monospace; }
+  .cc-dashboard .pbar { background: var(--cc-border); }
+
+  .cc-dashboard .campaign-row { background: var(--cc-surface); border: 1px solid var(--cc-border); border-radius: var(--cc-radius-sm); box-shadow: var(--cc-shadow); }
+  .cc-dashboard .campaign-name { color: var(--cc-text); }
+  .cc-dashboard .camp-rev { font-family: 'DM Mono', monospace; }
+  .cc-dashboard .cc-stat-card { background: var(--cc-surface); border: 1px solid var(--cc-border); border-radius: var(--cc-radius-sm); padding: 12px 14px; text-align: center; }
+  .cc-dashboard .cc-deal-row { background: var(--cc-surface); border: 1px solid var(--cc-border); border-radius: var(--cc-radius-sm); padding: 11px 14px; }
+  .cc-dashboard .empty { color: var(--cc-text3); }
 `;
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
 const fmt = (n) => { if (n >= 1e6) return (n/1e6).toFixed(1)+'M'; if (n >= 1e3) return (n/1e3).toFixed(1)+'K'; return String(n||0); };
@@ -703,7 +746,7 @@ function CommandCenter({ activeBrand, setPage }) {
   const tot = analytics?.totals || {};
 
   return (
-    <div className="page">
+    <div className="cc-dashboard">
       {/* KPI Row */}
       <div className="kpi-grid">
         {[
@@ -715,16 +758,16 @@ function CommandCenter({ activeBrand, setPage }) {
           <div className="kpi-card" key={k.label}>
             <div className="kpi-glow" style={{ background: k.glow }} />
             <div className="kpi-icon"><I n={k.icon} s={26} /></div>
-            <div className="kpi-label">{k.label}</div>
-            <div className="kpi-val">{k.val}</div>
             <div className="kpi-delta" style={{ color: k.up ? 'var(--green)' : 'var(--red)' }}>{k.up?'↑':'↓'} {k.delta}</div>
+            <div className="kpi-val">{k.val}</div>
+            <div className="kpi-label">{k.label}</div>
           </div>
         ))}
       </div>
 
       {/* Pipeline */}
       <div className="sec-hdr">
-        <div className="sec-title"><I n="production" s={14} /> Production Pipeline</div>
+        <div className="sec-title cc-dot-accent"><I n="production" s={14} /> Production Pipeline</div>
         <button className="btn btn-ghost btn-sm" onClick={() => setPage('production')}><I n="arrow" s={12} /> View All</button>
       </div>
       <PipelineBoard />
@@ -732,7 +775,7 @@ function CommandCenter({ activeBrand, setPage }) {
       <div className="grid-2">
         {/* Platform Tracker */}
         <div className="panel">
-          <div className="sec-hdr"><div className="sec-title"><I n="distribution" s={14} /> Platform Tracker</div></div>
+          <div className="sec-hdr"><div className="sec-title cc-dot-green"><I n="distribution" s={14} /> Platform Tracker</div></div>
           {platformStats.map(p => {
             const prog = Math.round((p.published_this_week / Math.max(p.target_per_week,1)) * 100);
             const growth = p.followers_start > 0 ? ((p.followers_current - p.followers_start) / p.followers_start * 100).toFixed(1) : '0.0';
@@ -755,7 +798,7 @@ function CommandCenter({ activeBrand, setPage }) {
 
         {/* Top Performers */}
         <div className="panel">
-          <div className="sec-hdr"><div className="sec-title"><I n="trending" s={14} /> Top Performers</div><span style={{ fontSize:10.5, color:'var(--text3)' }}>By score</span></div>
+          <div className="sec-hdr"><div className="sec-title cc-dot-accent2"><I n="trending" s={14} /> Top Performers</div><span style={{ fontSize:10.5, color:'var(--text3)' }}>By score</span></div>
           {(analytics?.top_performers||[]).slice(0,5).map((p,i) => (
             <div className="performer-row" key={p.id}>
               <div className="performer-rank">#{i+1}</div>
@@ -774,7 +817,7 @@ function CommandCenter({ activeBrand, setPage }) {
       <BrandDealsSection activeBrand={activeBrand} />
 
       {campaigns.length > 0 && <>
-        <div className="sec-hdr"><div className="sec-title"><I n="target" s={14} /> Active Campaigns</div></div>
+        <div className="sec-hdr"><div className="sec-title cc-dot-green"><I n="target" s={14} /> Active Campaigns</div></div>
         {campaigns.map(c => {
           const prog = Math.round((c.pieces_planned > 0 ? 60 : 0));
           return (
@@ -1887,18 +1930,18 @@ function BrandDealsSection({ activeBrand }) {
   return (
     <div style={{ marginBottom:28 }}>
       <div className="sec-hdr" style={{ marginTop:8 }}>
-        <div className="sec-title">🤝 Brand Deals</div>
+        <div className="sec-title cc-dot-accent2">🤝 Brand Deals</div>
         <button className="btn btn-primary btn-sm" onClick={() => setShowAdd(true)}><I n="plus" s={12} /> Add Deal</button>
       </div>
 
       {/* Stats row */}
       <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:8, marginBottom:16 }}>
-        <div style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'var(--r-sm)', padding:'12px 14px', textAlign:'center' }}>
+        <div className="cc-stat-card">
           <div style={{ fontSize:10, color:'var(--text3)', fontWeight:700, textTransform:'uppercase', marginBottom:4 }}>Total Revenue</div>
           <div style={{ fontFamily:'var(--font-d)', fontSize:20, fontWeight:800, color:'var(--green)' }}>{money(totalRevenue)}</div>
         </div>
         {pipeline.map(p => (
-          <div key={p.status} style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'var(--r-sm)', padding:'12px 14px', textAlign:'center' }}>
+          <div key={p.status} className="cc-stat-card">
             <div style={{ fontSize:10, color:'var(--text3)', fontWeight:700, textTransform:'uppercase', marginBottom:4 }}>{p.status}</div>
             <div style={{ fontFamily:'var(--font-d)', fontSize:20, fontWeight:800, color:p.color }}>{p.count}</div>
           </div>
@@ -1907,7 +1950,7 @@ function BrandDealsSection({ activeBrand }) {
 
       {/* Deal cards */}
       {deals.map(d => (
-        <div key={d.id} style={{ display:'flex', gap:12, alignItems:'center', padding:'11px 14px', background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'var(--r-sm)', marginBottom:7 }}>
+        <div key={d.id} className="cc-deal-row" style={{ display:'flex', gap:12, alignItems:'center', marginBottom:7 }}>
           <div style={{ flex:1, minWidth:0 }}>
             <div style={{ fontWeight:600, fontSize:13, color:'var(--text)', marginBottom:3 }}>{d.partner_name}</div>
             <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
