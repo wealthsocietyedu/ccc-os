@@ -5,26 +5,17 @@ const path = require('path');
 const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
 const Anthropic = require('@anthropic-ai/sdk');
+const { getDB } = require('../db');
+const { cookieArgs } = require('../utils/ytdlpCookies');
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-const DOWNLOADS_BASE = '/data/downloads';
+const DOWNLOADS_BASE = path.join(__dirname, '../../data/downloads');
 const MAX_CONCURRENT_JOBS = 3;
 
 // ─── In-memory process map (keyed by jobId) ───────────────────────────────────
 const activeProcesses = new Map();
-
-// ─── DB helper (injected via middleware or direct require) ────────────────────
-// We access the shared `db` instance from the main app
-function getDb() {
-  // CCC OS pattern: db is attached to app or required from a shared module
-  try {
-    return require('../database'); // adjust path if needed
-  } catch {
-    return null;
-  }
-}
 
 // ─── Schema bootstrap (call once on route load) ───────────────────────────────
 function ensureSchema(db) {
@@ -92,6 +83,7 @@ function buildYtdlpArgs(url, jobId, platform, options) {
     '--no-warnings',
     '--ignore-errors',
     '--no-playlist-reverse',
+    ...cookieArgs(),
   ];
 
   if (dateAfter) {
@@ -374,10 +366,8 @@ async function runDownloadJob(db, jobId, url, platform, channelHandle, options) 
 
 // ─── Middleware: inject db ────────────────────────────────────────────────────
 router.use((req, res, next) => {
-  const db = req.app.get('db') || getDb();
-  if (!db) return res.status(500).json({ error: 'Database not available' });
-  req.db = db;
-  ensureSchema(db);
+  req.db = getDB();
+  ensureSchema(req.db);
   next();
 });
 

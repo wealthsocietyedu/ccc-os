@@ -4,6 +4,7 @@ const { exec, spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
+const { cookieArgs } = require('../utils/ytdlpCookies');
 
 // ─── Utility: Detect platform from URL ───────────────────────────────────────
 function detectPlatform(url) {
@@ -47,6 +48,7 @@ router.post('/info', async (req, res) => {
       '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
       '--extractor-args', 'youtube:player_client=web,android,tv_embedded',
       '--add-headers', 'Accept-Language:en-US,en;q=0.9',
+      ...cookieArgs(),
       url.trim()
     ];
 
@@ -122,6 +124,7 @@ router.post('/download', async (req, res) => {
       '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
       '--extractor-args', 'youtube:player_client=web,android,tv_embedded',
       '--add-headers', 'Accept-Language:en-US,en;q=0.9',
+      ...cookieArgs(),
       '-o', `${tmpFile}.%(ext)s`,
     ];
 
