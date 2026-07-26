@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 const API = '/api/smart-clipper';
+const getToken = () => localStorage.getItem('ccc_token');
 async function apiFetch(endpoint, body, method = 'POST') {
-  const opts = { method, headers: { 'Content-Type': 'application/json' } };
+  const opts = { method, headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getToken()}` } };
   if (body) opts.body = JSON.stringify(body);
   const res = await fetch(`${API}${endpoint}`, opts);
   if (!res.ok) { const e = await res.json(); throw new Error(e.error || 'Request failed'); }
@@ -170,7 +171,10 @@ export default function SmartClipper() {
   const pollRef = useRef(null);
   // Check system health on mount
   useEffect(() => {
-    fetch(`${API}/health`).then(r => r.json()).then(setHealth).catch(() => {});
+    fetch(`${API}/health`, { headers: { 'Authorization': `Bearer ${getToken()}` } })
+      .then(r => r.ok ? r.json() : null)
+      .then(setHealth)
+      .catch(() => {});
   }, []);
   // Poll job status
   useEffect(() => {
@@ -239,7 +243,7 @@ export default function SmartClipper() {
         <p style={{ margin: '6px 0 0', fontSize: 13, color: C.text3 }}>Paste any YouTube URL → AI finds your best clips → ready to post</p>
       </div>
       {/* System health */}
-      {health && (
+      {health?.checks && (
         <div style={{ display: 'flex', gap: 10, marginBottom: 20, flexWrap: 'wrap' }}>
           {[
             { label: 'yt-dlp', ok: health.checks.ytdlp, note: 'video download' },

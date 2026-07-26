@@ -24,7 +24,7 @@ function sanitizeId(str) {
 }
 
 function requireAuth(req, res, next) {
-  if (!req.user) return res.status(401).json({ error: 'Unauthorized' });
+  if (!req.userId) return res.status(401).json({ error: 'Unauthorized' });
   next();
 }
 
@@ -42,13 +42,13 @@ router.post('/clip', requireAuth, async (req, res) => {
   const { url, contentPillars, niche, clipCount = 5, maxDuration = 60, captionStyle = 'bold' } = req.body;
   if (!url) return res.status(400).json({ error: 'URL is required' });
 
-  const jobId = `job_${Date.now()}_${sanitizeId(req.user.id.toString())}`;
+  const jobId = `job_${Date.now()}_${sanitizeId(req.userId.toString())}`;
   const jobDir = path.join(TMP, jobId);
   fs.mkdirSync(jobDir, { recursive: true });
 
   res.json({ success: true, job_id: jobId, status: 'processing', message: 'Clipping started — poll /status/:jobId for updates' });
 
-  runClipPipeline(jobId, jobDir, url, { contentPillars, niche, clipCount, maxDuration, captionStyle, userId: req.user.id })
+  runClipPipeline(jobId, jobDir, url, { contentPillars, niche, clipCount, maxDuration, captionStyle, userId: req.userId })
     .catch(err => {
       console.error(`Clip job ${jobId} failed:`, err.message);
       fs.writeFileSync(path.join(jobDir, 'error.json'), JSON.stringify({ error: err.message }));
