@@ -11,13 +11,18 @@ const { cookieArgs } = require('../utils/ytdlpCookies');
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-const DOWNLOADS_BASE = path.join(__dirname, '../../data/downloads');
+// Same pattern as DB_PATH (server/db/index.js): must live inside the actual
+// Railway volume mount path, or bulk-archived files get wiped on every
+// redeploy — the opposite of what "archive" is supposed to mean. Set
+// DOWNLOADS_PATH=<RAILWAY_VOLUME_MOUNT_PATH>/downloads in production.
+const DOWNLOADS_BASE = process.env.DOWNLOADS_PATH || path.join(__dirname, '../../data/downloads');
 const MAX_CONCURRENT_JOBS = 3;
 
 // ─── In-memory process map (keyed by jobId) ───────────────────────────────────
 const activeProcesses = new Map();
 
 // ─── Schema bootstrap (call once on route load) ───────────────────────────────
+let didReconcileOrphans = false;
 function ensureSchema(db) {
   if (!db) return;
   db.exec(`
@@ -41,6 +46,25 @@ function ensureSchema(db) {
       total_size_mb   REAL DEFAULT 0
     );
   `);
+
+  // A job left 'running'/'queued' at server start can only be orphaned — the
+  // in-memory process map is always empty on a fresh boot, so nothing is
+  // actually still downloading. Without this, a container restart mid-job
+  // (e.g. a deploy) leaves it stuck showing "running" forever.
+  if (!didReconcileOrphans) {
+    didReconcileOrphans = true;
+    try {
+      const orphaned = db.prepare(`
+        UPDATE download_jobs SET status='failed', error_message='Job interrupted by a server restart before it finished. Start a new job to retry.', completed_at=?
+        WHERE status IN ('running','queued')
+      `).run(new Date().toISOString());
+      if (orphaned.changes > 0) {
+        console.log(`[ChannelDownloader] Marked ${orphaned.changes} orphaned job(s) as failed on startup`);
+      }
+    } catch (e) {
+      console.error('[ChannelDownloader] Orphan reconciliation failed:', e.message);
+    }
+  }
 }
 
 // ─── Utility: detect platform from URL ───────────────────────────────────────
@@ -61,28 +85,60 @@ function extractHandle(url, platform) {
     if (platform === 'instagram') return parts[0]?.replace('@', '') || 'unknown';
     if (platform === 'youtube') {
       const handle = parts.find(p => p.startsWith('@'));
-      return handle || parts[parts.length - 1] || 'unknown';
+      return (handle || parts[parts.length - 1] || 'unknown').replace('@', '');
     }
   } catch {}
   return 'unknown';
 }
 
+// ─── Utility: scope a bare YouTube channel URL to its Videos tab ──────────────
+// A bare channel URL (youtube.com/@handle, /channel/UC..., /c/name, /user/name)
+// makes yt-dlp enumerate the Videos, Shorts, AND Live tabs simultaneously, each
+// independently sliced by --playlist-items — so a "5 videos" request can pull
+// 10-15 items across tabs, several of which (upcoming/live streams) aren't even
+// downloadable. Pin to /videos explicitly unless a specific tab was requested.
+const YT_TAB_SUFFIXES = new Set(['videos', 'shorts', 'streams', 'featured', 'playlists', 'community', 'about']);
+function normalizeChannelUrl(url, platform) {
+  if (platform !== 'youtube') return url;
+  try {
+    const u = new URL(url);
+    const parts = u.pathname.split('/').filter(Boolean);
+    const isChannelRoot = parts.length >= 1 && (
+      parts[0].startsWith('@') || parts[0] === 'channel' || parts[0] === 'c' || parts[0] === 'user'
+    );
+    if (!isChannelRoot) return url; // single video, playlist, or already-specific URL
+    const lastPart = parts[parts.length - 1].toLowerCase();
+    if (YT_TAB_SUFFIXES.has(lastPart)) return url; // already scoped to a tab
+    u.pathname = u.pathname.replace(/\/+$/, '') + '/videos';
+    return u.toString();
+  } catch {
+    return url;
+  }
+}
+
 // ─── Utility: build yt-dlp args per platform ─────────────────────────────────
 function buildYtdlpArgs(url, jobId, platform, options) {
-  const { maxVideos = 25, quality = '1080', audioOnly = false, dateAfter = '' } = options;
+  const { maxVideos = 25, quality = '1080', audioOnly = false, dateAfter = '', startIndex = 1 } = options;
   const outputDir = path.join(DOWNLOADS_BASE, jobId);
   const outputTemplate = path.join(outputDir, '%(uploader)s_%(id)s.%(ext)s');
+  const endIndex = startIndex + maxVideos - 1;
 
   const baseArgs = [
-    url,
+    normalizeChannelUrl(url, platform),
     '--output', outputTemplate,
-    '--playlist-items', `1-${maxVideos}`,
+    '--playlist-items', `${startIndex}-${endIndex}`,
     '--write-thumbnail',
     '--write-info-json',
     '--newline',
     '--no-warnings',
     '--ignore-errors',
     '--no-playlist-reverse',
+    // Bulk channel archiving means many sequential downloads in one run —
+    // throttle to reduce the odds of the whole job getting IP-blocked partway
+    // through (this is the main real-world failure mode for large channels).
+    '--sleep-requests', '1',
+    '--sleep-interval', '3',
+    '--max-sleep-interval', '8',
     ...cookieArgs(),
   ];
 
@@ -163,6 +219,19 @@ function getDirSizeMB(dirPath) {
     return Math.round((total / 1024 / 1024) * 10) / 10;
   } catch {
     return 0;
+  }
+}
+
+// ─── Get free space on the volume backing a path, in MB ───────────────────────
+// A large channel job can easily be tens of GB — better to reject it up front
+// with a clear error than let it run for hours and die when the disk fills.
+function getAvailableStorageMB(dirPath) {
+  try {
+    fs.mkdirSync(dirPath, { recursive: true });
+    const stats = fs.statfsSync(dirPath);
+    return Math.round((stats.bavail * stats.bsize) / 1024 / 1024);
+  } catch {
+    return null; // unknown — caller should not block on a failed check
   }
 }
 
@@ -308,11 +377,13 @@ async function runDownloadJob(db, jobId, url, platform, channelHandle, options) 
     }
   });
 
+  const errorLines = [];
   proc.stderr.on('data', chunk => {
     const line = chunk.toString();
     // Only log real errors, not warnings
     if (line.includes('ERROR:')) {
       console.error(`[ChannelDownloader:${jobId}] ${line.trim()}`);
+      errorLines.push(line.trim());
     }
   });
 
@@ -341,12 +412,17 @@ async function runDownloadJob(db, jobId, url, platform, channelHandle, options) 
       }
 
       const status = code === 0 || fileList.length > 0 ? 'completed' : 'failed';
+      // Surface the real yt-dlp failure reason on a hard failure, not just "failed"
+      // with no context — this was previously logged server-side only.
+      const errorMessage = status === 'failed' && errorLines.length
+        ? errorLines.slice(0, 5).join('\n').slice(0, 2000)
+        : null;
 
       db.prepare(`
         UPDATE download_jobs SET
           status=?, progress=100, downloaded_videos=?,
           total_videos=?, file_list=?, meta_summary=?,
-          total_size_mb=?, completed_at=?
+          total_size_mb=?, completed_at=?, error_message=?
         WHERE id=?
       `).run(
         status,
@@ -356,6 +432,7 @@ async function runDownloadJob(db, jobId, url, platform, channelHandle, options) 
         metaSummary ? JSON.stringify(metaSummary) : null,
         totalSizeMB,
         new Date().toISOString(),
+        errorMessage,
         jobId
       );
 
@@ -373,7 +450,7 @@ router.use((req, res, next) => {
 
 // ─── POST /start ──────────────────────────────────────────────────────────────
 router.post('/start', async (req, res) => {
-  const { url, maxVideos = 25, quality = '1080', audioOnly = false, dateAfter = '', subtitles = true } = req.body;
+  const { url, maxVideos = 25, quality = '1080', audioOnly = false, dateAfter = '', subtitles = true, startIndex = 1 } = req.body;
 
   if (!url?.trim()) {
     return res.status(400).json({ error: 'URL is required' });
@@ -391,8 +468,21 @@ router.post('/start', async (req, res) => {
 
   const jobId = uuidv4();
   const channelHandle = extractHandle(url, platform);
-  const options = { maxVideos: Math.min(parseInt(maxVideos) || 25, 100), quality, audioOnly, dateAfter, subtitles };
+  const options = {
+    maxVideos: Math.min(parseInt(maxVideos) || 25, 300),
+    quality, audioOnly, dateAfter, subtitles,
+    startIndex: Math.max(parseInt(startIndex) || 1, 1),
+  };
   const estimatedMB = estimateStorageMB(platform, options.maxVideos, quality, audioOnly);
+
+  // A channel job can be tens of GB — check there's actually room before starting
+  // a run that might take hours only to die when the volume fills up.
+  const availableMB = getAvailableStorageMB(DOWNLOADS_BASE);
+  if (availableMB !== null && estimatedMB > availableMB * 0.9) {
+    return res.status(400).json({
+      error: `Not enough storage: this job is estimated at ~${estimatedMB}MB but only ${availableMB}MB is available. Lower "Clips to find", switch to audio-only, or free up space (Storage tab) first.`
+    });
+  }
 
   req.db.prepare(`
     INSERT INTO download_jobs (id, url, platform, channel_handle, status, options, created_at, total_videos)

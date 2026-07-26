@@ -243,13 +243,13 @@ function DownloadTab({ onJobStarted }) {
             <span style={{ fontSize: 13, color: C.amber, fontFamily: C.mono, fontWeight: 600 }}>{maxVideos}</span>
           </div>
           <input
-            type="range" min={5} max={100} step={5} value={maxVideos}
+            type="range" min={5} max={300} step={5} value={maxVideos}
             onChange={e => setMaxVideos(+e.target.value)}
             style={{ width: '100%', accentColor: C.amber }}
           />
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
             <span style={{ fontSize: 11, color: C.textMut, fontFamily: C.mono }}>5</span>
-            <span style={{ fontSize: 11, color: C.textMut, fontFamily: C.mono }}>100</span>
+            <span style={{ fontSize: 11, color: C.textMut, fontFamily: C.mono }}>300</span>
           </div>
         </div>
 
@@ -826,7 +826,7 @@ function SettingsTab() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {[
             { label: 'Max concurrent jobs', value: '3' },
-            { label: 'Max videos per job', value: '100' },
+            { label: 'Max videos per job', value: '300' },
             { label: 'Storage location', value: '/data/downloads/' },
             { label: 'Supported formats', value: 'MP4, MP3, MKV' },
           ].map(s => (
