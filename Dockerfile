@@ -11,7 +11,7 @@ RUN apk add --no-cache \
     make \
     g++ \
     && apk add --no-cache --repository=https://dl-cdn.alpinelinux.org/alpine/edge/community deno \
-    && pip3 install yt-dlp yt-dlp-ejs --break-system-packages
+    && pip3 install yt-dlp yt-dlp-ejs curl_cffi --break-system-packages
 
 WORKDIR /app
 
