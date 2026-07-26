@@ -4,6 +4,7 @@ const { exec } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const Anthropic = require('@anthropic-ai/sdk');
+const { cookieArgs } = require('../utils/ytdlpCookies');
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 const TMP = '/tmp/ccc-clipper';
@@ -34,7 +35,8 @@ router.get('/health', async (req, res) => {
   try { await run('yt-dlp --version'); checks.ytdlp = true; } catch { checks.ytdlp = false; }
   try { await run('ffmpeg -version'); checks.ffmpeg = true; } catch { checks.ffmpeg = false; }
   try { await run('whisper --help'); checks.whisper = true; } catch { checks.whisper = false; }
-  res.json({ checks, ready: checks.ytdlp && checks.ffmpeg, note: 'whisper optional — falls back to OpenAI API' });
+  try { await run('deno --version'); checks.deno = true; } catch { checks.deno = false; }
+  res.json({ checks, ready: checks.ytdlp && checks.ffmpeg, note: 'whisper optional — falls back to OpenAI API; deno required for YouTube JS-runtime challenges' });
 });
 
 // ─── POST: Clip from YouTube URL ─────────────────────────────────────────────
@@ -68,7 +70,14 @@ async function runClipPipeline(jobId, jobDir, url, opts) {
 
   // Step 1: Download
   const videoPath = path.join(jobDir, 'source.mp4');
-  await run(`yt-dlp -f "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best" --merge-output-format mp4 -o "${videoPath}" "${url}" --no-playlist`);
+  const cookieArgStr = cookieArgs().map(a => `"${a}"`).join(' ');
+  await run(
+    `yt-dlp -f "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best" --merge-output-format mp4 ` +
+    `--user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" ` +
+    `--extractor-args "youtube:player_client=web,android,tv_embedded" ` +
+    `--add-headers "Accept-Language:en-US,en;q=0.9" ` +
+    `${cookieArgStr} -o "${videoPath}" "${url}" --no-playlist`
+  );
 
   updateStatus('transcribing', 20);
 

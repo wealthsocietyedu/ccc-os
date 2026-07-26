@@ -1,12 +1,17 @@
 FROM node:22-alpine
 
+# deno isn't in this Alpine base's stable repos (node:22-alpine tracks a
+# stable release; deno is edge-only in apk), so pull just that one package
+# from edge/community. Installing via the deno.land curl script instead is
+# not reliable on Alpine — its prebuilt binaries target glibc, not musl.
 RUN apk add --no-cache \
     ffmpeg \
     python3 \
     py3-pip \
     make \
     g++ \
-    && pip3 install yt-dlp --break-system-packages
+    && apk add --no-cache --repository=https://dl-cdn.alpinelinux.org/alpine/edge/community deno \
+    && pip3 install yt-dlp yt-dlp-ejs --break-system-packages
 
 WORKDIR /app
 
