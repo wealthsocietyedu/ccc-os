@@ -170,7 +170,7 @@ In the Railway dashboard → Variables, add:
 ```
 NODE_ENV=production
 JWT_SECRET=<generate a 64-char random string>
-DB_PATH=/var/data/ccc_os.db
+DB_PATH=/data/ccc_os.db
 CLIENT_URL=https://your-app.railway.app
 PORT=3001
 ```
@@ -184,8 +184,14 @@ node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
 
 In Railway dashboard:
 1. Click your service → **Volumes**
-2. Add volume, mount path: `/var/data`
+2. Add volume, mount path: `/data`
 3. This ensures your database survives redeploys
+
+**`DB_PATH` must live inside whatever mount path you pick here.** Railway
+injects the real mount path as `RAILWAY_VOLUME_MOUNT_PATH` at runtime — if
+you ever change the volume's mount path in the dashboard, update `DB_PATH`
+to match, or the database silently falls back to the container's ephemeral
+filesystem and gets wiped on every redeploy.
 
 ### Step 5 — Deploy
 
@@ -237,7 +243,7 @@ Apply to any route to enforce tier restrictions.
 
 - [ ] Change `JWT_SECRET` to a random 64-character string
 - [ ] Set `NODE_ENV=production`
-- [ ] Use a Railway volume for `/var/data` (SQLite persistence)
+- [ ] Use a Railway volume for `/data` (SQLite persistence) — `DB_PATH` must match `RAILWAY_VOLUME_MOUNT_PATH` exactly
 - [ ] Enable HTTPS (Railway provides this automatically)
 - [ ] Review rate limits in `server/index.js`
 - [ ] Set `CLIENT_URL` to your exact production domain (CORS)

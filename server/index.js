@@ -8,38 +8,6 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const path = require('path');
 
-// ─── TEMP DIAGNOSTIC — DB_PATH vs RAILWAY_VOLUME_MOUNT_PATH investigation ─────
-// Read-only filesystem checks only. Remove once the mismatch is confirmed/resolved.
-(() => {
-  const fs = require('fs');
-  const dbPathEnv = process.env.DB_PATH || '(unset)';
-  const volMount = process.env.RAILWAY_VOLUME_MOUNT_PATH || '(unset)';
-  console.log(`[DIAG] DB_PATH=${dbPathEnv} RAILWAY_VOLUME_MOUNT_PATH=${volMount}`);
-  const candidates = ['/data', '/var/data', dbPathEnv].filter((p, i, arr) => p && p !== '(unset)' && arr.indexOf(p) === i);
-  for (const p of candidates) {
-    try {
-      const exists = fs.existsSync(p);
-      let extra = '';
-      if (exists) {
-        const st = fs.statSync(p);
-        extra = st.isDirectory()
-          ? ` dir contents=${JSON.stringify(fs.readdirSync(p))}`
-          : ` file size=${st.size}B mtime=${st.mtime.toISOString()}`;
-      }
-      console.log(`[DIAG] ${p} exists=${exists}${extra}`);
-    } catch (e) {
-      console.log(`[DIAG] ${p} check failed: ${e.message}`);
-    }
-  }
-  for (const p of ['/data', '/var/data']) {
-    try {
-      console.log(`[DIAG] realpath(${p}) = ${fs.realpathSync(p)}`);
-    } catch (e) {
-      console.log(`[DIAG] realpath(${p}) failed: ${e.message}`);
-    }
-  }
-})();
-
 const authRoutes = require('./routes/auth');
 const brandRoutes = require('./routes/brands');
 const productionRoutes = require('./routes/production');
