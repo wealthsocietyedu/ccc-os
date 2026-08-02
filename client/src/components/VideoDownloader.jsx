@@ -1,6 +1,26 @@
 import { useState, useRef } from 'react';
+import { colors, radius, font, glass, gradients, glow } from '../lib/theme.js';
+import { Button, Card, StatCard, SectionLabel } from './ui/index.js';
 
 const API_BASE = '/api/video-downloader';
+
+// ─── Design tokens (re-pointed to shared theme.js) ───────────────────────────
+const C = {
+  bg: colors.bg,
+  panel: colors.surface,
+  panelBorder: colors.border2,
+  input: colors.surface2,
+  inputBorder: colors.border2,
+  text: colors.text,
+  text2: colors.text2,
+  text3: colors.text3,
+  amber: colors.accent2,
+  amberDim: colors.accent,
+  red: colors.red,
+  green: colors.green,
+  sans: font.display,
+  mono: font.mono,
+};
 
 // ─── Platform config ──────────────────────────────────────────────────────────
 const PLATFORMS = {
@@ -10,7 +30,7 @@ const PLATFORMS = {
   twitter: { name: 'Twitter / X', icon: '𝕏', color: '#1DA1F2', accent: '#1DA1F2' },
   facebook: { name: 'Facebook', icon: '📘', color: '#1877F2', accent: '#1877F2' },
   pinterest: { name: 'Pinterest', icon: '📌', color: '#E60023', accent: '#E60023' },
-  unknown: { name: 'Video', icon: '🎬', color: '#7C3AED', accent: '#7C3AED' }
+  unknown: { name: 'Video', icon: '🎬', color: '#7C3AED', accent: C.amber }
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -61,13 +81,13 @@ function PasteInput({ value, onChange, onFetch, loading }) {
     <div style={{ position: 'relative' }}>
       <div style={{
         display: 'flex', alignItems: 'center', gap: '12px',
-        background: '#0D0D1A', border: `1.5px solid ${value ? p.accent : '#2D2D44'}`,
-        borderRadius: '14px', padding: '14px 18px', transition: 'border-color 0.2s'
+        background: C.input, border: `1.5px solid ${value ? p.accent : C.inputBorder}`,
+        borderRadius: radius.md, padding: '14px 18px', transition: 'border-color 0.2s'
       }}>
         {/* Platform icon */}
         <div style={{
-          width: '40px', height: '40px', borderRadius: '10px', flexShrink: 0,
-          background: value ? `${p.accent}20` : '#1A1A2E',
+          width: '40px', height: '40px', borderRadius: radius.sm, flexShrink: 0,
+          background: value ? `${p.accent}20` : colors.surface2,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           fontSize: '20px', transition: 'all 0.2s'
         }}>
@@ -76,7 +96,7 @@ function PasteInput({ value, onChange, onFetch, loading }) {
 
         {/* Input */}
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: '11px', color: '#4B5563', fontFamily: 'DM Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '4px' }}>
+          <div style={{ fontSize: '11px', color: C.text3, fontFamily: C.mono, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '4px' }}>
             {value ? p.name : 'Paste video URL'}
           </div>
           <input
@@ -88,8 +108,8 @@ function PasteInput({ value, onChange, onFetch, loading }) {
             placeholder="https://www.tiktok.com/@username/video/..."
             style={{
               background: 'none', border: 'none', outline: 'none', width: '100%',
-              color: '#E5E7EB', fontSize: '13px', fontFamily: 'DM Mono, monospace',
-              caretColor: '#7C3AED'
+              color: C.text, fontSize: '13px', fontFamily: C.mono,
+              caretColor: C.amber
             }}
           />
         </div>
@@ -98,7 +118,7 @@ function PasteInput({ value, onChange, onFetch, loading }) {
         {value && (
           <button
             onClick={() => onChange('')}
-            style={{ background: 'none', border: 'none', color: '#4B5563', cursor: 'pointer', fontSize: '18px', padding: '4px', lineHeight: 1 }}
+            style={{ background: 'none', border: 'none', color: C.text3, cursor: 'pointer', fontSize: '18px', padding: '4px', lineHeight: 1 }}
           >
             ✕
           </button>
@@ -109,7 +129,7 @@ function PasteInput({ value, onChange, onFetch, loading }) {
       {!value && (
         <div style={{ display: 'flex', gap: '8px', marginTop: '10px', flexWrap: 'wrap' }}>
           {['TikTok 🎵', 'Instagram 📸', 'YouTube ▶️', 'Twitter 𝕏', 'Facebook 📘'].map(p => (
-            <span key={p} style={{ fontSize: '11px', color: '#4B5563', fontFamily: 'DM Mono, monospace', background: '#1A1A2E', borderRadius: '6px', padding: '3px 8px', border: '1px solid #2D2D44' }}>
+            <span key={p} style={{ fontSize: '11px', color: C.text3, fontFamily: C.mono, background: colors.surface2, borderRadius: radius.sm, padding: '3px 8px', border: `1px solid ${C.inputBorder}` }}>
               {p}
             </span>
           ))}
@@ -126,8 +146,8 @@ function VideoPreview({ info, url }) {
 
   return (
     <div style={{
-      background: '#0D0D1A', border: `1px solid ${p.accent}40`,
-      borderRadius: '14px', overflow: 'hidden', animation: 'fadeIn 0.3s ease'
+      ...glass, padding: 0, overflow: 'hidden',
+      border: `1px solid ${p.accent}40`, animation: 'fadeIn 0.3s ease'
     }}>
       {/* Platform badge */}
       <div style={{
@@ -135,11 +155,11 @@ function VideoPreview({ info, url }) {
         padding: '10px 16px', display: 'flex', alignItems: 'center', gap: '8px'
       }}>
         <span style={{ fontSize: '16px' }}>{p.icon}</span>
-        <span style={{ fontSize: '12px', color: p.accent, fontFamily: 'DM Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: '600' }}>
+        <span style={{ fontSize: '12px', color: p.accent, fontFamily: C.mono, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: '600' }}>
           {p.name}
         </span>
         {info.duration && (
-          <span style={{ marginLeft: 'auto', fontSize: '12px', color: '#6B7280', fontFamily: 'DM Mono, monospace' }}>
+          <span style={{ marginLeft: 'auto', fontSize: '12px', color: C.text3, fontFamily: C.mono }}>
             ⏱ {info.duration}
           </span>
         )}
@@ -152,7 +172,7 @@ function VideoPreview({ info, url }) {
             <img
               src={info.thumbnail}
               alt="Thumbnail"
-              style={{ width: '120px', aspectRatio: '16/9', objectFit: 'cover', borderRadius: '8px' }}
+              style={{ width: '120px', aspectRatio: '16/9', objectFit: 'cover', borderRadius: radius.sm }}
               onError={e => { e.target.style.display = 'none'; }}
             />
           </div>
@@ -160,33 +180,40 @@ function VideoPreview({ info, url }) {
 
         {/* Meta */}
         <div style={{ flex: 1, minWidth: 0 }}>
-          <h3 style={{ margin: '0 0 8px', fontSize: '14px', color: '#fff', fontWeight: '600', fontFamily: 'Sora, sans-serif', lineHeight: '1.4', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+          <h3 style={{ margin: '0 0 8px', fontSize: '14px', color: C.text, fontWeight: '600', fontFamily: C.sans, lineHeight: '1.4', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
             {info.title}
           </h3>
           <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
             {info.uploader && (
-              <span style={{ fontSize: '12px', color: '#9CA3AF', fontFamily: 'DM Mono, monospace' }}>
+              <span style={{ fontSize: '12px', color: C.text2, fontFamily: C.mono }}>
                 @{info.uploader}
               </span>
             )}
             {info.viewCount && (
-              <span style={{ fontSize: '12px', color: '#6B7280', fontFamily: 'DM Mono, monospace' }}>
+              <span style={{ fontSize: '12px', color: C.text3, fontFamily: C.mono }}>
                 {formatViews(info.viewCount)}
               </span>
             )}
             {info.uploadDate && (
-              <span style={{ fontSize: '12px', color: '#6B7280', fontFamily: 'DM Mono, monospace' }}>
+              <span style={{ fontSize: '12px', color: C.text3, fontFamily: C.mono }}>
                 {formatDate(info.uploadDate)}
               </span>
             )}
           </div>
           {info.description && (
-            <p style={{ margin: '8px 0 0', fontSize: '12px', color: '#4B5563', fontFamily: 'Sora, sans-serif', lineHeight: '1.5', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+            <p style={{ margin: '8px 0 0', fontSize: '12px', color: C.text3, fontFamily: C.sans, lineHeight: '1.5', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
               {info.description}
             </p>
           )}
         </div>
       </div>
+
+      {(info.viewCount || info.duration) && (
+        <div style={{ display: 'flex', gap: '10px', padding: '0 16px 16px' }}>
+          {info.viewCount && <StatCard value={formatViews(info.viewCount).replace(' views', '')} label="Views" style={{ flex: 1, padding: '14px 16px' }} />}
+          {info.duration && <StatCard value={info.duration} label="Duration" style={{ flex: 1, padding: '14px 16px' }} />}
+        </div>
+      )}
     </div>
   );
 }
@@ -204,7 +231,7 @@ function DownloadOptions({ quality, setQuality, audioOnly, setAudioOnly, onDownl
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
       {/* Format toggle */}
       <div>
-        <div style={{ fontSize: '11px', color: '#6B7280', fontFamily: 'DM Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '10px' }}>
+        <div style={{ fontSize: '11px', color: C.text3, fontFamily: C.mono, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '10px' }}>
           Format
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
@@ -216,14 +243,14 @@ function DownloadOptions({ quality, setQuality, audioOnly, setAudioOnly, onDownl
               key={String(opt.id)}
               onClick={() => setAudioOnly(opt.id)}
               style={{
-                background: audioOnly === opt.id ? '#1A0A2E' : '#1A1A2E',
-                border: `1px solid ${audioOnly === opt.id ? '#7C3AED' : '#2D2D44'}`,
-                borderRadius: '10px', padding: '12px', cursor: 'pointer', transition: 'all 0.15s'
+                background: audioOnly === opt.id ? 'rgba(212,149,58,0.10)' : colors.surface2,
+                border: `1px solid ${audioOnly === opt.id ? C.amber : C.inputBorder}`,
+                borderRadius: radius.sm, padding: '12px', cursor: 'pointer', transition: 'all 0.15s'
               }}
             >
               <div style={{ fontSize: '20px', marginBottom: '4px' }}>{opt.icon}</div>
-              <div style={{ fontSize: '13px', color: audioOnly === opt.id ? '#E5E7EB' : '#9CA3AF', fontFamily: 'Sora, sans-serif', fontWeight: '500' }}>{opt.label}</div>
-              <div style={{ fontSize: '11px', color: '#4B5563', fontFamily: 'DM Mono, monospace' }}>{opt.sub}</div>
+              <div style={{ fontSize: '13px', color: audioOnly === opt.id ? C.text : C.text2, fontFamily: C.sans, fontWeight: '500' }}>{opt.label}</div>
+              <div style={{ fontSize: '11px', color: C.text3, fontFamily: C.mono }}>{opt.sub}</div>
             </div>
           ))}
         </div>
@@ -232,47 +259,35 @@ function DownloadOptions({ quality, setQuality, audioOnly, setAudioOnly, onDownl
       {/* Quality selector (video only) */}
       {!audioOnly && (
         <div>
-          <div style={{ fontSize: '11px', color: '#6B7280', fontFamily: 'DM Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '10px' }}>
+          <div style={{ fontSize: '11px', color: C.text3, fontFamily: C.mono, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '10px' }}>
             Quality
           </div>
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
             {qualityOptions.map(opt => (
-              <button
+              <Button
                 key={opt.value}
+                variant={quality === opt.value ? 'primary' : 'secondary'}
+                size="sm"
                 onClick={() => setQuality(opt.value)}
-                style={{
-                  background: quality === opt.value ? '#7C3AED' : '#1A1A2E',
-                  border: `1px solid ${quality === opt.value ? '#7C3AED' : '#2D2D44'}`,
-                  borderRadius: '8px', color: quality === opt.value ? '#fff' : '#9CA3AF',
-                  padding: '8px 14px', fontSize: '12px', cursor: 'pointer',
-                  fontFamily: 'DM Mono, monospace', transition: 'all 0.15s'
-                }}
               >
                 {opt.label}
-              </button>
+              </Button>
             ))}
           </div>
         </div>
       )}
 
       {/* Download button */}
-      <button
+      <Button
+        variant="primary"
+        size="lg"
         onClick={onDownload}
         disabled={loading}
-        style={{
-          background: loading ? '#4C1D95' : 'linear-gradient(135deg, #7C3AED, #4F46E5)',
-          border: 'none', borderRadius: '12px', color: '#fff',
-          padding: '14px 28px', fontSize: '15px', fontWeight: '700',
-          fontFamily: 'Sora, sans-serif', cursor: loading ? 'not-allowed' : 'pointer',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px',
-          transition: 'all 0.2s', opacity: loading ? 0.8 : 1,
-          boxShadow: loading ? 'none' : '0 0 24px rgba(124,58,237,0.45)',
-          letterSpacing: '0.02em'
-        }}
+        style={{ width: '100%' }}
       >
         {loading ? (
           <>
-            <div style={{ width: '18px', height: '18px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+            <div style={{ width: '18px', height: '18px', border: '2px solid rgba(12,10,7,0.3)', borderTopColor: colors.bg, borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
             Downloading...
           </>
         ) : (
@@ -280,14 +295,14 @@ function DownloadOptions({ quality, setQuality, audioOnly, setAudioOnly, onDownl
             ↓ Download {audioOnly ? 'Audio' : 'Video'}
           </>
         )}
-      </button>
+      </Button>
 
       {/* Progress indicator */}
       {loading && (
-        <div style={{ background: '#1A1A2E', borderRadius: '8px', padding: '12px 16px', border: '1px solid #2D2D44' }}>
+        <div style={{ background: colors.surface2, borderRadius: radius.sm, padding: '12px 16px', border: `1px solid ${C.inputBorder}` }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#7C3AED', animation: 'pulse 1.5s ease infinite' }} />
-            <span style={{ fontSize: '12px', color: '#9CA3AF', fontFamily: 'DM Mono, monospace' }}>
+            <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: C.amber, animation: 'pulse 1.5s ease infinite' }} />
+            <span style={{ fontSize: '12px', color: C.text2, fontFamily: C.mono }}>
               {progress || 'Fetching video from server...'}
             </span>
           </div>
@@ -301,19 +316,19 @@ function DownloadOptions({ quality, setQuality, audioOnly, setAudioOnly, onDownl
 function HistoryItem({ item }) {
   const p = PLATFORMS[item.platform] || PLATFORMS.unknown;
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 14px', background: '#1A1A2E', borderRadius: '10px', border: '1px solid #2D2D44' }}>
-      <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: `${p.accent}20`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', flexShrink: 0 }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 14px', background: colors.surface2, borderRadius: radius.sm, border: `1px solid ${C.inputBorder}` }}>
+      <div style={{ width: '32px', height: '32px', borderRadius: radius.sm, background: `${p.accent}20`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', flexShrink: 0 }}>
         {p.icon}
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: '13px', color: '#E5E7EB', fontFamily: 'Sora, sans-serif', fontWeight: '500', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        <div style={{ fontSize: '13px', color: C.text, fontFamily: C.sans, fontWeight: '500', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {item.title}
         </div>
-        <div style={{ fontSize: '11px', color: '#4B5563', fontFamily: 'DM Mono, monospace', marginTop: '2px' }}>
+        <div style={{ fontSize: '11px', color: C.text3, fontFamily: C.mono, marginTop: '2px' }}>
           {p.name} · {item.quality} · {new Date(item.timestamp).toLocaleTimeString()}
         </div>
       </div>
-      <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#4ADE80', flexShrink: 0 }} />
+      <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: C.green, flexShrink: 0 }} />
     </div>
   );
 }
@@ -424,8 +439,8 @@ export default function VideoDownloader() {
 
   return (
     <div style={{
-      minHeight: '100vh', background: '#0C0A07', color: '#E5E7EB',
-      fontFamily: 'Sora, sans-serif', padding: '32px'
+      minHeight: '100%', background: C.bg, color: C.text,
+      fontFamily: C.sans, padding: '32px'
     }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300;1,400&display=swap');
@@ -434,26 +449,27 @@ export default function VideoDownloader() {
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
         * { box-sizing: border-box; }
         ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-track { background: #0C0A07; }
-        ::-webkit-scrollbar-thumb { background: #2D2D44; border-radius: 3px; }
+        ::-webkit-scrollbar-track { background: ${C.bg}; }
+        ::-webkit-scrollbar-thumb { background: ${C.inputBorder}; border-radius: 3px; }
       `}</style>
 
       {/* Header */}
       <div style={{ marginBottom: '36px', animation: 'fadeIn 0.4s ease' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '6px' }}>
           <div style={{
-            width: '48px', height: '48px', borderRadius: '14px',
-            background: 'linear-gradient(135deg, #F0A800, #D4953A)',
+            width: '52px', height: '52px', borderRadius: radius.md,
+            background: gradients.amber,
             display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px',
-            boxShadow: '0 0 28px rgba(240,168,0,0.35)'
+            boxShadow: glow.amber
           }}>
             ↓
           </div>
           <div>
-            <h1 style={{ margin: 0, fontSize: '26px', fontWeight: '700', color: '#fff', letterSpacing: '-0.02em' }}>
+            <SectionLabel>Single Video</SectionLabel>
+            <h1 style={{ margin: '8px 0 0', fontSize: '32px', fontWeight: '800', color: C.text, letterSpacing: '-0.03em', fontFamily: C.sans, lineHeight: 1.04 }}>
               Video Downloader
             </h1>
-            <p style={{ margin: 0, fontSize: '13px', color: '#6B7280', fontFamily: 'DM Mono, monospace' }}>
+            <p style={{ margin: '6px 0 0', fontSize: '13px', color: C.text3, fontFamily: C.mono }}>
               TikTok · Instagram · YouTube · Twitter · Facebook
             </p>
           </div>
@@ -467,8 +483,8 @@ export default function VideoDownloader() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
 
           {/* URL Input */}
-          <div style={{ background: '#131108', border: '1px solid #2A2510', borderRadius: '16px', padding: '20px' }}>
-            <div style={{ fontSize: '11px', color: '#F0A800', fontFamily: 'DM Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '14px' }}>
+          <Card>
+            <div style={{ fontSize: '11px', color: C.amber, fontFamily: C.mono, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '14px' }}>
               ✦ Step 1 — Paste your link
             </div>
             <PasteInput
@@ -479,34 +495,29 @@ export default function VideoDownloader() {
             />
 
             {url && !videoInfo && !infoLoading && (
-              <button
+              <Button
+                variant="secondary"
                 onClick={() => handleFetchInfo(url)}
-                style={{
-                  marginTop: '12px', background: '#1A1A2E', border: '1px solid #F0A800',
-                  borderRadius: '10px', color: '#F0A800', padding: '10px 20px',
-                  fontSize: '13px', cursor: 'pointer', fontFamily: 'DM Mono, monospace',
-                  display: 'flex', alignItems: 'center', gap: '8px', width: '100%',
-                  justifyContent: 'center'
-                }}
+                style={{ marginTop: '12px', width: '100%' }}
               >
                 {infoLoading ? (
                   <>
-                    <div style={{ width: '14px', height: '14px', border: '2px solid rgba(240,168,0,0.3)', borderTopColor: '#F0A800', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                    <div style={{ width: '14px', height: '14px', border: '2px solid rgba(240,168,0,0.3)', borderTopColor: C.amber, borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
                     Fetching info...
                   </>
                 ) : (
                   <>🔍 Fetch Video Info</>
                 )}
-              </button>
+              </Button>
             )}
 
             {infoLoading && (
-              <div style={{ marginTop: '14px', display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', background: '#1A1A2E', borderRadius: '8px' }}>
-                <div style={{ width: '16px', height: '16px', border: '2px solid rgba(240,168,0,0.3)', borderTopColor: '#F0A800', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-                <span style={{ fontSize: '12px', color: '#9CA3AF', fontFamily: 'DM Mono, monospace' }}>Fetching video info...</span>
+              <div style={{ marginTop: '14px', display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', background: colors.surface2, borderRadius: radius.sm }}>
+                <div style={{ width: '16px', height: '16px', border: '2px solid rgba(240,168,0,0.3)', borderTopColor: C.amber, borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                <span style={{ fontSize: '12px', color: C.text2, fontFamily: C.mono }}>Fetching video info...</span>
               </div>
             )}
-          </div>
+          </Card>
 
           {/* Video Preview */}
           {videoInfo && (
@@ -515,27 +526,27 @@ export default function VideoDownloader() {
 
           {/* Error */}
           {error && (
-            <div style={{ background: '#1F0A0A', border: '1px solid #7F1D1D', borderRadius: '12px', padding: '14px 18px', display: 'flex', gap: '12px', alignItems: 'flex-start', animation: 'fadeIn 0.3s ease' }}>
+            <div style={{ background: 'rgba(196,42,24,0.10)', border: `1px solid ${C.red}66`, borderRadius: radius.md, padding: '14px 18px', display: 'flex', gap: '12px', alignItems: 'flex-start', animation: 'fadeIn 0.3s ease' }}>
               <span style={{ fontSize: '18px', flexShrink: 0 }}>⚠️</span>
               <div>
-                <div style={{ fontSize: '13px', color: '#FCA5A5', fontFamily: 'Sora, sans-serif', fontWeight: '500', marginBottom: '4px' }}>Download Error</div>
-                <div style={{ fontSize: '12px', color: '#EF4444', fontFamily: 'DM Mono, monospace', lineHeight: '1.5' }}>{error}</div>
+                <div style={{ fontSize: '13px', color: '#FCA5A5', fontFamily: C.sans, fontWeight: '500', marginBottom: '4px' }}>Download Error</div>
+                <div style={{ fontSize: '12px', color: C.red, fontFamily: C.mono, lineHeight: '1.5' }}>{error}</div>
               </div>
             </div>
           )}
 
           {/* Success */}
           {successMsg && (
-            <div style={{ background: '#0A1F0A', border: '1px solid #1A5C1A', borderRadius: '12px', padding: '14px 18px', display: 'flex', gap: '12px', alignItems: 'center', animation: 'fadeIn 0.3s ease' }}>
+            <div style={{ background: 'rgba(61,158,140,0.10)', border: `1px solid ${C.green}66`, borderRadius: radius.md, padding: '14px 18px', display: 'flex', gap: '12px', alignItems: 'center', animation: 'fadeIn 0.3s ease' }}>
               <span style={{ fontSize: '20px' }}>✅</span>
-              <span style={{ fontSize: '13px', color: '#4ADE80', fontFamily: 'Sora, sans-serif' }}>{successMsg}</span>
+              <span style={{ fontSize: '13px', color: C.green, fontFamily: C.sans }}>{successMsg}</span>
             </div>
           )}
 
           {/* Download history */}
           {history.length > 0 && (
-            <div style={{ background: '#131108', border: '1px solid #2A2510', borderRadius: '16px', padding: '20px' }}>
-              <div style={{ fontSize: '11px', color: '#6B7280', fontFamily: 'DM Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px' }}>
+            <Card>
+              <div style={{ fontSize: '11px', color: C.text3, fontFamily: C.mono, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px' }}>
                 Recent Downloads
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -543,14 +554,14 @@ export default function VideoDownloader() {
                   <HistoryItem key={item.id} item={item} />
                 ))}
               </div>
-            </div>
+            </Card>
           )}
         </div>
 
         {/* Right: Download Options */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <div style={{ background: '#131108', border: '1px solid #2A2510', borderRadius: '16px', padding: '20px' }}>
-            <div style={{ fontSize: '11px', color: '#F0A800', fontFamily: 'DM Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '16px' }}>
+          <Card>
+            <div style={{ fontSize: '11px', color: C.amber, fontFamily: C.mono, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '16px' }}>
               ✦ Step 2 — Download
             </div>
             <DownloadOptions
@@ -562,11 +573,11 @@ export default function VideoDownloader() {
               loading={downloadLoading}
               progress={progress}
             />
-          </div>
+          </Card>
 
           {/* How to use */}
-          <div style={{ background: '#0D0D1A', border: '1px solid #2D2D44', borderRadius: '16px', padding: '20px' }}>
-            <div style={{ fontSize: '11px', color: '#6B7280', fontFamily: 'DM Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '14px' }}>
+          <Card>
+            <div style={{ fontSize: '11px', color: C.text3, fontFamily: C.mono, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '14px' }}>
               How to use
             </div>
             {[
@@ -577,20 +588,20 @@ export default function VideoDownloader() {
               { step: '5', text: 'File saves directly to your Downloads folder' }
             ].map(({ step, text }) => (
               <div key={step} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', marginBottom: '10px' }}>
-                <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: '#1A1A2E', border: '1px solid #F0A800', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', color: '#F0A800', fontFamily: 'DM Mono, monospace', flexShrink: 0, marginTop: '1px' }}>
+                <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: colors.surface2, border: `1px solid ${C.amber}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', color: C.amber, fontFamily: C.mono, flexShrink: 0, marginTop: '1px' }}>
                   {step}
                 </div>
-                <span style={{ fontSize: '12px', color: '#9CA3AF', fontFamily: 'Sora, sans-serif', lineHeight: '1.5' }}>{text}</span>
+                <span style={{ fontSize: '12px', color: C.text2, fontFamily: C.sans, lineHeight: '1.5' }}>{text}</span>
               </div>
             ))}
 
             {/* Disclaimer */}
-            <div style={{ marginTop: '16px', padding: '10px 12px', background: '#0C0A07', border: '1px solid #2A2510', borderRadius: '8px' }}>
-              <div style={{ fontSize: '11px', color: '#4B5563', fontFamily: 'DM Mono, monospace', lineHeight: '1.5' }}>
+            <div style={{ marginTop: '16px', padding: '10px 12px', background: C.bg, border: `1px solid ${C.inputBorder}`, borderRadius: radius.sm }}>
+              <div style={{ fontSize: '11px', color: C.text3, fontFamily: C.mono, lineHeight: '1.5' }}>
                 ℹ️ For personal use and content research only. Respect copyright and platform terms of service.
               </div>
             </div>
-          </div>
+          </Card>
         </div>
       </div>
     </div>

@@ -3,12 +3,38 @@ const router = express.Router();
 const { exec } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const multer = require('multer');
 const Anthropic = require('@anthropic-ai/sdk');
 const { cookieArgs } = require('../utils/ytdlpCookies');
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 const TMP = '/tmp/ccc-clipper';
 if (!fs.existsSync(TMP)) fs.mkdirSync(TMP, { recursive: true });
+
+// ─── Upload handling (Smart Clipper is upload-only) ───────────────────────────
+// User uploads a long-form video file they already have; multer streams it to
+// disk (never buffered in memory — these files are large), then the same
+// transcribe → analyze → cut pipeline runs against the local file.
+const UPLOAD_TMP = path.join(TMP, 'uploads');
+if (!fs.existsSync(UPLOAD_TMP)) fs.mkdirSync(UPLOAD_TMP, { recursive: true });
+const ALLOWED_VIDEO_EXT = new Set(['.mp4', '.mov', '.mkv', '.webm', '.avi', '.m4v', '.mpeg', '.mpg']);
+const uploadStorage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, UPLOAD_TMP),
+  filename: (req, file, cb) => {
+    const ext = (path.extname(file.originalname || '') || '.mp4').toLowerCase();
+    cb(null, `up_${Date.now()}_${Math.random().toString(36).slice(2)}${ext}`);
+  },
+});
+const uploadVideo = multer({
+  storage: uploadStorage,
+  limits: { fileSize: 3 * 1024 * 1024 * 1024 }, // 3GB ceiling for long-form uploads
+  fileFilter: (req, file, cb) => {
+    const ext = path.extname(file.originalname || '').toLowerCase();
+    const looksVideo = (file.mimetype || '').startsWith('video/') || ALLOWED_VIDEO_EXT.has(ext);
+    if (looksVideo) cb(null, true);
+    else cb(new Error('Unsupported file type — upload a video file (mp4, mov, mkv, webm, avi).'));
+  },
+}).single('video');
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 function run(cmd, opts = {}) {
@@ -57,29 +83,78 @@ router.post('/clip', requireAuth, async (req, res) => {
     });
 });
 
+// ─── POST: Clip from an uploaded local file (upload-only flow) ────────────────
+// This is the Smart Clipper entry point — the user uploads a long-form video they
+// already downloaded; there is NO URL/YouTube input. Skips the download step and
+// runs transcribe → analyze → cut against the uploaded file.
+router.post('/clip-upload', requireAuth, (req, res) => {
+  uploadVideo(req, res, async (uErr) => {
+    if (uErr) return res.status(400).json({ error: uErr.message });
+    if (!req.file) return res.status(400).json({ error: 'Video file is required (multipart field name: "video").' });
+
+    const { contentPillars, niche, clipCount = 5, maxDuration = 60, captionStyle = 'bold' } = req.body || {};
+
+    const jobId = `job_${Date.now()}_${sanitizeId(req.userId.toString())}`;
+    const jobDir = path.join(TMP, jobId);
+    fs.mkdirSync(jobDir, { recursive: true });
+
+    // Move the uploaded file into the job dir as the pipeline's source video.
+    const ext = (path.extname(req.file.filename) || '.mp4').toLowerCase();
+    const localVideoPath = path.join(jobDir, `source${ext}`);
+    try {
+      fs.renameSync(req.file.path, localVideoPath);
+    } catch {
+      // rename can fail across devices — fall back to copy+unlink
+      fs.copyFileSync(req.file.path, localVideoPath);
+      try { fs.unlinkSync(req.file.path); } catch {}
+    }
+
+    res.json({ success: true, job_id: jobId, status: 'processing', message: 'Upload received — poll /status/:jobId for updates' });
+
+    runClipPipeline(jobId, jobDir, null, {
+      contentPillars,
+      niche,
+      clipCount: parseInt(clipCount) || 5,
+      maxDuration: parseInt(maxDuration) || 60,
+      captionStyle,
+      userId: req.userId,
+      localVideoPath,
+    }).catch(err => {
+      console.error(`Clip-upload job ${jobId} failed:`, err.message);
+      fs.writeFileSync(path.join(jobDir, 'error.json'), JSON.stringify({ error: err.message }));
+    });
+  });
+});
+
 // ─── Full Pipeline ────────────────────────────────────────────────────────────
 async function runClipPipeline(jobId, jobDir, url, opts) {
   const statusFile = path.join(jobDir, 'status.json');
-  const { contentPillars, niche, clipCount, maxDuration, captionStyle } = opts;
+  const { contentPillars, niche, clipCount, maxDuration, captionStyle, localVideoPath } = opts;
 
   const updateStatus = (stage, progress, data = {}) => {
     fs.writeFileSync(statusFile, JSON.stringify({ stage, progress, ...data, updated_at: new Date().toISOString() }));
   };
 
-  updateStatus('downloading', 5);
-
-  // Step 1: Download
-  const videoPath = path.join(jobDir, 'source.mp4');
-  const cookieArgStr = cookieArgs().map(a => `"${a}"`).join(' ');
-  await run(
-    `yt-dlp -f "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best" --merge-output-format mp4 ` +
-    `--user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" ` +
-    `--extractor-args "youtube:player_client=web,android,tv_embedded" ` +
-    `--add-headers "Accept-Language:en-US,en;q=0.9" ` +
-    `${cookieArgStr} -o "${videoPath}" "${url}" --no-playlist`
-  );
-
-  updateStatus('transcribing', 20);
+  // Step 1: Obtain the source video.
+  // Upload-only flow (Smart Clipper) passes a local file and skips downloading;
+  // the legacy URL flow downloads via yt-dlp.
+  let videoPath;
+  if (localVideoPath) {
+    videoPath = localVideoPath;
+    updateStatus('transcribing', 20);
+  } else {
+    updateStatus('downloading', 5);
+    videoPath = path.join(jobDir, 'source.mp4');
+    const cookieArgStr = cookieArgs().map(a => `"${a}"`).join(' ');
+    await run(
+      `yt-dlp -f "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best" --merge-output-format mp4 ` +
+      `--user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" ` +
+      `--extractor-args "youtube:player_client=web,android,tv_embedded" ` +
+      `--add-headers "Accept-Language:en-US,en;q=0.9" ` +
+      `${cookieArgStr} -o "${videoPath}" "${url}" --no-playlist`
+    );
+    updateStatus('transcribing', 20);
+  }
 
   // Step 2: Extract audio
   const audioPath = path.join(jobDir, 'audio.wav');
@@ -95,19 +170,22 @@ async function runClipPipeline(jobId, jobDir, url, opts) {
     const whisperOut = JSON.parse(fs.readFileSync(path.join(jobDir, 'audio.json'), 'utf8'));
     transcript = { text: whisperOut.text, segments: whisperOut.segments };
   } else {
+    // Cloud fallback when local whisper isn't installed. Uses Groq's
+    // OpenAI-compatible transcription endpoint (same request/response shape as
+    // the OpenAI Whisper API) with a Groq-hosted Whisper model.
     const { default: FormData } = await import('form-data');
     const formData = new FormData();
     formData.append('file', fs.createReadStream(audioPath), { filename: 'audio.wav', contentType: 'audio/wav' });
-    formData.append('model', 'whisper-1');
+    formData.append('model', 'whisper-large-v3-turbo');
     formData.append('response_format', 'verbose_json');
     formData.append('timestamp_granularities[]', 'segment');
-    const resp = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+    const resp = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
       method: 'POST',
-      headers: { 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`, ...formData.getHeaders() },
+      headers: { 'Authorization': `Bearer ${process.env.GROQ_API_KEY}`, ...formData.getHeaders() },
       body: formData
     });
     const data = await resp.json();
-    if (data.error) throw new Error(data.error.message);
+    if (data.error) throw new Error(data.error.message || data.error);
     transcript = { text: data.text, segments: data.segments || [] };
   }
 

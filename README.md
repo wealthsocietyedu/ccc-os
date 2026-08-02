@@ -175,6 +175,14 @@ CLIENT_URL=https://your-app.railway.app
 PORT=3001
 ```
 
+Optional AI provider keys (see `server/.env.example` for the full list):
+
+```
+ANTHROPIC_API_KEY=sk-ant-...   # AI Studio, Content Advisor, Smart Clipper clip detection
+GROQ_API_KEY=gsk_...           # Smart Clipper audio transcription (Whisper via Groq, OpenAI-compatible)
+OPENAI_API_KEY=sk-...          # Repurpose Engine caption adaptation
+```
+
 To generate a strong JWT secret:
 ```bash
 node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"

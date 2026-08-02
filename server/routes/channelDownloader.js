@@ -342,21 +342,28 @@ async function runDownloadJob(db, jobId, url, platform, channelHandle, options) 
   let lastUpdate = Date.now();
   let currentProgress = 0;
   let currentFile = '';
-  let downloadedVideos = 0;
+  let attemptIndex = 0;
   let totalVideos = options.maxVideos || 25;
   let buffer = '';
 
+  // "Downloading item N of M" fires when yt-dlp *starts* item N, not when it
+  // succeeds — trusting it as "downloaded" made a job that's actually failing
+  // on every item (e.g. YouTube bot-check with no cookies) show misleading
+  // near-100% progress right up until it flips to Failed with 0 files. Count
+  // real completed files on disk instead, same source of truth the job uses
+  // at completion.
   const flushUpdate = () => {
     if (Date.now() - lastUpdate < 2000) return;
     lastUpdate = Date.now();
+    const completedCount = scanOutputFiles(outputDir).length;
     db.prepare(`
       UPDATE download_jobs SET
         progress=?, downloaded_videos=?, current_file=?, total_size_mb=?
       WHERE id=?
     `).run(
       Math.min(currentProgress, 99),
-      downloadedVideos,
-      currentFile,
+      completedCount,
+      attemptIndex ? `${currentFile} (attempting ${attemptIndex}/${totalVideos})` : currentFile,
       getDirSizeMB(outputDir),
       jobId
     );
@@ -371,7 +378,7 @@ async function runDownloadJob(db, jobId, url, platform, channelHandle, options) 
       const parsed = parseProgress(line);
       if (parsed.percent !== null) currentProgress = parsed.percent;
       if (parsed.currentFile) currentFile = parsed.currentFile;
-      if (parsed.videoIndex) downloadedVideos = parsed.videoIndex;
+      if (parsed.videoIndex) attemptIndex = parsed.videoIndex;
       if (parsed.videoTotal) totalVideos = parsed.videoTotal;
       flushUpdate();
     }
@@ -560,6 +567,26 @@ router.get('/files/:jobId', (req, res) => {
   const job = req.db.prepare(`SELECT file_list, output_dir FROM download_jobs WHERE id=?`).get(req.params.jobId);
   if (!job) return res.status(404).json({ error: 'Job not found' });
   res.json({ files: job.file_list ? JSON.parse(job.file_list) : [] });
+});
+
+// ─── GET /download/:jobId/:filename ───────────────────────────────────────────
+// Streams a single downloaded file from a completed job to the user's machine as
+// an attachment. Files otherwise only live on the server's Railway volume.
+router.get('/download/:jobId/:filename', (req, res) => {
+  const job = req.db.prepare(`SELECT output_dir FROM download_jobs WHERE id=?`).get(req.params.jobId);
+  if (!job || !job.output_dir) return res.status(404).json({ error: 'Job not found' });
+
+  // Strip any directory components to prevent path traversal, then confirm the
+  // resolved path is still inside the job's own output directory.
+  const safeName = path.basename(req.params.filename);
+  const baseDir = path.resolve(job.output_dir);
+  const filePath = path.resolve(baseDir, safeName);
+  if (filePath !== path.join(baseDir, safeName) || !filePath.startsWith(baseDir + path.sep)) {
+    return res.status(400).json({ error: 'Invalid file path' });
+  }
+  if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'File not found' });
+
+  res.download(filePath, safeName);
 });
 
 // ─── GET /analysis/:jobId ─────────────────────────────────────────────────────

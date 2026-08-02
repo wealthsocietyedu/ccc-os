@@ -1,25 +1,28 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { colors, radius, font, glass, gradients, glow } from '../lib/theme.js';
+import { Button, Card, StatCard, SectionLabel } from './ui/index.js';
+import { channelDownloader } from '../lib/api.js';
 
 const API = '/api/channel-downloader';
 
-// ─── Design tokens (CCC OS TVA theme) ────────────────────────────────────────
+// ─── Design tokens (CCC OS TVA theme — re-pointed to shared theme.js) ────────
 const C = {
-  bg:       '#0C0A07',
-  bgCard:   '#111009',
-  bgInput:  '#1A1712',
-  border:   '#2A2520',
-  borderHi: '#3D3328',
-  amber:    '#F0A800',
-  amberDim: '#D4953A',
-  teal:     '#3D9E8C',
-  tealDim:  '#2A6E62',
-  red:      '#C0392B',
-  green:    '#27AE60',
-  textPri:  '#EDE8DF',
-  textSec:  '#8A8070',
-  textMut:  '#4A4438',
-  mono:     '"DM Mono", monospace',
-  sans:     '"Sora", sans-serif',
+  bg:       colors.bg,
+  bgCard:   colors.surface,
+  bgInput:  colors.surface2,
+  border:   colors.border,
+  borderHi: colors.border2,
+  amber:    colors.accent2,
+  amberDim: colors.accent,
+  teal:     colors.green,
+  tealDim:  'rgba(61,158,140,0.35)',
+  red:      colors.red,
+  green:    colors.green,
+  textPri:  colors.text,
+  textSec:  colors.text2,
+  textMut:  colors.text3,
+  mono:     font.mono,
+  sans:     font.display,
 };
 
 // ─── Fetch helper ─────────────────────────────────────────────────────────────
@@ -88,11 +91,12 @@ function TabBtn({ active, onClick, icon, label, badge }) {
   return (
     <button onClick={onClick} style={{
       display: 'flex', alignItems: 'center', gap: 8,
-      padding: '9px 18px', borderRadius: 8, border: 'none',
+      padding: '9px 18px', borderRadius: radius.pill, border: 'none',
       cursor: 'pointer', fontSize: 13, fontFamily: C.sans,
       fontWeight: active ? 600 : 400,
-      background: active ? C.amber : 'transparent',
+      background: active ? gradients.amber : 'transparent',
       color: active ? C.bg : C.textSec,
+      boxShadow: active ? glow.amber : 'none',
       transition: 'all .2s',
       position: 'relative',
     }}>
@@ -112,17 +116,17 @@ function TabBtn({ active, onClick, icon, label, badge }) {
 
 function StatusBadge({ status }) {
   const map = {
-    queued:    { bg: '#1A1712', color: C.textSec,  dot: C.textSec,  label: 'Queued'    },
-    running:   { bg: '#0A1A10', color: C.teal,     dot: C.teal,     label: 'Running'   },
-    completed: { bg: '#0A1408', color: C.green,    dot: C.green,    label: 'Completed' },
-    failed:    { bg: '#1A0A08', color: C.red,      dot: C.red,      label: 'Failed'    },
-    cancelled: { bg: '#1A1510', color: C.textSec,  dot: C.textMut,  label: 'Cancelled' },
+    queued:    { bg: C.bgInput, color: C.textSec,  dot: C.textSec,  label: 'Queued'    },
+    running:   { bg: 'rgba(61,158,140,0.12)', color: C.teal,     dot: C.teal,     label: 'Running'   },
+    completed: { bg: 'rgba(61,158,140,0.10)', color: C.green,    dot: C.green,    label: 'Completed' },
+    failed:    { bg: 'rgba(196,42,24,0.12)', color: C.red,      dot: C.red,      label: 'Failed'    },
+    cancelled: { bg: C.bgInput, color: C.textSec,  dot: C.textMut,  label: 'Cancelled' },
   };
   const s = map[status] || map.queued;
   return (
     <span style={{
       background: s.bg, color: s.color, border: `1px solid ${s.dot}33`,
-      borderRadius: 99, padding: '3px 10px', fontSize: 11,
+      borderRadius: radius.pill, padding: '3px 10px', fontSize: 11,
       fontFamily: C.mono, display: 'inline-flex', alignItems: 'center', gap: 6,
     }}>
       <span style={{ width: 6, height: 6, borderRadius: '50%', background: s.dot, animation: status === 'running' ? 'pulse 1.5s infinite' : 'none' }} />
@@ -133,11 +137,11 @@ function StatusBadge({ status }) {
 
 function ProgressBar({ pct, color = C.amber }) {
   return (
-    <div style={{ height: 4, background: C.bgInput, borderRadius: 99, overflow: 'hidden' }}>
+    <div style={{ height: 4, background: C.bgInput, borderRadius: radius.pill, overflow: 'hidden' }}>
       <div style={{
         height: '100%', width: `${Math.min(pct || 0, 100)}%`,
         background: `linear-gradient(90deg, ${color}, ${color}AA)`,
-        borderRadius: 99, transition: 'width .4s ease',
+        borderRadius: radius.pill, transition: 'width .4s ease',
       }} />
     </div>
   );
@@ -153,7 +157,7 @@ function Label({ children }) {
 
 function Section({ title, children, action }) {
   return (
-    <div style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 12, padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+    <Card style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       {(title || action) && (
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           {title && <Label>{title}</Label>}
@@ -161,7 +165,7 @@ function Section({ title, children, action }) {
         </div>
       )}
       {children}
-    </div>
+    </Card>
   );
 }
 
@@ -217,7 +221,7 @@ function DownloadTab({ onJobStarted }) {
               style={{
                 width: '100%', boxSizing: 'border-box',
                 background: C.bgInput, border: `1px solid ${platform ? C.amber + '66' : C.border}`,
-                borderRadius: 10, color: C.textPri, padding: '13px 48px 13px 14px',
+                borderRadius: radius.sm, color: C.textPri, padding: '13px 48px 13px 14px',
                 fontSize: 14, fontFamily: C.sans, outline: 'none',
                 transition: 'border-color .2s',
               }}
@@ -265,7 +269,7 @@ function DownloadTab({ onJobStarted }) {
               }}
               style={{
                 background: C.bgInput, border: `1px solid ${C.border}`,
-                borderRadius: 8, color: C.textPri, padding: '10px 12px',
+                borderRadius: radius.sm, color: C.textPri, padding: '10px 12px',
                 fontSize: 13, fontFamily: C.sans, outline: 'none',
               }}
             >
@@ -285,7 +289,7 @@ function DownloadTab({ onJobStarted }) {
               onChange={e => setDateAfter(e.target.value)}
               style={{
                 background: C.bgInput, border: `1px solid ${C.border}`,
-                borderRadius: 8, color: C.textPri, padding: '10px 12px',
+                borderRadius: radius.sm, color: C.textPri, padding: '10px 12px',
                 fontSize: 13, fontFamily: C.sans, outline: 'none',
               }}
             />
@@ -300,7 +304,7 @@ function DownloadTab({ onJobStarted }) {
           ].map(t => (
             <div key={t.key} style={{
               flex: 1, background: C.bgCard, border: `1px solid ${C.border}`,
-              borderRadius: 8, padding: '10px 14px', display: 'flex',
+              borderRadius: radius.sm, padding: '10px 14px', display: 'flex',
               justifyContent: 'space-between', alignItems: 'center',
             }}>
               <span style={{ fontSize: 13, color: C.textSec, fontFamily: C.sans }}>{t.label}</span>
@@ -314,23 +318,16 @@ function DownloadTab({ onJobStarted }) {
         {success && <Alert type="success">{success}</Alert>}
 
         {/* Start button */}
-        <button
+        <Button
+          variant="primary"
+          size="lg"
           onClick={handleStart}
           disabled={loading || !platform}
-          style={{
-            background: loading || !platform
-              ? C.bgInput
-              : `linear-gradient(135deg, ${C.amber}, ${C.amberDim})`,
-            border: 'none', borderRadius: 10, color: loading || !platform ? C.textMut : C.bg,
-            padding: '14px 24px', fontSize: 14, fontWeight: 700,
-            fontFamily: C.sans, cursor: loading || !platform ? 'not-allowed' : 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
-            transition: 'all .2s', boxShadow: loading || !platform ? 'none' : `0 0 24px ${C.amber}33`,
-          }}
+          style={{ width: '100%' }}
         >
           <span style={{ fontSize: 18 }}>{loading ? '⟳' : '⬇'}</span>
           {loading ? 'Starting download...' : `Start Download${platform ? ` — ${PLATFORMS[platform].label}` : ''}`}
-        </button>
+        </Button>
       </div>
 
       {/* Right: info panel */}
@@ -338,24 +335,16 @@ function DownloadTab({ onJobStarted }) {
 
         {/* Storage estimate */}
         {platform && (
-          <Section title="Estimated Storage">
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <span style={{
-                fontSize: 28, fontWeight: 700, fontFamily: C.mono,
-                color: storageWarning ? C.amberDim : C.amber,
-              }}>
-                {fmtMB(estimatedMB)}
-              </span>
-              <span style={{ fontSize: 12, color: C.textSec, fontFamily: C.mono }}>
-                ~{maxVideos} videos @ {audioOnly ? 'audio' : quality}
-              </span>
-              {storageWarning && (
-                <span style={{ fontSize: 12, color: C.amberDim, fontFamily: C.mono, marginTop: 4 }}>
-                  ⚠ Large download — ensure Railway volume has space
-                </span>
-              )}
-            </div>
-          </Section>
+          <StatCard
+            value={fmtMB(estimatedMB)}
+            label="Estimated Storage"
+            delta={`~${maxVideos} videos @ ${audioOnly ? 'audio' : quality}`}
+            deltaUp={!storageWarning}
+            style={storageWarning ? { border: `1px solid ${C.amberDim}66` } : {}}
+          />
+        )}
+        {platform && storageWarning && (
+          <Alert type="warn">⚠ Large download — ensure Railway volume has space</Alert>
         )}
 
         {/* Platform notes */}
@@ -379,8 +368,8 @@ function DownloadTab({ onJobStarted }) {
 
         {/* Usage note */}
         <div style={{
-          background: '#0A1008', border: `1px solid ${C.tealDim}44`,
-          borderRadius: 10, padding: '12px 14px',
+          ...glass,
+          padding: '12px 14px', border: `1px solid ${C.tealDim}`,
         }}>
           <div style={{ fontSize: 11, color: C.teal, fontFamily: C.mono, marginBottom: 6 }}>✦ Research Use Only</div>
           <div style={{ fontSize: 12, color: C.textSec, fontFamily: C.sans, lineHeight: 1.6 }}>
@@ -416,15 +405,15 @@ function Toggle({ value, onChange, disabled }) {
 // ─── Alert helper ─────────────────────────────────────────────────────────────
 function Alert({ type, children }) {
   const styles = {
-    error:   { bg: '#1A0800', border: C.red + '44',   color: '#FF8066' },
-    success: { bg: '#081408', border: C.teal + '44',  color: C.teal    },
-    warn:    { bg: '#1A1000', border: C.amber + '44', color: C.amberDim },
+    error:   { bg: 'rgba(196,42,24,0.10)', border: C.red + '44',   color: '#FF8066' },
+    success: { bg: 'rgba(61,158,140,0.10)', border: C.teal + '44',  color: C.teal    },
+    warn:    { bg: 'rgba(212,149,58,0.10)', border: C.amber + '44', color: C.amberDim },
   };
   const s = styles[type] || styles.warn;
   return (
     <div style={{
       background: s.bg, border: `1px solid ${s.border}`,
-      borderRadius: 8, padding: '10px 14px',
+      borderRadius: radius.sm, padding: '10px 14px',
       fontSize: 13, fontFamily: C.mono, color: s.color,
     }}>
       {children}
@@ -437,11 +426,19 @@ function JobCard({ job, onCancel, onDelete, onAnalyze, onCleanup, expanded, onTo
   const p = PLATFORMS[job.platform] || PLATFORMS.tiktok;
   const isActive = job.status === 'running' || job.status === 'queued';
 
+  // Load the downloadable file list when a completed job is expanded.
+  const [files, setFiles] = useState([]);
+  useEffect(() => {
+    if (expanded && job.status === 'completed') {
+      channelDownloader.files(job.id).then(d => setFiles(d.files || [])).catch(() => setFiles([]));
+    }
+  }, [expanded, job.id, job.status]);
+
   return (
     <div style={{
-      background: C.bgCard, border: `1px solid ${job.status === 'running' ? C.amber + '44' : C.border}`,
-      borderRadius: 12, overflow: 'hidden',
-      boxShadow: job.status === 'running' ? `0 0 16px ${C.amber}11` : 'none',
+      ...glass, padding: 0, overflow: 'hidden',
+      border: `1px solid ${job.status === 'running' ? C.amber + '44' : colors.glassBorder}`,
+      boxShadow: job.status === 'running' ? `${glass.boxShadow}, 0 0 20px rgba(212,149,58,0.12)` : glass.boxShadow,
     }}>
       {/* Card header */}
       <div style={{ padding: '14px 16px', display: 'flex', gap: 14, alignItems: 'flex-start' }}>
@@ -504,19 +501,19 @@ function JobCard({ job, onCancel, onDelete, onAnalyze, onCleanup, expanded, onTo
         {/* Actions */}
         <div style={{ display: 'flex', gap: 6, flexShrink: 0, flexDirection: 'column' }}>
           {isActive && (
-            <ActionBtn onClick={() => onCancel?.(job.id)} variant="danger">✕ Cancel</ActionBtn>
+            <Button size="sm" variant="danger" onClick={() => onCancel?.(job.id)}>✕ Cancel</Button>
           )}
           {job.status === 'completed' && (
             <>
-              <ActionBtn onClick={() => onToggleExpand?.(job.id)} variant={expanded ? 'active' : 'default'}>
+              <Button size="sm" variant={expanded ? 'primary' : 'secondary'} onClick={() => onToggleExpand?.(job.id)}>
                 {expanded ? '▲ Hide' : '▼ Details'}
-              </ActionBtn>
-              <ActionBtn onClick={() => onAnalyze?.(job.id)} variant="teal">✦ Analyze</ActionBtn>
-              <ActionBtn onClick={() => onCleanup?.(job.id)} variant="ghost">🗑 Files</ActionBtn>
+              </Button>
+              <Button size="sm" variant="secondary" style={{ color: C.teal, borderColor: C.tealDim }} onClick={() => onAnalyze?.(job.id)}>✦ Analyze</Button>
+              <Button size="sm" variant="ghost" onClick={() => onCleanup?.(job.id)}>🗑 Files</Button>
             </>
           )}
           {(job.status === 'failed' || job.status === 'cancelled') && (
-            <ActionBtn onClick={() => onDelete?.(job.id)} variant="ghost">Remove</ActionBtn>
+            <Button size="sm" variant="ghost" onClick={() => onDelete?.(job.id)}>Remove</Button>
           )}
         </div>
       </div>
@@ -524,6 +521,28 @@ function JobCard({ job, onCancel, onDelete, onAnalyze, onCleanup, expanded, onTo
       {/* Expanded: file list + analysis */}
       {expanded && (
         <div style={{ borderTop: `1px solid ${C.border}`, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {/* Downloadable files — pull completed files from the server to this machine */}
+          <div>
+            <Label>Files {files.length ? `(${files.length})` : ''}</Label>
+            {files.length === 0 ? (
+              <div style={{ fontSize: 12, color: C.textMut, fontFamily: C.mono, marginTop: 8 }}>
+                {job.file_count > 0 ? 'Loading files…' : 'No files on disk (they may have been cleaned up).'}
+              </div>
+            ) : (
+              <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {files.map((f) => (
+                  <div key={f.filename} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', background: C.bg, borderRadius: 8, border: `1px solid ${C.border}` }}>
+                    <span style={{ flex: 1, minWidth: 0, fontSize: 12, color: C.textPri, fontFamily: C.sans, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.filename}</span>
+                    <span style={{ fontSize: 11, color: C.textSec, fontFamily: C.mono, flexShrink: 0 }}>{fmtMB(f.sizeMB || 0)}</span>
+                    <a href={channelDownloader.fileUrl(job.id, f.filename)} download style={{ textDecoration: 'none', flexShrink: 0 }}>
+                      <Button size="sm" variant="secondary">↓ Download</Button>
+                    </a>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           {/* Analysis */}
           {analysis && <AnalysisPanel analysis={analysis} />}
           {!analysis && job.has_analysis === 1 && (
@@ -535,27 +554,6 @@ function JobCard({ job, onCancel, onDelete, onAnalyze, onCleanup, expanded, onTo
   );
 }
 
-function ActionBtn({ onClick, children, variant = 'default' }) {
-  const vars = {
-    default: { bg: C.bgInput, color: C.textSec, border: C.border },
-    active:  { bg: C.amber + '22', color: C.amber, border: C.amber + '55' },
-    danger:  { bg: C.red + '11', color: C.red, border: C.red + '44' },
-    teal:    { bg: C.teal + '11', color: C.teal, border: C.teal + '44' },
-    ghost:   { bg: 'transparent', color: C.textMut, border: C.border },
-  };
-  const v = vars[variant] || vars.default;
-  return (
-    <button onClick={onClick} style={{
-      background: v.bg, border: `1px solid ${v.border}`, borderRadius: 6,
-      color: v.color, padding: '5px 12px', fontSize: 11,
-      fontFamily: C.mono, cursor: 'pointer', whiteSpace: 'nowrap',
-      transition: 'all .15s',
-    }}>
-      {children}
-    </button>
-  );
-}
-
 // ─── Analysis panel ───────────────────────────────────────────────────────────
 function AnalysisPanel({ analysis: a }) {
   if (!a) return null;
@@ -563,7 +561,7 @@ function AnalysisPanel({ analysis: a }) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       {/* Content insight */}
       {a.contentInsight && (
-        <div style={{ background: C.amber + '0D', border: `1px solid ${C.amber}33`, borderRadius: 10, padding: '12px 14px' }}>
+        <div style={{ background: C.amber + '0D', border: `1px solid ${C.amber}33`, borderRadius: radius.sm, padding: '12px 14px' }}>
           <div style={{ fontSize: 11, color: C.amber, fontFamily: C.mono, textTransform: 'uppercase', marginBottom: 6 }}>✦ Content Insight</div>
           <p style={{ margin: 0, fontSize: 13, color: C.textPri, fontFamily: C.sans, lineHeight: 1.6 }}>{a.contentInsight}</p>
         </div>
@@ -591,7 +589,7 @@ function AnalysisPanel({ analysis: a }) {
             <Label>Topic Clusters</Label>
             {a.topicClusters.map((t, i) => (
               <div key={i} style={{
-                padding: '7px 10px', background: C.teal + '11',
+                padding: '7px 10px', background: 'rgba(61,158,140,0.10)',
                 border: `1px solid ${C.teal}33`, borderRadius: 6,
                 fontSize: 12, color: C.teal, fontFamily: C.sans,
               }}>
@@ -656,20 +654,17 @@ function QueueTab({ jobs, onCancel, onRefresh }) {
         <span style={{ fontSize: 13, color: C.textSec, fontFamily: C.mono }}>
           {activeJobs.length} active {activeJobs.length === 1 ? 'job' : 'jobs'}
         </span>
-        <ActionBtn onClick={onRefresh} variant="ghost">↺ Refresh</ActionBtn>
+        <Button size="sm" variant="ghost" onClick={onRefresh}>↺ Refresh</Button>
       </div>
 
       {activeJobs.length === 0 ? (
-        <div style={{
-          background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 12,
-          padding: '48px 24px', textAlign: 'center',
-        }}>
+        <Card style={{ padding: '48px 24px', textAlign: 'center' }}>
           <div style={{ fontSize: 40, marginBottom: 12 }}>⬇</div>
           <div style={{ fontSize: 14, color: C.textSec, fontFamily: C.sans }}>No active downloads</div>
           <div style={{ fontSize: 12, color: C.textMut, fontFamily: C.mono, marginTop: 4 }}>
             Paste a URL in the Download tab to get started
           </div>
-        </div>
+        </Card>
       ) : (
         activeJobs.map(job => (
           <JobCard key={job.id} job={job} onCancel={onCancel} />
@@ -719,12 +714,9 @@ function LibraryTab({ jobs, onDelete, onCleanup }) {
           <Label>Completed Downloads ({completedJobs.length})</Label>
         </div>
         {completedJobs.length === 0 ? (
-          <div style={{
-            background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 12,
-            padding: '32px', textAlign: 'center',
-          }}>
+          <Card style={{ padding: 32, textAlign: 'center' }}>
             <div style={{ fontSize: 13, color: C.textSec, fontFamily: C.mono }}>No completed downloads yet</div>
-          </div>
+          </Card>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {completedJobs.map(job => (
@@ -772,27 +764,21 @@ function SettingsTab() {
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, maxWidth: 800 }}>
 
       {/* Storage */}
-      <Section title="Storage">
+      {stats ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {stats ? (
-            <>
-              <div>
-                <div style={{ fontSize: 28, fontWeight: 700, color: C.amber, fontFamily: C.mono }}>
-                  {fmtMB(stats.totalStorageMB)}
-                </div>
-                <div style={{ fontSize: 12, color: C.textSec, fontFamily: C.mono }}>
-                  used across {stats.jobCount} jobs
-                </div>
-              </div>
-              <div style={{ fontSize: 12, color: C.textMut, fontFamily: C.mono }}>
-                Path: {stats.downloadsPath}
-              </div>
-            </>
-          ) : (
-            <div style={{ fontSize: 13, color: C.textMut, fontFamily: C.mono }}>Loading...</div>
-          )}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <StatCard value={fmtMB(stats.totalStorageMB)} label="Storage Used" />
+            <StatCard value={stats.jobCount} label="Jobs Stored" />
+          </div>
+          <div style={{ fontSize: 12, color: C.textMut, fontFamily: C.mono, padding: '0 4px' }}>
+            Path: {stats.downloadsPath}
+          </div>
         </div>
-      </Section>
+      ) : (
+        <Section title="Storage">
+          <div style={{ fontSize: 13, color: C.textMut, fontFamily: C.mono }}>Loading...</div>
+        </Section>
+      )}
 
       {/* Tool version */}
       <Section title="yt-dlp">
@@ -888,7 +874,7 @@ export default function ChannelDownloader() {
   ];
 
   return (
-    <div style={{ minHeight: '100vh', background: C.bg, color: C.textPri, fontFamily: C.sans, padding: 32 }}>
+    <div style={{ minHeight: '100%', background: C.bg, color: C.textPri, fontFamily: C.sans, padding: 32 }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300;1,400&display=swap');
         @keyframes spin  { to { transform: rotate(360deg); } }
@@ -904,18 +890,19 @@ export default function ChannelDownloader() {
 
       {/* Header */}
       <div style={{ marginBottom: 32, animation: 'fadeIn .4s ease' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 20 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 18 }}>
           <div style={{
-            width: 48, height: 48, borderRadius: 14,
-            background: `linear-gradient(135deg, ${C.amber}, ${C.amberDim})`,
+            width: 52, height: 52, borderRadius: radius.md,
+            background: gradients.amber,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 22, boxShadow: `0 0 28px ${C.amber}33`,
+            fontSize: 22, boxShadow: glow.amber,
           }}>⬇</div>
           <div>
-            <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: C.textPri, letterSpacing: '-0.02em' }}>
+            <SectionLabel>Research</SectionLabel>
+            <h1 style={{ margin: '8px 0 0', fontFamily: C.sans, fontSize: 32, fontWeight: 800, color: C.textPri, letterSpacing: '-0.03em', lineHeight: 1.04 }}>
               Channel Downloader
             </h1>
-            <p style={{ margin: 0, fontSize: 12, color: C.textSec, fontFamily: C.mono }}>
+            <p style={{ margin: '6px 0 0', fontSize: 13, color: C.textSec, fontFamily: C.mono }}>
               Bulk download TikTok pages · Instagram profiles · YouTube channels
             </p>
           </div>
@@ -925,7 +912,7 @@ export default function ChannelDownloader() {
             <div style={{
               marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8,
               background: C.amber + '11', border: `1px solid ${C.amber}33`,
-              borderRadius: 99, padding: '6px 14px',
+              borderRadius: radius.pill, padding: '6px 14px',
             }}>
               <span style={{ width: 8, height: 8, borderRadius: '50%', background: C.amber, animation: 'pulse 1.5s infinite' }} />
               <span style={{ fontSize: 12, color: C.amber, fontFamily: C.mono }}>
@@ -943,20 +930,17 @@ export default function ChannelDownloader() {
             { label: 'YouTube',   sub: 'Channels + lists', icon: '▶️' },
             { label: 'AI Insights', sub: 'Claude analysis', icon: '✦' },
           ].map(s => (
-            <div key={s.label} style={{
-              flex: 1, background: C.bgCard, borderRadius: 10, padding: '12px 14px',
-              border: `1px solid ${C.border}`,
-            }}>
+            <Card key={s.label} style={{ flex: 1, padding: '12px 14px' }}>
               <div style={{ fontSize: 11, color: C.textSec, fontFamily: C.mono, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{s.icon} {s.label}</div>
               <div style={{ fontSize: 12, color: C.amberDim, fontFamily: C.mono, marginTop: 4 }}>{s.sub}</div>
-            </div>
+            </Card>
           ))}
         </div>
       </div>
 
       {/* Tabs */}
       <div style={{
-        display: 'flex', gap: 4, background: C.bgCard, borderRadius: 10,
+        display: 'flex', gap: 4, background: C.bgCard, borderRadius: radius.pill,
         padding: 4, width: 'fit-content', marginBottom: 28, border: `1px solid ${C.border}`,
       }}>
         {tabs.map(t => (

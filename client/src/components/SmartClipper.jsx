@@ -1,55 +1,50 @@
-import { useState, useEffect, useRef } from 'react';
-const API = '/api/smart-clipper';
-const getToken = () => localStorage.getItem('ccc_token');
-async function apiFetch(endpoint, body, method = 'POST') {
-  const opts = { method, headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getToken()}` } };
-  if (body) opts.body = JSON.stringify(body);
-  const res = await fetch(`${API}${endpoint}`, opts);
-  if (!res.ok) { const e = await res.json(); throw new Error(e.error || 'Request failed'); }
-  return res.json();
-}
-// ─── Design tokens (TVA theme) ────────────────────────────────────────────────
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { colors, radius, font, glass, gradients, glow } from '../lib/theme.js';
+import { Button, Card, StatCard, SectionLabel } from './ui/index.js';
+import { smartClipper } from '../lib/api.js';
+
+// ─── Design tokens (TVA theme — re-pointed to shared theme.js) ───────────────
 const C = {
-  bg: '#0C0A07', surface: '#1A1610', surface2: '#231E16', surface3: '#2E2720',
-  border: '#2D2318', border2: '#3D3428', border3: '#5C4E38',
-  amber: '#F0A800', amberMid: '#D4953A', amberDim: '#7A5820',
-  amberText: '#FCD97A', amberSub: 'rgba(212,149,58,0.08)',
-  teal: '#3D9E8C', tealDim: '#1E5050', tealText: '#6ECFBF', tealSub: 'rgba(61,158,140,0.08)',
-  red: '#C42A18', redText: '#F87060', redSub: 'rgba(196,42,24,0.1)',
-  text: '#F0EBE0', text2: '#A89880', text3: '#6B5E4E', text4: '#3D3428',
-  font: "'Sora', sans-serif", mono: "'DM Mono', monospace",
+  bg: colors.bg, surface: colors.surface, surface2: colors.surface2, surface3: colors.surface2,
+  border: colors.border, border2: colors.border2, border3: colors.border2,
+  amber: colors.accent2, amberMid: colors.accent, amberDim: 'rgba(212,149,58,0.35)',
+  amberText: colors.accent2, amberSub: 'rgba(212,149,58,0.08)',
+  teal: colors.green, tealDim: 'rgba(61,158,140,0.35)', tealText: colors.cyan, tealSub: 'rgba(61,158,140,0.08)',
+  red: colors.red, redText: '#F87060', redSub: 'rgba(196,42,24,0.1)',
+  text: colors.text, text2: colors.text2, text3: colors.text3, text4: colors.text3,
+  font: font.display, mono: font.mono,
 };
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+const fmtBytes = (b) => {
+  if (!b && b !== 0) return '';
+  if (b >= 1024 ** 3) return `${(b / 1024 ** 3).toFixed(2)} GB`;
+  if (b >= 1024 ** 2) return `${(b / 1024 ** 2).toFixed(1)} MB`;
+  if (b >= 1024) return `${(b / 1024).toFixed(0)} KB`;
+  return `${b} B`;
+};
+const ACCEPTED = ['.mp4', '.mov', '.mkv', '.webm', '.avi', '.m4v'];
+const isVideoFile = (file) =>
+  !!file && ((file.type || '').startsWith('video/') || ACCEPTED.some(ext => file.name.toLowerCase().endsWith(ext)));
+
 // ─── Shared UI ────────────────────────────────────────────────────────────────
-const Btn = ({ children, onClick, variant = 'primary', disabled, style = {} }) => {
-  const v = {
-    primary: { background: `linear-gradient(135deg,${C.amberMid},${C.amber})`, color: '#0C0A07', border: 'none', boxShadow: `0 0 18px rgba(212,149,58,0.3)` },
-    secondary: { background: C.surface2, color: C.text2, border: `1px solid ${C.border2}` },
-    teal: { background: C.tealSub, color: C.tealText, border: `1px solid ${C.tealDim}` },
-    ghost: { background: 'transparent', color: C.text3, border: `1px solid ${C.border}` },
-    danger: { background: C.redSub, color: C.redText, border: `1px solid ${C.red}` },
-  };
-  return (
-    <button onClick={onClick} disabled={disabled} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '9px 18px', borderRadius: 8, fontFamily: C.font, fontSize: 13, fontWeight: 600, cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.5 : 1, transition: 'all .15s', ...v[variant], ...style }}>
-      {children}
-    </button>
-  );
-};
 const Input = ({ label, value, onChange, placeholder, multiline, rows = 3 }) => (
   <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
     {label && <label style={{ fontFamily: C.mono, fontSize: 10, color: C.text3, textTransform: 'uppercase', letterSpacing: '0.1em' }}>{label}</label>}
     {multiline
-      ? <textarea value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} rows={rows} style={{ background: C.surface, border: `1px solid ${C.border2}`, borderRadius: 8, color: C.text, padding: '10px 12px', fontSize: 13, fontFamily: C.font, outline: 'none', resize: 'vertical' }} />
-      : <input value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} style={{ background: C.surface, border: `1px solid ${C.border2}`, borderRadius: 8, color: C.text, padding: '10px 12px', fontSize: 13, fontFamily: C.font, outline: 'none' }} />
+      ? <textarea value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} rows={rows} style={{ background: C.surface, border: `1px solid ${C.border2}`, borderRadius: radius.sm, color: C.text, padding: '10px 12px', fontSize: 13, fontFamily: C.font, outline: 'none', resize: 'vertical' }} />
+      : <input value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} style={{ background: C.surface, border: `1px solid ${C.border2}`, borderRadius: radius.sm, color: C.text, padding: '10px 12px', fontSize: 13, fontFamily: C.font, outline: 'none' }} />
     }
   </div>
 );
 const Tag = ({ children, color = 'amber' }) => {
   const s = { amber: { bg: C.amberSub, text: C.amberText, border: C.amberDim }, teal: { bg: C.tealSub, text: C.tealText, border: C.tealDim }, neutral: { bg: C.surface2, text: C.text3, border: C.border } }[color] || { bg: C.surface2, text: C.text3, border: C.border };
-  return <span style={{ display: 'inline-flex', alignItems: 'center', padding: '2px 8px', borderRadius: 4, fontFamily: C.mono, fontSize: 10, background: s.bg, color: s.text, border: `1px solid ${s.border}` }}>{children}</span>;
+  return <span style={{ display: 'inline-flex', alignItems: 'center', padding: '2px 8px', borderRadius: radius.pill, fontFamily: C.mono, fontSize: 10, background: s.bg, color: s.text, border: `1px solid ${s.border}` }}>{children}</span>;
 };
 const Spinner = ({ size = 36 }) => (
   <div style={{ width: size, height: size, border: `3px solid ${C.amberMid}`, borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
 );
+
 // ─── Virality Score Ring ──────────────────────────────────────────────────────
 function ScoreRing({ score }) {
   const r = 22, circ = 2 * Math.PI * r;
@@ -67,10 +62,12 @@ function ScoreRing({ score }) {
     </div>
   );
 }
-// ─── Progress Bar ─────────────────────────────────────────────────────────────
+
+// ─── Progress Bar (upload-only pipeline: no "download" stage) ─────────────────
 function ProgressBar({ stage, progress }) {
-  const stages = ['downloading', 'transcribing', 'analyzing', 'cutting', 'complete'];
-  const labels = { downloading: '⬇ Downloading', transcribing: '🎙 Transcribing', analyzing: '🧠 Analyzing', cutting: '✂ Cutting Clips', complete: '✓ Done' };
+  const stages = ['uploading', 'transcribing', 'analyzing', 'cutting', 'complete'];
+  const labels = { uploading: '⬆ Uploading', transcribing: '🎙 Transcribing', analyzing: '🧠 Analyzing', cutting: '✂ Cutting Clips', complete: '✓ Done' };
+  const idx = Math.max(stages.indexOf(stage), 0);
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -81,23 +78,24 @@ function ProgressBar({ stage, progress }) {
         <div style={{ height: '100%', width: `${progress}%`, background: `linear-gradient(90deg,${C.amberMid},${C.amber})`, borderRadius: 3, transition: 'width .5s ease' }} />
       </div>
       <div style={{ display: 'flex', gap: 4 }}>
-        {stages.map(s => (
-          <div key={s} style={{ flex: 1, height: 3, borderRadius: 2, background: stages.indexOf(s) <= stages.indexOf(stage) ? C.amberMid : C.border, transition: 'background .3s' }} />
+        {stages.map((s, i) => (
+          <div key={s} style={{ flex: 1, height: 3, borderRadius: 2, background: i <= idx ? C.amberMid : C.border, transition: 'background .3s' }} />
         ))}
       </div>
     </div>
   );
 }
+
 // ─── Clip Card ────────────────────────────────────────────────────────────────
 function ClipCard({ clip, jobId, onSendToScheduler }) {
   const [playing, setPlaying] = useState(false);
   const videoRef = useRef(null);
-  const previewUrl = `${API}/preview/${jobId}/${clip.file}`;
-  const downloadUrl = `${API}/download/${jobId}/${clip.file}`;
+  const previewUrl = smartClipper.previewUrl(jobId, clip.file);
+  const downloadUrl = smartClipper.downloadUrl(jobId, clip.file);
   const emotionColors = { curiosity: C.teal, surprise: C.amber, inspiration: '#4ADE80', relatability: '#A78BFA', controversy: C.red };
   const emotionColor = emotionColors[clip.emotion] || C.text3;
   return (
-    <div style={{ background: C.surface, border: `1px solid ${C.border2}`, borderRadius: 14, overflow: 'hidden', transition: 'border-color .15s' }}>
+    <div style={{ ...glass, padding: 0, overflow: 'hidden' }}>
       {/* Video preview */}
       <div style={{ position: 'relative', background: '#000', aspectRatio: '16/9' }}>
         <video
@@ -135,33 +133,95 @@ function ClipCard({ clip, jobId, onSendToScheduler }) {
         </div>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
           <Tag color="amber">🔥 {clip.virality_score} virality</Tag>
-          <span style={{ display: 'inline-flex', alignItems: 'center', padding: '2px 8px', borderRadius: 4, fontFamily: C.mono, fontSize: 10, background: `${emotionColor}15`, color: emotionColor, border: `1px solid ${emotionColor}40` }}>{clip.emotion}</span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', padding: '2px 8px', borderRadius: radius.pill, fontFamily: C.mono, fontSize: 10, background: `${emotionColor}15`, color: emotionColor, border: `1px solid ${emotionColor}40` }}>{clip.emotion}</span>
           {clip.pillar_match && <Tag color="teal">✦ {clip.pillar_match}</Tag>}
         </div>
-        <div style={{ background: C.surface2, borderRadius: 8, padding: '8px 10px', marginBottom: 12, fontSize: 12, color: C.text3, lineHeight: 1.5 }}>
+        <div style={{ background: C.surface2, borderRadius: radius.sm, padding: '8px 10px', marginBottom: 12, fontSize: 12, color: C.text3, lineHeight: 1.5 }}>
           {clip.why_viral}
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <a href={downloadUrl} download={`clip_${clip.clip_number}.mp4`} style={{ textDecoration: 'none', flex: 1 }}>
-            <Btn variant="primary" style={{ width: '100%', justifyContent: 'center', fontSize: 12, padding: '8px 12px' }}>
+            <Button variant="primary" size="sm" style={{ width: '100%' }}>
               ↓ Download
-            </Btn>
+            </Button>
           </a>
-          <Btn variant="teal" onClick={() => onSendToScheduler(clip)} style={{ fontSize: 12, padding: '8px 12px' }}>
+          <Button variant="secondary" size="sm" style={{ color: C.tealText, borderColor: C.tealDim }} onClick={() => onSendToScheduler(clip)}>
             📅 Schedule
-          </Btn>
+          </Button>
         </div>
       </div>
     </div>
   );
 }
-// ─── Main Component ───────────────────────────────────────────────────────────
+
+// ─── Drop zone (upload-only ingest) ───────────────────────────────────────────
+function DropZone({ file, onPick, onClear, disabled }) {
+  const [dragging, setDragging] = useState(false);
+  const inputRef = useRef(null);
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setDragging(false);
+    if (disabled) return;
+    const dropped = e.dataTransfer.files?.[0];
+    if (dropped) onPick(dropped);
+  };
+
+  if (file) {
+    return (
+      <div style={{ ...glass, padding: 16, display: 'flex', alignItems: 'center', gap: 14 }}>
+        <div style={{ width: 44, height: 44, borderRadius: radius.sm, background: gradients.amber, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>🎬</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{file.name}</div>
+          <div style={{ fontSize: 11, color: C.text3, fontFamily: C.mono, marginTop: 2 }}>{fmtBytes(file.size)} · ready to clip</div>
+        </div>
+        {!disabled && (
+          <Button variant="ghost" size="sm" onClick={onClear}>✕ Remove</Button>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div
+      onClick={() => !disabled && inputRef.current?.click()}
+      onDragOver={(e) => { e.preventDefault(); if (!disabled) setDragging(true); }}
+      onDragLeave={() => setDragging(false)}
+      onDrop={handleDrop}
+      style={{
+        border: `1.5px dashed ${dragging ? C.amber : C.border2}`,
+        borderRadius: radius.lg,
+        background: dragging ? C.amberSub : C.surface,
+        padding: '40px 24px',
+        textAlign: 'center',
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        transition: 'border-color .18s, background .18s',
+        opacity: disabled ? 0.6 : 1,
+      }}
+    >
+      <input
+        ref={inputRef}
+        type="file"
+        accept="video/*,.mp4,.mov,.mkv,.webm,.avi,.m4v"
+        style={{ display: 'none' }}
+        onChange={(e) => { const f = e.target.files?.[0]; if (f) onPick(f); e.target.value = ''; }}
+      />
+      <div style={{ fontSize: 40, marginBottom: 12 }}>⬆</div>
+      <div style={{ fontSize: 15, fontWeight: 700, color: C.text, marginBottom: 6 }}>Drop your video here</div>
+      <div style={{ fontSize: 12, color: C.text3, marginBottom: 4 }}>or click to browse — upload a long-form video you already have</div>
+      <div style={{ fontSize: 11, color: C.text4, fontFamily: C.mono }}>MP4 · MOV · MKV · WEBM · AVI (up to 3GB)</div>
+    </div>
+  );
+}
+
+// ─── Main Component (upload-only) ─────────────────────────────────────────────
 export default function SmartClipper() {
-  const [url, setUrl] = useState('');
+  const [file, setFile] = useState(null);
   const [pillars, setPillars] = useState('');
   const [niche, setNiche] = useState('');
   const [clipCount, setClipCount] = useState('5');
   const [captionStyle, setCaptionStyle] = useState('bold');
+  const [uploadPct, setUploadPct] = useState(0);
   const [loading, setLoading] = useState(false);
   const [jobId, setJobId] = useState(null);
   const [status, setStatus] = useState(null);
@@ -169,19 +229,18 @@ export default function SmartClipper() {
   const [error, setError] = useState('');
   const [health, setHealth] = useState(null);
   const pollRef = useRef(null);
-  // Check system health on mount
+
+  // Check system health on mount (upload flow needs FFmpeg + transcription, not yt-dlp)
   useEffect(() => {
-    fetch(`${API}/health`, { headers: { 'Authorization': `Bearer ${getToken()}` } })
-      .then(r => r.ok ? r.json() : null)
-      .then(setHealth)
-      .catch(() => {});
+    smartClipper.health().then(setHealth).catch(() => {});
   }, []);
-  // Poll job status
+
+  // Poll job status once a job exists
   useEffect(() => {
     if (!jobId) return;
     pollRef.current = setInterval(async () => {
       try {
-        const data = await apiFetch(`/status/${jobId}`, null, 'GET');
+        const data = await smartClipper.status(jobId);
         setStatus(data);
         if (data.status === 'completed') {
           clearInterval(pollRef.current);
@@ -201,27 +260,50 @@ export default function SmartClipper() {
     }, 3000);
     return () => clearInterval(pollRef.current);
   }, [jobId]);
+
+  const handlePick = (f) => {
+    if (!isVideoFile(f)) { setError('That file is not a supported video format. Use MP4, MOV, MKV, WEBM, or AVI.'); return; }
+    setError('');
+    setFile(f);
+  };
+
   const handleClip = async () => {
-    if (!url.trim()) return;
-    setLoading(true); setError(''); setClips([]); setStatus(null); setJobId(null);
+    if (!file) return;
+    setLoading(true); setError(''); setClips([]); setStatus({ stage: 'uploading', progress: 0 }); setJobId(null); setUploadPct(0);
     try {
-      const data = await apiFetch('/clip', { url, contentPillars: pillars, niche, clipCount: parseInt(clipCount), captionStyle });
+      const data = await smartClipper.uploadAndClip({
+        file,
+        contentPillars: pillars,
+        niche,
+        clipCount: parseInt(clipCount),
+        captionStyle,
+        onProgress: (pct) => {
+          setUploadPct(pct);
+          setStatus({ stage: 'uploading', progress: pct });
+        },
+      });
       setJobId(data.job_id);
-      setStatus({ stage: 'downloading', progress: 5 });
+      setStatus({ stage: 'transcribing', progress: 20 });
     } catch (e) {
       setLoading(false);
       setError(e.message);
     }
   };
+
   const handleSendToScheduler = (clip) => {
     alert(`"${clip.title}" — send to scheduler coming soon! Download the clip first and use your Distribution Room.`);
   };
+
   const handleReset = () => {
-    if (jobId) apiFetch(`/job/${jobId}`, null, 'DELETE').catch(() => {});
-    setJobId(null); setStatus(null); setClips([]); setLoading(false); setError(''); setUrl('');
+    if (jobId) smartClipper.remove(jobId).catch(() => {});
+    if (pollRef.current) clearInterval(pollRef.current);
+    setJobId(null); setStatus(null); setClips([]); setLoading(false); setError(''); setFile(null); setUploadPct(0);
   };
+
+  const displayStatus = status || (loading ? { stage: 'uploading', progress: uploadPct } : null);
+
   return (
-    <div style={{ minHeight: '100vh', background: C.bg, color: C.text, fontFamily: C.font, padding: 32 }}>
+    <div style={{ minHeight: '100%', background: C.bg, color: C.text, fontFamily: C.font, padding: 32 }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&family=DM+Mono:wght@300;400;500&display=swap');
         @keyframes spin { to { transform: rotate(360deg); } }
@@ -233,138 +315,138 @@ export default function SmartClipper() {
         input::placeholder, textarea::placeholder { color: ${C.text4}; }
         select option { background: ${C.surface}; color: ${C.text}; }
       `}</style>
+
       {/* Header */}
       <div style={{ marginBottom: 28, animation: 'fadeUp .3s ease' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-          <div style={{ fontFamily: C.mono, fontSize: 10, color: C.amberText, textTransform: 'uppercase', letterSpacing: '0.12em' }}>——</div>
-          <div style={{ fontFamily: C.mono, fontSize: 10, color: C.amberText, textTransform: 'uppercase', letterSpacing: '0.12em' }}>Smart Clipper</div>
-        </div>
-        <h1 style={{ margin: 0, fontSize: 26, fontWeight: 800, color: C.text, letterSpacing: '-0.03em' }}>AI Clip Engine</h1>
-        <p style={{ margin: '6px 0 0', fontSize: 13, color: C.text3 }}>Paste any YouTube URL → AI finds your best clips → ready to post</p>
+        <SectionLabel>AI Pipeline</SectionLabel>
+        <h1 style={{ margin: '10px 0 0', fontSize: 32, fontWeight: 800, color: C.text, letterSpacing: '-0.03em', fontFamily: C.font, lineHeight: 1.04 }}>Smart Clipper</h1>
+        <p style={{ margin: '6px 0 0', fontSize: 13, color: C.text3 }}>Upload a long-form video → AI finds your best moments → export ready-to-post clips</p>
       </div>
+
       {/* System health */}
       {health?.checks && (
         <div style={{ display: 'flex', gap: 10, marginBottom: 20, flexWrap: 'wrap' }}>
           {[
-            { label: 'yt-dlp', ok: health.checks.ytdlp, note: 'video download' },
             { label: 'FFmpeg', ok: health.checks.ffmpeg, note: 'video cutting' },
             { label: 'Whisper', ok: health.checks.whisper, note: health.checks.whisper ? 'local — free' : 'using OpenAI API' },
           ].map(({ label, ok, note }) => (
-            <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 12px', background: ok ? C.tealSub : C.amberSub, border: `1px solid ${ok ? C.tealDim : C.amberDim}`, borderRadius: 6 }}>
+            <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 12px', background: ok ? C.tealSub : C.amberSub, border: `1px solid ${ok ? C.tealDim : C.amberDim}`, borderRadius: radius.pill }}>
               <span style={{ fontSize: 10 }}>{ok ? '●' : '○'}</span>
               <span style={{ fontFamily: C.mono, fontSize: 10, color: ok ? C.tealText : C.amberText }}>{label}</span>
               <span style={{ fontFamily: C.mono, fontSize: 9, color: C.text3 }}>{note}</span>
             </div>
           ))}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 12px', background: C.tealSub, border: `1px solid ${C.tealDim}`, borderRadius: 6 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 12px', background: C.tealSub, border: `1px solid ${C.tealDim}`, borderRadius: radius.pill }}>
             <span style={{ fontSize: 10, color: C.tealText }}>●</span>
             <span style={{ fontFamily: C.mono, fontSize: 10, color: C.tealText }}>Claude AI</span>
-            <span style={{ fontFamily: C.mono, fontSize: 9, color: C.text3 }}>viral detection</span>
+            <span style={{ fontFamily: C.mono, fontSize: 9, color: C.text3 }}>moment detection</span>
           </div>
         </div>
       )}
+
       <div style={{ display: 'grid', gridTemplateColumns: clips.length ? '360px 1fr' : '500px 1fr', gap: 28 }}>
         {/* Controls */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div style={{ background: C.amberSub, border: `1px solid ${C.amberDim}`, borderRadius: 10, padding: 14 }}>
-            <div style={{ fontFamily: C.mono, fontSize: 9, color: C.amberText, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 4 }}>✦ 100% Free Pipeline</div>
-            <div style={{ fontSize: 12, color: C.text3, lineHeight: 1.5 }}>yt-dlp + Whisper + FFmpeg — no API costs except Claude (your existing key)</div>
-          </div>
-          <Input label="YouTube URL" value={url} onChange={setUrl} placeholder="https://youtube.com/watch?v=..." />
+          <DropZone file={file} onPick={handlePick} onClear={() => setFile(null)} disabled={loading} />
+
           <Input label="Your Content Pillars (optional — improves matching)" value={pillars} onChange={setPillars} placeholder="Faith, Business, Productivity, Mindset..." multiline rows={2} />
-          <Input label="Your Niche" value={niche} onChange={setNiche} placeholder="Christian entrepreneurs, fitness coaches..." />
+          <Input label="Your Niche (optional)" value={niche} onChange={setNiche} placeholder="Christian entrepreneurs, fitness coaches..." />
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
               <label style={{ fontFamily: C.mono, fontSize: 10, color: C.text3, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Clips to find</label>
-              <select value={clipCount} onChange={e => setClipCount(e.target.value)} style={{ background: C.surface, border: `1px solid ${C.border2}`, borderRadius: 8, color: C.text, padding: '10px 12px', fontSize: 13, fontFamily: C.font, outline: 'none', appearance: 'none' }}>
+              <select value={clipCount} onChange={e => setClipCount(e.target.value)} style={{ background: C.surface, border: `1px solid ${C.border2}`, borderRadius: radius.sm, color: C.text, padding: '10px 12px', fontSize: 13, fontFamily: C.font, outline: 'none', appearance: 'none' }}>
                 {['3','5','7','10'].map(n => <option key={n} value={n}>{n} clips</option>)}
               </select>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
               <label style={{ fontFamily: C.mono, fontSize: 10, color: C.text3, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Caption style</label>
-              <select value={captionStyle} onChange={e => setCaptionStyle(e.target.value)} style={{ background: C.surface, border: `1px solid ${C.border2}`, borderRadius: 8, color: C.text, padding: '10px 12px', fontSize: 13, fontFamily: C.font, outline: 'none', appearance: 'none' }}>
+              <select value={captionStyle} onChange={e => setCaptionStyle(e.target.value)} style={{ background: C.surface, border: `1px solid ${C.border2}`, borderRadius: radius.sm, color: C.text, padding: '10px 12px', fontSize: 13, fontFamily: C.font, outline: 'none', appearance: 'none' }}>
                 <option value="bold">Bold White</option>
                 <option value="yellow">Yellow Bold</option>
                 <option value="minimal">Minimal</option>
               </select>
             </div>
           </div>
+
           {!loading && !clips.length && (
-            <Btn onClick={handleClip} disabled={!url.trim() || loading}>
+            <Button onClick={handleClip} disabled={!file || loading} style={{ width: '100%' }}>
               ✂ Extract Clips
-            </Btn>
+            </Button>
           )}
           {(loading || clips.length > 0) && (
-            <Btn variant="ghost" onClick={handleReset} style={{ fontSize: 12 }}>
-              ← New Video
-            </Btn>
+            <Button variant="ghost" onClick={handleReset} style={{ fontSize: 12 }}>
+              ← New Upload
+            </Button>
           )}
           {error && (
-            <div style={{ background: C.redSub, border: `1px solid ${C.red}`, borderRadius: 8, padding: 12, color: C.redText, fontSize: 12, fontFamily: C.mono }}>
+            <div style={{ background: C.redSub, border: `1px solid ${C.red}`, borderRadius: radius.sm, padding: 12, color: C.redText, fontSize: 12, fontFamily: C.mono }}>
               {error}
             </div>
           )}
+
           {/* How it works */}
           {!loading && !clips.length && (
-            <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: 14 }}>
+            <Card style={{ padding: 14 }}>
               <div style={{ fontFamily: C.mono, fontSize: 9, color: C.text3, textTransform: 'uppercase', marginBottom: 10 }}>Pipeline</div>
               {[
-                ['⬇', 'Download video (yt-dlp)'],
+                ['⬆', 'Upload your long-form video'],
                 ['🎙', 'Transcribe audio (Whisper)'],
                 ['🧠', 'Claude finds best moments'],
                 ['✂', 'FFmpeg cuts + crops clips'],
                 ['💬', 'Captions burned in'],
-                ['✓', 'Ready to download or schedule'],
+                ['✓', 'Download or schedule each clip'],
               ].map(([icon, text]) => (
                 <div key={text} style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 8 }}>
                   <span style={{ fontSize: 14, width: 20 }}>{icon}</span>
                   <span style={{ fontSize: 12, color: C.text3 }}>{text}</span>
                 </div>
               ))}
-            </div>
+            </Card>
           )}
         </div>
+
         {/* Output */}
         <div>
           {/* Processing state */}
-          {loading && status && (
-            <div style={{ background: C.surface, border: `1px solid ${C.border2}`, borderRadius: 14, padding: 28 }}>
+          {loading && displayStatus && (
+            <Card style={{ padding: 28 }}>
               <div style={{ marginBottom: 20 }}>
-                <ProgressBar stage={status.stage} progress={status.progress} />
+                <ProgressBar stage={displayStatus.stage} progress={displayStatus.progress} />
               </div>
               <div style={{ display: 'flex', justifyContent: 'center', gap: 16, alignItems: 'center' }}>
                 <Spinner />
                 <div>
                   <div style={{ fontSize: 14, fontWeight: 600, color: C.text, marginBottom: 4 }}>
-                    {status.stage === 'downloading' && 'Downloading video...'}
-                    {status.stage === 'transcribing' && 'Transcribing with Whisper...'}
-                    {status.stage === 'analyzing' && 'Claude is finding your best clips...'}
-                    {status.stage === 'cutting' && 'Cutting & captioning clips...'}
+                    {displayStatus.stage === 'uploading' && 'Uploading your video...'}
+                    {displayStatus.stage === 'transcribing' && 'Transcribing with Whisper...'}
+                    {displayStatus.stage === 'analyzing' && 'Claude is finding your best clips...'}
+                    {displayStatus.stage === 'cutting' && 'Cutting & captioning clips...'}
                   </div>
                   <div style={{ fontSize: 12, color: C.text3, fontFamily: C.mono }}>
-                    {status.stage === 'transcribing' && 'Free local transcription — no API cost'}
-                    {status.stage === 'analyzing' && `Transcript ready — ${status.transcript_length || 0} characters`}
-                    {status.stage === 'cutting' && 'Burning in captions...'}
+                    {displayStatus.stage === 'uploading' && `${uploadPct}% uploaded — keep this tab open`}
+                    {displayStatus.stage === 'transcribing' && 'Free local transcription — no API cost'}
+                    {displayStatus.stage === 'analyzing' && `Transcript ready — ${displayStatus.transcript_length || 0} characters`}
+                    {displayStatus.stage === 'cutting' && 'Burning in captions...'}
                   </div>
                 </div>
               </div>
-            </div>
+            </Card>
           )}
+
           {/* Clips grid */}
           {clips.length > 0 && !loading && (
             <div style={{ animation: 'fadeUp .3s ease' }}>
+              <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
+                <StatCard value={clips.length} label="Clips Extracted" style={{ flex: '1 1 140px' }} />
+                <StatCard value={Math.round(clips.reduce((s, c) => s + c.virality_score, 0) / clips.length) || 0} label="Avg Virality" style={{ flex: '1 1 140px' }} />
+                <StatCard value={clips.reduce((s, c) => s + Math.round(parseFloat(c.duration) || 0), 0) + 's'} label="Total Runtime" style={{ flex: '1 1 140px' }} />
+              </div>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-                <div>
-                  <div style={{ fontSize: 16, fontWeight: 700, color: C.text }}>
-                    {clips.length} clips extracted ✦
-                  </div>
-                  <div style={{ fontSize: 12, color: C.text3, fontFamily: C.mono, marginTop: 2 }}>
-                    Sorted by virality score — click ▶ to preview
-                  </div>
+                <div style={{ fontSize: 12, color: C.text3, fontFamily: C.mono }}>
+                  Sorted by virality score — click ▶ to preview
                 </div>
                 <div style={{ display: 'flex', gap: 8 }}>
-                  <Tag color="amber">{clipCount} clips</Tag>
-                  <Tag color="teal">Free pipeline</Tag>
+                  <Tag color="teal">Upload pipeline</Tag>
                 </div>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16 }}>
@@ -374,13 +456,14 @@ export default function SmartClipper() {
               </div>
             </div>
           )}
+
           {/* Empty state */}
           {!loading && !clips.length && !error && (
-            <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, minHeight: 400, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
+            <Card style={{ minHeight: 400, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
               <span style={{ fontSize: 48 }}>✂</span>
-              <div style={{ fontSize: 14, color: C.text4 }}>Paste a YouTube URL to extract clips</div>
-              <div style={{ fontSize: 11, color: C.text4, fontFamily: C.mono }}>Supports YouTube, and any platform yt-dlp supports</div>
-            </div>
+              <div style={{ fontSize: 14, color: C.text4 }}>Upload a video to extract clips</div>
+              <div style={{ fontSize: 11, color: C.text4, fontFamily: C.mono }}>Your file is analyzed for highlight moments — no link needed</div>
+            </Card>
           )}
         </div>
       </div>

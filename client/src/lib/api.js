@@ -195,3 +195,72 @@ export const scheduler = {
       fetch(`${BASE}/scheduler/repurpose-rules/${id}`, { method: 'DELETE', headers: headers() }).then(handle),
   },
 };
+
+// ─── CHANNEL DOWNLOADER ───────────────────────────────────────────────────────
+// Bulk batch downloader with a persisted job queue (server/routes/channelDownloader.js).
+export const channelDownloader = {
+  start: (opts) => fetch(`${BASE}/channel-downloader/start`, { method: 'POST', headers: headers(), body: JSON.stringify(opts) }).then(handle),
+  status: (jobId) => fetch(`${BASE}/channel-downloader/status/${jobId}`, { headers: headers() }).then(handle),
+  cancel: (jobId) => fetch(`${BASE}/channel-downloader/cancel/${jobId}`, { method: 'POST', headers: headers() }).then(handle),
+  jobs: () => fetch(`${BASE}/channel-downloader/jobs`, { headers: headers() }).then(handle),
+  files: (jobId) => fetch(`${BASE}/channel-downloader/files/${jobId}`, { headers: headers() }).then(handle),
+  analysis: (jobId) => fetch(`${BASE}/channel-downloader/analysis/${jobId}`, { headers: headers() }).then(handle),
+  analyze: (jobId) => fetch(`${BASE}/channel-downloader/analyze/${jobId}`, { method: 'POST', headers: headers() }).then(handle),
+  cleanup: (jobId) => fetch(`${BASE}/channel-downloader/cleanup/${jobId}`, { method: 'POST', headers: headers() }).then(handle),
+  remove: (jobId) => fetch(`${BASE}/channel-downloader/job/${jobId}`, { method: 'DELETE', headers: headers() }).then(handle),
+  storageStats: () => fetch(`${BASE}/channel-downloader/storage-stats`, { headers: headers() }).then(handle),
+  // Direct link for pulling a completed file to the user's machine (server streams it as an attachment).
+  fileUrl: (jobId, filename) => `${BASE}/channel-downloader/download/${jobId}/${encodeURIComponent(filename)}`,
+};
+
+// ─── VIDEO DOWNLOADER ─────────────────────────────────────────────────────────
+// Single-video by-URL downloader (server/routes/videoDownloader.js).
+export const videoDownloader = {
+  info: (url) => fetch(`${BASE}/video-downloader/info`, { method: 'POST', headers: headers(), body: JSON.stringify({ url }) }).then(handle),
+  // /download streams the media file back — return the raw Response so callers can blob() it.
+  download: async ({ url, quality = 'best', audioOnly = false }) => {
+    const res = await fetch(`${BASE}/video-downloader/download`, { method: 'POST', headers: headers(), body: JSON.stringify({ url, quality, audioOnly }) });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+      throw Object.assign(new Error(err.error || `HTTP ${res.status}`), err, { status: res.status });
+    }
+    return res; // caller does res.blob() + Content-Disposition parsing
+  },
+};
+
+// ─── SMART CLIPPER ────────────────────────────────────────────────────────────
+// Upload-only: user uploads a long-form video file they already have; the server
+// detects highlight moments and cuts individual clips (server/routes/clipper.js).
+// No URL input exists in this module.
+export const smartClipper = {
+  health: () => fetch(`${BASE}/smart-clipper/health`, { headers: headers() }).then(handle),
+  // Multipart upload — do NOT set Content-Type; the browser adds the multipart boundary.
+  // onProgress(0..100) is optional and driven via XHR so the upload bar can move.
+  uploadAndClip: ({ file, contentPillars = '', niche = '', clipCount = 5, maxDuration = 60, captionStyle = 'bold', onProgress }) =>
+    new Promise((resolve, reject) => {
+      const form = new FormData();
+      form.append('video', file);
+      form.append('contentPillars', contentPillars);
+      form.append('niche', niche);
+      form.append('clipCount', String(clipCount));
+      form.append('maxDuration', String(maxDuration));
+      form.append('captionStyle', captionStyle);
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', `${BASE}/smart-clipper/clip-upload`);
+      const token = getToken();
+      if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+      if (onProgress) xhr.upload.onprogress = (e) => { if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100)); };
+      xhr.onload = () => {
+        let data = {};
+        try { data = JSON.parse(xhr.responseText); } catch {}
+        if (xhr.status >= 200 && xhr.status < 300) resolve(data);
+        else reject(Object.assign(new Error(data.error || `HTTP ${xhr.status}`), data, { status: xhr.status }));
+      };
+      xhr.onerror = () => reject(new Error('Upload failed — network error'));
+      xhr.send(form);
+    }),
+  status: (jobId) => fetch(`${BASE}/smart-clipper/status/${jobId}`, { headers: headers() }).then(handle),
+  remove: (jobId) => fetch(`${BASE}/smart-clipper/job/${jobId}`, { method: 'DELETE', headers: headers() }).then(handle),
+  previewUrl: (jobId, filename) => `${BASE}/smart-clipper/preview/${jobId}/${encodeURIComponent(filename)}`,
+  downloadUrl: (jobId, filename) => `${BASE}/smart-clipper/download/${jobId}/${encodeURIComponent(filename)}`,
+};

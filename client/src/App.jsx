@@ -4,6 +4,7 @@ import * as api from './lib/api.js';
 import { PricingPage, BillingManagement, UpgradePrompt, SuccessScreen } from './pages/Billing.jsx';
 import { useContentStore } from './lib/store/useContentStore.ts';
 import { MODULES } from './modules.js';
+import { Button, Card, StatCard, SectionLabel, PillNav } from './components/ui';
 
 // ─── AUTH CONTEXT ─────────────────────────────────────────────────────────────
 const AuthCtx = createContext(null);
@@ -441,6 +442,55 @@ const STYLES = `
   .cc-dashboard .cc-stat-card { background: var(--cc-surface); border: 1px solid var(--cc-border); border-radius: var(--cc-radius-sm); padding: 12px 14px; text-align: center; }
   .cc-dashboard .cc-deal-row { background: var(--cc-surface); border: 1px solid var(--cc-border); border-radius: var(--cc-radius-sm); padding: 11px 14px; }
   .cc-dashboard .empty { color: var(--cc-text3); }
+
+  /* ── Floating shell (redesigned app frame) ── */
+  .shell { display: flex; gap: 14px; height: 100vh; padding: 14px; overflow: hidden; background: radial-gradient(1200px 600px at 78% -10%, rgba(212,149,58,0.07), transparent 60%), var(--bg); }
+  .main-float { flex: 1; display: flex; flex-direction: column; min-width: 0; overflow: hidden; }
+  .content-scroll { flex: 1; overflow-y: auto; border-radius: 24px; }
+
+  /* Reusable glass surface for downstream screens/components */
+  .glass { background: linear-gradient(180deg, rgba(36,30,22,0.55), rgba(26,22,16,0.45)); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(212,149,58,0.12); border-radius: 22px; box-shadow: 0 10px 40px rgba(0,0,0,0.35); }
+
+  /* Pill button helper (rounded-full) */
+  .btn-pill { border-radius: 999px !important; padding: 9px 18px; }
+
+  /* ── Floating rail: logo + user chip ── */
+  .rail-logo { display: flex; align-items: center; gap: 10px; padding: 6px 8px 4px; }
+  .rail-logo-mark { width: 34px; height: 34px; border-radius: 12px; background: linear-gradient(135deg,#D4953A,#F0A800); color: #0C0A07; font-family: var(--font-d); font-weight: 800; font-size: 16px; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 18px rgba(212,149,58,0.3); flex-shrink: 0; }
+  .rail-logo-title { font-family: var(--font-d); font-size: 12.5px; font-weight: 800; line-height: 1.25; letter-spacing: -0.01em; color: var(--text); }
+  .rail-user { display: flex; align-items: center; gap: 9px; padding: 10px 6px 4px; margin-top: 10px; border-top: 1px solid var(--border); }
+
+  /* ── Floating topbar (pill) ── */
+  .topbar-float { display: flex; align-items: center; gap: 14px; background: linear-gradient(180deg, rgba(36,30,22,0.6), rgba(26,22,16,0.5)); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid var(--border2); border-radius: 999px; padding: 9px 12px 9px 24px; margin-bottom: 14px; flex-shrink: 0; box-shadow: 0 12px 40px rgba(0,0,0,0.4); }
+
+  /* ── Dashboard hero + bento ── */
+  .dash { padding: 8px 24px 34px; }
+  .hero { display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 36px; align-items: center; margin: 12px 0 40px; }
+  .hero-title { font-family: var(--font-d); font-size: 46px; font-weight: 800; line-height: 1.04; letter-spacing: -0.035em; color: var(--text); margin: 16px 0 14px; }
+  .hero-sub { font-size: 14.5px; color: var(--text2); line-height: 1.65; max-width: 460px; margin-bottom: 24px; }
+  .hero-actions { display: flex; gap: 12px; flex-wrap: wrap; }
+  .hero-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .hero-stats > :nth-child(even) { transform: translateY(26px); }
+
+  .bento { display: grid; grid-template-columns: repeat(12, 1fr); gap: 14px; align-items: start; }
+  .b-4 { grid-column: span 4; }
+  .b-5 { grid-column: span 5; }
+  .b-7 { grid-column: span 7; }
+  .b-8 { grid-column: span 8; }
+  .b-12 { grid-column: span 12; }
+
+  .dash-sec-hdr { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+  .dash-h { font-family: var(--font-d); font-size: 18px; font-weight: 700; letter-spacing: -0.02em; color: var(--text); margin-top: 9px; }
+
+  /* Dark base for brand-deal cards (previously only styled under .cc-dashboard) */
+  .cc-stat-card { background: rgba(36,30,22,0.5); border: 1px solid var(--border2); border-radius: 14px; padding: 12px 14px; text-align: center; }
+  .cc-deal-row { background: rgba(36,30,22,0.5); border: 1px solid var(--border2); border-radius: 14px; padding: 11px 14px; }
+
+  @media (max-width: 1200px) {
+    .hero { grid-template-columns: 1fr; }
+    .hero-title { font-size: 38px; }
+    .bento > * { grid-column: span 12 !important; }
+  }
 `;
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
 const fmt = (n) => { if (n >= 1e6) return (n/1e6).toFixed(1)+'M'; if (n >= 1e3) return (n/1e3).toFixed(1)+'K'; return String(n||0); };
@@ -586,7 +636,7 @@ function BrandSelector({ brands, activeBrand, onSelect }) {
   }, []);
   if (!activeBrand) return null;
   return (
-    <div style={{ position:'relative', margin:'12px 14px' }} ref={ref}>
+    <div style={{ position:'relative', margin:'10px 2px 4px' }} ref={ref}>
       <div className="brand-sel" onClick={() => setOpen(!open)}>
         <div className="b-dot" style={{ background: activeBrand.color }} />
         <div className="brand-sel-name">{activeBrand.name}</div>
@@ -721,7 +771,7 @@ function PipelineBoard({ onCardClick }) {
 }
 
 // ─── COMMAND CENTER ───────────────────────────────────────────────────────────
-function CommandCenter({ activeBrand, setPage }) {
+function CommandCenter({ activeBrand, setPage, user, onQuickAdd }) {
   const [assets, setAssets] = useState([]);
   const [analytics, setAnalytics] = useState(null);
   const [platformStats, setPlatformStats] = useState([]);
@@ -744,38 +794,79 @@ function CommandCenter({ activeBrand, setPage }) {
   if (loading) return <div className="page"><div className="loading"><I n="refresh" s={16} c="spin" /> Loading dashboard...</div></div>;
 
   const tot = analytics?.totals || {};
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+  const firstName = (user?.name || 'Operator').split(' ')[0];
+  const brandName = activeBrand?.name || 'your brand';
+  const kpis = [
+    { label:'Total Views', value: fmt(tot.total_views||0), delta:'+23% this week' },
+    { label:'New Followers', value: fmt(tot.total_followers||0), delta:'+8.4% growth' },
+    { label:'Leads Generated', value: fmt(tot.total_leads||0), delta:'30 days' },
+    { label:'Est. Revenue', value: money(tot.total_revenue||0), delta:'This month' },
+  ];
 
   return (
-    <div className="cc-dashboard">
-      {/* KPI Row */}
-      <div className="kpi-grid">
-        {[
-          { label:'Total Views', val: fmt(tot.total_views||0), delta:'+23% this week', up:true, icon:'eye', glow:'#6C47FF' },
-          { label:'New Followers', val: fmt(tot.total_followers||0), delta:'+8.4% growth', up:true, icon:'users', glow:'#22d3ee' },
-          { label:'Leads Generated', val: fmt(tot.total_leads||0), delta:'Last 30 days', up:true, icon:'target', glow:'#22c55e' },
-          { label:'Est. Revenue', val: money(tot.total_revenue||0), delta:'This month', up:true, icon:'money', glow:'#f59e0b' },
-        ].map(k => (
-          <div className="kpi-card" key={k.label}>
-            <div className="kpi-glow" style={{ background: k.glow }} />
-            <div className="kpi-icon"><I n={k.icon} s={26} /></div>
-            <div className="kpi-delta" style={{ color: k.up ? 'var(--green)' : 'var(--red)' }}>{k.up?'↑':'↓'} {k.delta}</div>
-            <div className="kpi-val">{k.val}</div>
-            <div className="kpi-label">{k.label}</div>
+    <div className="dash">
+      {/* ── Hero ── */}
+      <section className="hero">
+        <div className="hero-left">
+          <SectionLabel>Mission Control</SectionLabel>
+          <h1 className="hero-title">{greeting}, {firstName}.<br />Let's grow {brandName}.</h1>
+          <p className="hero-sub">Your entire content engine in one view — pipeline, platforms, deals, and revenue. Pick the next move and ship it.</p>
+          <div className="hero-actions">
+            <Button variant="primary" size="lg" onClick={onQuickAdd}><I n="plus" s={15} /> New Content</Button>
+            <Button variant="secondary" size="lg" onClick={() => setPage('scheduler')}><I n="calendar" s={15} /> Open Scheduler</Button>
           </div>
-        ))}
-      </div>
+        </div>
+        <div className="hero-stats">
+          {kpis.map(k => <StatCard key={k.label} value={k.value} label={k.label} delta={k.delta} />)}
+        </div>
+      </section>
 
-      {/* Pipeline */}
-      <div className="sec-hdr">
-        <div className="sec-title cc-dot-accent"><I n="production" s={14} /> Production Pipeline</div>
-        <button className="btn btn-ghost btn-sm" onClick={() => setPage('production')}><I n="arrow" s={12} /> View All</button>
-      </div>
-      <PipelineBoard />
+      {/* ── Bento ── */}
+      <div className="bento">
+        {/* Production Pipeline (large) */}
+        <Card className="b-8">
+          <div className="dash-sec-hdr">
+            <div>
+              <SectionLabel>Pipeline</SectionLabel>
+              <h3 className="dash-h">Production Pipeline</h3>
+            </div>
+            <Button variant="ghost" size="sm" onClick={() => setPage('studio')}>Content Studio</Button>
+          </div>
+          <PipelineBoard />
+        </Card>
 
-      <div className="grid-2">
-        {/* Platform Tracker */}
-        <div className="panel">
-          <div className="sec-hdr"><div className="sec-title cc-dot-green"><I n="distribution" s={14} /> Platform Tracker</div></div>
+        {/* Top Performers (small) */}
+        <Card className="b-4">
+          <div className="dash-sec-hdr">
+            <div>
+              <SectionLabel>Ranking</SectionLabel>
+              <h3 className="dash-h">Top Performers</h3>
+            </div>
+            <span style={{ fontSize:10.5, color:'var(--text3)', marginTop:9 }}>By score</span>
+          </div>
+          {(analytics?.top_performers||[]).slice(0,5).map((p,i) => (
+            <div className="performer-row" key={p.id}>
+              <div className="performer-rank">#{i+1}</div>
+              <div className="performer-info">
+                <div className="performer-title">{p.title}</div>
+                <div className="performer-meta">{p.platform} · {p.format} · {fmt(p.views)} views</div>
+              </div>
+              <div className="performer-score">{p.score}</div>
+            </div>
+          ))}
+          {!analytics?.top_performers?.length && <div className="empty">Log performance data to see top performers.</div>}
+        </Card>
+
+        {/* Platform Tracker (medium) */}
+        <Card className="b-5">
+          <div className="dash-sec-hdr">
+            <div>
+              <SectionLabel>Distribution</SectionLabel>
+              <h3 className="dash-h">Platform Tracker</h3>
+            </div>
+          </div>
           {platformStats.map(p => {
             const prog = Math.round((p.published_this_week / Math.max(p.target_per_week,1)) * 100);
             const growth = p.followers_start > 0 ? ((p.followers_current - p.followers_start) / p.followers_start * 100).toFixed(1) : '0.0';
@@ -794,47 +885,41 @@ function CommandCenter({ activeBrand, setPage }) {
             );
           })}
           {platformStats.length===0 && <div className="empty">No platforms configured yet.</div>}
-        </div>
+        </Card>
 
-        {/* Top Performers */}
-        <div className="panel">
-          <div className="sec-hdr"><div className="sec-title cc-dot-accent2"><I n="trending" s={14} /> Top Performers</div><span style={{ fontSize:10.5, color:'var(--text3)' }}>By score</span></div>
-          {(analytics?.top_performers||[]).slice(0,5).map((p,i) => (
-            <div className="performer-row" key={p.id}>
-              <div className="performer-rank">#{i+1}</div>
-              <div className="performer-info">
-                <div className="performer-title">{p.title}</div>
-                <div className="performer-meta">{p.platform} · {p.format} · {fmt(p.views)} views</div>
-              </div>
-              <div className="performer-score">{p.score}</div>
-            </div>
-          ))}
-          {!analytics?.top_performers?.length && <div className="empty">Log performance data to see top performers.</div>}
-        </div>
+        {/* Brand Deals (large) */}
+        <Card className="b-7">
+          <BrandDealsSection activeBrand={activeBrand} />
+        </Card>
       </div>
 
       {/* Active Campaigns */}
-      <BrandDealsSection activeBrand={activeBrand} />
-
-      {campaigns.length > 0 && <>
-        <div className="sec-hdr"><div className="sec-title cc-dot-green"><I n="target" s={14} /> Active Campaigns</div></div>
-        {campaigns.map(c => {
-          const prog = Math.round((c.pieces_planned > 0 ? 60 : 0));
-          return (
-            <div className="campaign-row" key={c.id}>
-              <div className="campaign-info">
-                <div className="campaign-name">{c.name}</div>
-                <div className="campaign-dates">{c.type} · {c.start_date} → {c.end_date}</div>
-              </div>
-              <div className="cprog">
-                <div className="cprog-lbl"><span>{c.pieces_planned} pieces</span><span>{prog}%</span></div>
-                <div className="cbar"><div className="cbar-fill" style={{ width:`${prog}%` }} /></div>
-              </div>
-              <div className="camp-rev">{money(c.revenue_goal)}</div>
+      {campaigns.length > 0 && (
+        <Card style={{ marginTop:14 }}>
+          <div className="dash-sec-hdr">
+            <div>
+              <SectionLabel>Campaigns</SectionLabel>
+              <h3 className="dash-h">Active Campaigns</h3>
             </div>
-          );
-        })}
-      </>}
+          </div>
+          {campaigns.map(c => {
+            const prog = Math.round((c.pieces_planned > 0 ? 60 : 0));
+            return (
+              <div className="campaign-row" key={c.id}>
+                <div className="campaign-info">
+                  <div className="campaign-name">{c.name}</div>
+                  <div className="campaign-dates">{c.type} · {c.start_date} → {c.end_date}</div>
+                </div>
+                <div className="cprog">
+                  <div className="cprog-lbl"><span>{c.pieces_planned} pieces</span><span>{prog}%</span></div>
+                  <div className="cbar"><div className="cbar-fill" style={{ width:`${prog}%` }} /></div>
+                </div>
+                <div className="camp-rev">{money(c.revenue_goal)}</div>
+              </div>
+            );
+          })}
+        </Card>
+      )}
     </div>
   );
 }
@@ -876,10 +961,13 @@ function BrandDealsSection({ activeBrand }) {
   };
 
   return (
-    <div style={{ marginBottom:28 }}>
-      <div className="sec-hdr" style={{ marginTop:8 }}>
-        <div className="sec-title cc-dot-accent2">🤝 Brand Deals</div>
-        <button className="btn btn-primary btn-sm" onClick={() => setShowAdd(true)}><I n="plus" s={12} /> Add Deal</button>
+    <div>
+      <div className="dash-sec-hdr">
+        <div>
+          <SectionLabel>Partnerships</SectionLabel>
+          <h3 className="dash-h">Brand Deals</h3>
+        </div>
+        <Button variant="primary" size="sm" onClick={() => setShowAdd(true)}><I n="plus" s={12} /> Add Deal</Button>
       </div>
 
       {/* Stats row */}
@@ -2743,7 +2831,7 @@ export default function App() {
   const renderPage = () => {
     const props = { activeBrand, setPage };
     switch(page) {
-      case 'dashboard': return <CommandCenter {...props} />;
+      case 'dashboard': return <CommandCenter {...props} user={user} onQuickAdd={() => setQuickAdd(true)} />;
       case 'scheduler': return <SchedulerRoom {...props} user={user} />;
       case 'studio': return <ContentStudioRoom activeBrand={activeBrand} />;
       default: {
@@ -2804,103 +2892,106 @@ export default function App() {
     }
   };
 
+  const pageTitle = PAGE_TITLES[page] || NAV.find(n => n.id === page)?.label || 'Command Center';
+
+  const railHeader = (
+    <>
+      <div className="rail-logo">
+        <div className="rail-logo-mark">C</div>
+        <div className="rail-logo-title">Content<br /><span className="s-logo-accent">Command Center</span></div>
+      </div>
+      {activeBrand && (
+        <BrandSelector brands={brands} activeBrand={activeBrand} onSelect={setActiveBrand} />
+      )}
+    </>
+  );
+
+  const railFooter = (
+    <>
+      {/* Subscription status + usage */}
+      {subscription?.active && (
+        <div style={{ margin: '10px 4px 8px' }}>
+          <div style={{ display:'flex', justifyContent:'space-between', fontSize:10.5, color:'var(--text3)', marginBottom:4 }}>
+            <span>Videos This Month</span>
+            <span style={{ color: (subscription.usage?.videos_percent||0) >= 80 ? 'var(--amber)' : 'var(--text3)' }}>
+              {subscription.usage?.videos_used||0}/{subscription.usage?.videos_limit||0}
+            </span>
+          </div>
+          <div style={{ height:3, background:'var(--surface2)', borderRadius:2, overflow:'hidden' }}>
+            <div style={{
+              height:'100%', borderRadius:2,
+              width:`${Math.min(subscription.usage?.videos_percent||0,100)}%`,
+              background: (subscription.usage?.videos_percent||0) >= 90 ? 'var(--red)' : (subscription.usage?.videos_percent||0) >= 70 ? 'var(--amber)' : 'var(--accent)',
+              transition:'width .4s'
+            }} />
+          </div>
+          {(subscription.usage?.videos_percent||0) >= 80 && (
+            <button style={{ fontSize:10.5, color:'var(--accent2)', background:'none', border:'none', cursor:'pointer', padding:'3px 0', fontFamily:'var(--font-b)' }}
+              onClick={() => setPage('pricing')}>
+              Upgrade for more →
+            </button>
+          )}
+        </div>
+      )}
+      {!subscription?.active && !subscription?.is_admin && user?.is_admin !== 1 && (
+        <Button variant="secondary" style={{ width:'100%', marginBottom:8 }} onClick={() => setPage('billing')}>
+          <I n="zap" s={13} /> Activate Plan
+        </Button>
+      )}
+      <Button variant="primary" style={{ width:'100%', marginBottom:8 }} onClick={() => setQuickAdd(true)}>
+        <I n="zap" s={14} /> Quick Add
+      </Button>
+      <div className="rail-user">
+        <div className="s-avatar">
+          {user?.avatar
+            ? <img src={user.avatar} alt={user.name} referrerPolicy="no-referrer" />
+            : (user?.name || 'U').split(' ').slice(0,2).map(n => n[0]).join('').toUpperCase()
+          }
+        </div>
+        <div className="s-user-info">
+          <div className="s-user-name">{user?.name || 'Loading…'}</div>
+          <div className="s-user-email">{user?.email || ''}</div>
+        </div>
+      </div>
+      <Button variant="ghost" style={{ width:'100%', marginTop:8 }} onClick={logout}>
+        <I n="logout" s={13} /> Sign Out
+      </Button>
+    </>
+  );
+
   return (
     <>
       <style>{STYLES}</style>
-      <div className="app">
-        {/* Sidebar */}
-        <div className="sidebar">
-          {/* ── User identity block ── */}
-          <div className="s-user">
-            <div className="s-avatar">
-              {user?.avatar
-                ? <img src={user.avatar} alt={user.name} referrerPolicy="no-referrer" />
-                : (user?.name || 'U').split(' ').slice(0,2).map(n => n[0]).join('').toUpperCase()
-              }
-            </div>
-            <div className="s-user-info">
-              <div className="s-user-name">{user?.name || 'Loading…'}</div>
-              <div className="s-user-email">{user?.email || ''}</div>
-            </div>
-          </div>
-
-          <div className="s-logo" style={{ borderBottom: 'none', paddingTop: 14, paddingBottom: 10 }}>
-            <div className="s-logo-title">Content<br /><span className="s-logo-accent">Command Center</span></div>
-          </div>
-
-          {activeBrand && (
-            <BrandSelector brands={brands} activeBrand={activeBrand} onSelect={setActiveBrand} />
-          )}
-
-          <nav className="s-nav">
-            <div className="s-section">Modules</div>
-            {NAV.map(item => (
-              <div key={item.id} className={`s-item ${page===item.id?'active':''}`} onClick={() => setPage(item.id)}>
-                <I n={item.icon} s={14} />
-                {item.label}
-                {item.badge && <span style={{ marginLeft:'auto', fontSize:9, fontWeight:700, background:'var(--accent)', color:'#fff', padding:'1px 5px', borderRadius:3, letterSpacing:'.05em' }}>{item.badge}</span>}
-              </div>
-            ))}
-          </nav>
-
-          <div className="s-footer">
-            {/* Subscription status + usage */}
-            {subscription?.active && (
-              <div style={{ marginBottom: 8 }}>
-                <div style={{ display:'flex', justifyContent:'space-between', fontSize:10.5, color:'var(--text3)', marginBottom:4 }}>
-                  <span>Videos This Month</span>
-                  <span style={{ color: (subscription.usage?.videos_percent||0) >= 80 ? 'var(--amber)' : 'var(--text3)' }}>
-                    {subscription.usage?.videos_used||0}/{subscription.usage?.videos_limit||0}
-                  </span>
-                </div>
-                <div style={{ height:3, background:'var(--surface2)', borderRadius:2, overflow:'hidden' }}>
-                  <div style={{
-                    height:'100%', borderRadius:2,
-                    width:`${Math.min(subscription.usage?.videos_percent||0,100)}%`,
-                    background: (subscription.usage?.videos_percent||0) >= 90 ? 'var(--red)' : (subscription.usage?.videos_percent||0) >= 70 ? 'var(--amber)' : 'var(--accent)',
-                    transition:'width .4s'
-                  }} />
-                </div>
-                {(subscription.usage?.videos_percent||0) >= 80 && (
-                  <button style={{ fontSize:10.5, color:'var(--accent2)', background:'none', border:'none', cursor:'pointer', padding:'3px 0', fontFamily:'var(--font-b)' }}
-                    onClick={() => setPage('pricing')}>
-                    Upgrade for more →
-                  </button>
-                )}
-              </div>
-            )}
-            {!subscription?.active && !subscription?.is_admin && user?.is_admin !== 1 && (
-              <button className="btn btn-ghost" style={{ width:'100%', justifyContent:'center', fontSize:11.5, marginBottom:4, borderColor:'rgba(108,71,255,.35)', color:'var(--accent2)' }}
-                onClick={() => setPage('billing')}>
-                ⚡ Activate Plan
-              </button>
-            )}
-            <button className="btn btn-primary" style={{ width:'100%', justifyContent:'center' }} onClick={() => setQuickAdd(true)}>
-              <I n="zap" s={13} /> Quick Add
-            </button>
-            <button className="btn btn-ghost" style={{ width:'100%', justifyContent:'center', fontSize:12 }} onClick={logout}>
-              <I n="logout" s={13} /> Sign Out
-            </button>
-          </div>
-        </div>
+      <div className="shell">
+        {/* Floating pill navigation rail */}
+        <PillNav
+          items={NAV}
+          activeId={page}
+          onSelect={setPage}
+          renderIcon={(item) => <I n={item.icon} s={15} />}
+          header={railHeader}
+          footer={railFooter}
+        />
 
         {/* Main Content */}
-        <div className="main">
-          <div className="topbar">
+        <div className="main-float">
+          <div className="topbar-float">
             <div className="topbar-title">
-              {PAGE_TITLES[page]}
+              {pageTitle}
               {activeBrand && <span className="topbar-sub">— {activeBrand.name}</span>}
             </div>
             <div className="topbar-acts">
-              <button className="btn btn-ghost" style={{ fontSize:12 }} onClick={() => setPage('data')}>
+              <Button variant="ghost" size="sm" onClick={() => setPage('data')}>
                 <I n="review" s={13} /> Weekly Review
-              </button>
-              <button className="btn btn-primary" onClick={() => setQuickAdd(true)}>
+              </Button>
+              <Button variant="primary" size="sm" onClick={() => setQuickAdd(true)}>
                 <I n="plus" s={13} /> New Content
-              </button>
+              </Button>
             </div>
           </div>
-          {renderPage()}
+          <div className="content-scroll">
+            {renderPage()}
+          </div>
         </div>
 
         {/* Quick Add */}
