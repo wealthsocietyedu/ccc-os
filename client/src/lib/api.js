@@ -202,6 +202,9 @@ export const channelDownloader = {
   start: (opts) => fetch(`${BASE}/channel-downloader/start`, { method: 'POST', headers: headers(), body: JSON.stringify(opts) }).then(handle),
   status: (jobId) => fetch(`${BASE}/channel-downloader/status/${jobId}`, { headers: headers() }).then(handle),
   cancel: (jobId) => fetch(`${BASE}/channel-downloader/cancel/${jobId}`, { method: 'POST', headers: headers() }).then(handle),
+  // Resume a failed/cancelled/incomplete job — the server re-runs it against the
+  // same download archive, so only videos that never finished get re-fetched.
+  resume: (jobId) => fetch(`${BASE}/channel-downloader/resume/${jobId}`, { method: 'POST', headers: headers() }).then(handle),
   jobs: () => fetch(`${BASE}/channel-downloader/jobs`, { headers: headers() }).then(handle),
   files: (jobId) => fetch(`${BASE}/channel-downloader/files/${jobId}`, { headers: headers() }).then(handle),
   analysis: (jobId) => fetch(`${BASE}/channel-downloader/analysis/${jobId}`, { headers: headers() }).then(handle),

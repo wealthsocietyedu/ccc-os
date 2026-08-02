@@ -118,21 +118,26 @@ function normalizeChannelUrl(url, platform) {
 
 // ─── Utility: build yt-dlp args per platform ─────────────────────────────────
 function buildYtdlpArgs(url, jobId, platform, options) {
-  const { maxVideos = 25, quality = '1080', audioOnly = false, dateAfter = '', startIndex = 1 } = options;
+  const { maxVideos = 25, quality = '1080', audioOnly = false, dateAfter = '', startIndex = 1, allVideos = false } = options;
   const outputDir = path.join(DOWNLOADS_BASE, jobId);
   const outputTemplate = path.join(outputDir, '%(uploader)s_%(id)s.%(ext)s');
-  const endIndex = startIndex + maxVideos - 1;
 
   const baseArgs = [
     normalizeChannelUrl(url, platform),
     '--output', outputTemplate,
-    '--playlist-items', `${startIndex}-${endIndex}`,
     '--write-thumbnail',
     '--write-info-json',
     '--newline',
     '--no-warnings',
     '--ignore-errors',
     '--no-playlist-reverse',
+    // Resumability, the core of tokbackup-style whole-channel archiving. This file
+    // records every video that finished downloading; re-running the same job
+    // (POST /resume) re-reads it and skips completed videos, so a 200-video job
+    // that died at 140 continues from 141 instead of restarting from zero. It
+    // lives inside the job's own output dir — which Resume reuses — so the record
+    // survives across runs and across container restarts (persistent volume).
+    '--download-archive', path.join(outputDir, 'archive.txt'),
     // Bulk channel archiving means many sequential downloads in one run —
     // throttle to reduce the odds of the whole job getting IP-blocked partway
     // through (this is the main real-world failure mode for large channels).
@@ -141,6 +146,17 @@ function buildYtdlpArgs(url, jobId, platform, options) {
     '--max-sleep-interval', '8',
     ...cookieArgs(),
   ];
+
+  // Video range. "All videos" pulls the creator's entire public history
+  // (tokbackup parity) by omitting the upper bound so yt-dlp paginates the whole
+  // channel; a bounded job slices to a fixed count. startIndex lets either mode
+  // start deeper into a large channel.
+  if (allVideos) {
+    if (startIndex > 1) baseArgs.push('--playlist-items', `${startIndex}:`);
+  } else {
+    const endIndex = startIndex + maxVideos - 1;
+    baseArgs.push('--playlist-items', `${startIndex}-${endIndex}`);
+  }
 
   if (dateAfter) {
     baseArgs.push('--dateafter', dateAfter.replace(/-/g, ''));
@@ -343,7 +359,9 @@ async function runDownloadJob(db, jobId, url, platform, channelHandle, options) 
   let currentProgress = 0;
   let currentFile = '';
   let attemptIndex = 0;
-  let totalVideos = options.maxVideos || 25;
+  // Unknown up front for an "all videos" job — yt-dlp reports the real total via
+  // "Downloading item N of M" once it has paginated the channel.
+  let totalVideos = options.allVideos ? 0 : (options.maxVideos || 25);
   let buffer = '';
 
   // "Downloading item N of M" fires when yt-dlp *starts* item N, not when it
@@ -356,15 +374,23 @@ async function runDownloadJob(db, jobId, url, platform, channelHandle, options) 
     if (Date.now() - lastUpdate < 2000) return;
     lastUpdate = Date.now();
     const completedCount = scanOutputFiles(outputDir).length;
+    // Report progress as videos-done / total once the channel's total is known —
+    // far more meaningful for a many-video job than the current file's download %,
+    // which resets to 0 on every new video. Fall back to the per-file % until the
+    // total is known (start of an "all videos" job).
+    const overall = totalVideos > 0
+      ? Math.round((completedCount / totalVideos) * 100)
+      : currentProgress;
     db.prepare(`
       UPDATE download_jobs SET
-        progress=?, downloaded_videos=?, current_file=?, total_size_mb=?
+        progress=?, downloaded_videos=?, current_file=?, total_size_mb=?, total_videos=?
       WHERE id=?
     `).run(
-      Math.min(currentProgress, 99),
+      Math.min(overall, 99),
       completedCount,
       attemptIndex ? `${currentFile} (attempting ${attemptIndex}/${totalVideos})` : currentFile,
       getDirSizeMB(outputDir),
+      totalVideos || null,
       jobId
     );
   };
@@ -457,7 +483,7 @@ router.use((req, res, next) => {
 
 // ─── POST /start ──────────────────────────────────────────────────────────────
 router.post('/start', async (req, res) => {
-  const { url, maxVideos = 25, quality = '1080', audioOnly = false, dateAfter = '', subtitles = true, startIndex = 1 } = req.body;
+  const { url, maxVideos = 25, quality = '1080', audioOnly = false, dateAfter = '', subtitles = true, startIndex = 1, allVideos = false } = req.body;
 
   if (!url?.trim()) {
     return res.status(400).json({ error: 'URL is required' });
@@ -475,17 +501,24 @@ router.post('/start', async (req, res) => {
 
   const jobId = uuidv4();
   const channelHandle = extractHandle(url, platform);
+  const wantsAll = !!allVideos;
   const options = {
-    maxVideos: Math.min(parseInt(maxVideos) || 25, 300),
+    // allVideos = the creator's entire public history (no upper bound). Otherwise
+    // a bounded slice; maxVideos stays capped at 300 for a single bounded job.
+    maxVideos: wantsAll ? 0 : Math.min(parseInt(maxVideos) || 25, 300),
     quality, audioOnly, dateAfter, subtitles,
     startIndex: Math.max(parseInt(startIndex) || 1, 1),
+    allVideos: wantsAll,
   };
-  const estimatedMB = estimateStorageMB(platform, options.maxVideos, quality, audioOnly);
+  // Can't estimate an unbounded job up front — the count is unknown until yt-dlp
+  // paginates the channel. Resumability (--download-archive) is the safety net if
+  // the volume fills mid-run: free space, hit Resume, and it skips what's done.
+  const estimatedMB = wantsAll ? 0 : estimateStorageMB(platform, options.maxVideos, quality, audioOnly);
 
-  // A channel job can be tens of GB — check there's actually room before starting
-  // a run that might take hours only to die when the volume fills up.
+  // A bounded channel job can still be tens of GB — check there's actually room
+  // before starting a run that might take hours only to die when the volume fills.
   const availableMB = getAvailableStorageMB(DOWNLOADS_BASE);
-  if (availableMB !== null && estimatedMB > availableMB * 0.9) {
+  if (!wantsAll && availableMB !== null && estimatedMB > availableMB * 0.9) {
     return res.status(400).json({
       error: `Not enough storage: this job is estimated at ~${estimatedMB}MB but only ${availableMB}MB is available. Lower "Clips to find", switch to audio-only, or free up space (Storage tab) first.`
     });
@@ -545,6 +578,41 @@ router.post('/cancel/:jobId', (req, res) => {
     .run(new Date().toISOString(), req.params.jobId);
 
   res.json({ success: true, message: 'Job cancelled' });
+});
+
+// ─── POST /resume/:jobId ──────────────────────────────────────────────────────
+// Re-runs a failed, cancelled, or completed job into its ORIGINAL output dir. The
+// --download-archive file there records everything already downloaded, so yt-dlp
+// skips completed videos and only fetches what's missing — a genuine resume, not a
+// restart. This is how a large channel that got IP-blocked, hit an auth wall, or
+// was interrupted partway gets finished without re-pulling every video.
+router.post('/resume/:jobId', async (req, res) => {
+  const job = req.db.prepare(`SELECT * FROM download_jobs WHERE id=?`).get(req.params.jobId);
+  if (!job) return res.status(404).json({ error: 'Job not found' });
+  if (activeProcesses.has(job.id) || job.status === 'running' || job.status === 'queued') {
+    return res.status(400).json({ error: 'Job is already running' });
+  }
+
+  const running = req.db.prepare(`SELECT COUNT(*) as c FROM download_jobs WHERE status IN ('running','queued')`).get();
+  if (running.c >= MAX_CONCURRENT_JOBS) {
+    return res.status(429).json({ error: `Max ${MAX_CONCURRENT_JOBS} concurrent downloads. Wait for a job to finish.` });
+  }
+
+  const options = job.options ? JSON.parse(job.options) : {};
+  req.db.prepare(`UPDATE download_jobs SET status='queued', error_message=NULL, completed_at=NULL WHERE id=?`)
+    .run(job.id);
+
+  // Fire and forget — same output dir, same archive, so completed videos are skipped.
+  runDownloadJob(req.db, job.id, job.url, job.platform, job.channel_handle, options)
+    .catch(e => {
+      console.error(`Resume ${job.id} failed:`, e);
+      try {
+        req.db.prepare(`UPDATE download_jobs SET status='failed', error_message=? WHERE id=?`)
+          .run(e.message, job.id);
+      } catch {}
+    });
+
+  res.json({ success: true, jobId: job.id, message: 'Resuming — already-downloaded videos will be skipped' });
 });
 
 // ─── GET /jobs ────────────────────────────────────────────────────────────────

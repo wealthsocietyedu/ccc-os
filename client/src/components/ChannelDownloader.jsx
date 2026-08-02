@@ -173,6 +173,7 @@ function Section({ title, children, action }) {
 function DownloadTab({ onJobStarted }) {
   const [url, setUrl] = useState('');
   const [maxVideos, setMaxVideos] = useState(25);
+  const [allVideos, setAllVideos] = useState(false);
   const [quality, setQuality] = useState('1080');
   const [audioOnly, setAudioOnly] = useState(false);
   const [dateAfter, setDateAfter] = useState('');
@@ -182,7 +183,7 @@ function DownloadTab({ onJobStarted }) {
   const [success, setSuccess] = useState('');
 
   const platform = detectPlatform(url);
-  const estimatedMB = platform ? estimateMB(platform, maxVideos, quality, audioOnly) : 0;
+  const estimatedMB = platform && !allVideos ? estimateMB(platform, maxVideos, quality, audioOnly) : 0;
   const storageWarning = estimatedMB > 2000;
 
   const handleStart = async () => {
@@ -191,9 +192,11 @@ function DownloadTab({ onJobStarted }) {
     try {
       const data = await api('/start', {
         method: 'POST',
-        body: { url, maxVideos, quality, audioOnly, dateAfter, subtitles },
+        body: { url, maxVideos, quality, audioOnly, dateAfter, subtitles, allVideos },
       });
-      setSuccess(`✓ Download started for @${data.channelHandle} — estimated ${fmtMB(data.estimatedMB)}`);
+      setSuccess(allVideos
+        ? `✓ Full-channel archive started for @${data.channelHandle} — pulling entire public history`
+        : `✓ Download started for @${data.channelHandle} — estimated ${fmtMB(data.estimatedMB)}`);
       setUrl('');
       onJobStarted?.();
     } catch (e) {
@@ -242,18 +245,37 @@ function DownloadTab({ onJobStarted }) {
 
         {/* Volume selector */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <Label>Max Videos</Label>
-            <span style={{ fontSize: 13, color: C.amber, fontFamily: C.mono, fontWeight: 600 }}>{maxVideos}</span>
+            <span style={{ fontSize: 13, color: C.amber, fontFamily: C.mono, fontWeight: 600 }}>
+              {allVideos ? 'ALL' : maxVideos}
+            </span>
           </div>
           <input
             type="range" min={5} max={300} step={5} value={maxVideos}
             onChange={e => setMaxVideos(+e.target.value)}
-            style={{ width: '100%', accentColor: C.amber }}
+            disabled={allVideos}
+            style={{ width: '100%', accentColor: C.amber, opacity: allVideos ? 0.4 : 1 }}
           />
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
             <span style={{ fontSize: 11, color: C.textMut, fontFamily: C.mono }}>5</span>
             <span style={{ fontSize: 11, color: C.textMut, fontFamily: C.mono }}>300</span>
+          </div>
+
+          {/* Entire-history mode — pulls the creator's full public catalog, no cap.
+              Resumable via the archive if a long job is interrupted partway. */}
+          <div style={{
+            marginTop: 4, background: C.bgCard, border: `1px solid ${allVideos ? C.amber + '66' : C.border}`,
+            borderRadius: radius.sm, padding: '10px 14px', display: 'flex',
+            justifyContent: 'space-between', alignItems: 'center',
+          }}>
+            <div>
+              <div style={{ fontSize: 13, color: C.textPri, fontFamily: C.sans }}>Entire channel history</div>
+              <div style={{ fontSize: 11, color: C.textMut, fontFamily: C.mono }}>
+                No cap — archive every public video. Resumable if interrupted.
+              </div>
+            </div>
+            <Toggle value={allVideos} onChange={setAllVideos} />
           </div>
         </div>
 
@@ -336,9 +358,9 @@ function DownloadTab({ onJobStarted }) {
         {/* Storage estimate */}
         {platform && (
           <StatCard
-            value={fmtMB(estimatedMB)}
+            value={allVideos ? 'Entire history' : fmtMB(estimatedMB)}
             label="Estimated Storage"
-            delta={`~${maxVideos} videos @ ${audioOnly ? 'audio' : quality}`}
+            delta={allVideos ? `Full catalog @ ${audioOnly ? 'audio' : quality}` : `~${maxVideos} videos @ ${audioOnly ? 'audio' : quality}`}
             deltaUp={!storageWarning}
             style={storageWarning ? { border: `1px solid ${C.amberDim}66` } : {}}
           />
@@ -422,7 +444,7 @@ function Alert({ type, children }) {
 }
 
 // ─── Job card (shared between Queue and Library) ──────────────────────────────
-function JobCard({ job, onCancel, onDelete, onAnalyze, onCleanup, expanded, onToggleExpand, analysis }) {
+function JobCard({ job, onCancel, onResume, onDelete, onAnalyze, onCleanup, expanded, onToggleExpand, analysis }) {
   const p = PLATFORMS[job.platform] || PLATFORMS.tiktok;
   const isActive = job.status === 'running' || job.status === 'queued';
 
@@ -513,7 +535,12 @@ function JobCard({ job, onCancel, onDelete, onAnalyze, onCleanup, expanded, onTo
             </>
           )}
           {(job.status === 'failed' || job.status === 'cancelled') && (
-            <Button size="sm" variant="ghost" onClick={() => onDelete?.(job.id)}>Remove</Button>
+            <>
+              {onResume && (
+                <Button size="sm" variant="secondary" style={{ color: C.teal, borderColor: C.tealDim }} onClick={() => onResume(job.id)}>↻ Resume</Button>
+              )}
+              <Button size="sm" variant="ghost" onClick={() => onDelete?.(job.id)}>Remove</Button>
+            </>
           )}
         </div>
       </div>
@@ -675,7 +702,7 @@ function QueueTab({ jobs, onCancel, onRefresh }) {
 }
 
 // ─── TAB 3 — Library ──────────────────────────────────────────────────────────
-function LibraryTab({ jobs, onDelete, onCleanup }) {
+function LibraryTab({ jobs, onDelete, onCleanup, onResume }) {
   const [expanded, setExpanded] = useState({});
   const [analyses, setAnalyses] = useState({});
   const [analyzing, setAnalyzing] = useState({});
@@ -743,7 +770,7 @@ function LibraryTab({ jobs, onDelete, onCleanup }) {
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {failedJobs.map(job => (
-              <JobCard key={job.id} job={job} onDelete={onDelete} />
+              <JobCard key={job.id} job={job} onDelete={onDelete} onResume={onResume} />
             ))}
           </div>
         </div>
@@ -812,7 +839,8 @@ function SettingsTab() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {[
             { label: 'Max concurrent jobs', value: '3' },
-            { label: 'Max videos per job', value: '300' },
+            { label: 'Max videos per job', value: '300 · All (uncapped)' },
+            { label: 'Resumable jobs', value: 'Yes (archive)' },
             { label: 'Storage location', value: '/data/downloads/' },
             { label: 'Supported formats', value: 'MP4, MP3, MKV' },
           ].map(s => (
@@ -860,6 +888,16 @@ export default function ChannelDownloader() {
   const handleCleanup = async (jobId) => {
     if (!window.confirm('Delete downloaded files from disk? The job record will remain.')) return;
     await api(`/cleanup/${jobId}`, { method: 'POST' });
+    loadJobs();
+  };
+
+  const handleResume = async (jobId) => {
+    try {
+      await api(`/resume/${jobId}`, { method: 'POST' });
+      setActiveTab('queue');
+    } catch (e) {
+      window.alert(e.message);
+    }
     loadJobs();
   };
 
@@ -953,7 +991,7 @@ export default function ChannelDownloader() {
       <div style={{ animation: 'fadeIn .25s ease' }}>
         {activeTab === 'download' && <DownloadTab onJobStarted={() => { loadJobs(); setActiveTab('queue'); }} />}
         {activeTab === 'queue'    && <QueueTab jobs={jobs} onCancel={handleCancel} onRefresh={loadJobs} />}
-        {activeTab === 'library'  && <LibraryTab jobs={jobs} onDelete={handleDelete} onCleanup={handleCleanup} />}
+        {activeTab === 'library'  && <LibraryTab jobs={jobs} onDelete={handleDelete} onCleanup={handleCleanup} onResume={handleResume} />}
         {activeTab === 'settings' && <SettingsTab />}
       </div>
     </div>
