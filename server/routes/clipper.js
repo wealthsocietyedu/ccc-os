@@ -171,21 +171,30 @@ async function runClipPipeline(jobId, jobDir, url, opts) {
     transcript = { text: whisperOut.text, segments: whisperOut.segments };
   } else {
     // Cloud fallback when local whisper isn't installed. Uses Groq's
-    // OpenAI-compatible transcription endpoint (same request/response shape as
-    // the OpenAI Whisper API) with a Groq-hosted Whisper model.
-    const { default: FormData } = await import('form-data');
-    const formData = new FormData();
-    formData.append('file', fs.createReadStream(audioPath), { filename: 'audio.wav', contentType: 'audio/wav' });
-    formData.append('model', 'whisper-large-v3-turbo');
-    formData.append('response_format', 'verbose_json');
-    formData.append('timestamp_granularities[]', 'segment');
+    // OpenAI-compatible transcription endpoint with a Groq-hosted Whisper model.
+    //
+    // Build the multipart body with the global (undici) FormData + Blob, NOT the
+    // `form-data` npm package. Handing a `form-data` stream to the global fetch
+    // yields a malformed/empty multipart body (undici doesn't consume the
+    // legacy stream and the manually-spread getHeaders() boundary conflicts),
+    // which Groq's Go parser rejects with "multipart: NextPart: EOF". Reading
+    // the audio into a Blob once lets undici set the boundary + Content-Length
+    // correctly, and it's a fresh read of the file (not a reused stream handle).
+    const audioBuffer = fs.readFileSync(audioPath);
+    const form = new FormData();
+    form.append('file', new Blob([audioBuffer], { type: 'audio/wav' }), 'audio.wav');
+    form.append('model', 'whisper-large-v3-turbo');
+    form.append('response_format', 'verbose_json');
+    form.append('timestamp_granularities[]', 'segment');
     const resp = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
       method: 'POST',
-      headers: { 'Authorization': `Bearer ${process.env.GROQ_API_KEY}`, ...formData.getHeaders() },
-      body: formData
+      headers: { 'Authorization': `Bearer ${process.env.GROQ_API_KEY}` },
+      body: form,
     });
     const data = await resp.json();
-    if (data.error) throw new Error(data.error.message || data.error);
+    if (!resp.ok || data.error) {
+      throw new Error((data.error && (data.error.message || data.error)) || `Transcription failed (HTTP ${resp.status})`);
+    }
     transcript = { text: data.text, segments: data.segments || [] };
   }
 
