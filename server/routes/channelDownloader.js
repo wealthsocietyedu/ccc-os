@@ -7,6 +7,7 @@ const { v4: uuidv4 } = require('uuid');
 const Anthropic = require('@anthropic-ai/sdk');
 const { getDB } = require('../db');
 const { cookieArgs } = require('../utils/ytdlpCookies');
+const { authenticate } = require('../middleware/auth');
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -637,10 +638,23 @@ router.get('/files/:jobId', (req, res) => {
   res.json({ files: job.file_list ? JSON.parse(job.file_list) : [] });
 });
 
-// ─── GET /download/:jobId/:filename ───────────────────────────────────────────
-// Streams a single downloaded file from a completed job to the user's machine as
-// an attachment. Files otherwise only live on the server's Railway volume.
-router.get('/download/:jobId/:filename', (req, res) => {
+// ─── GET /file/:jobId/:filename ───────────────────────────────────────────────
+// Streams a single downloaded video from a completed job to the user's device as
+// a real download — res.download sets Content-Disposition: attachment and the
+// Content-Type from the extension (video/mp4, audio/mpeg, …), so the browser
+// saves it (Downloads folder on desktop, "Save to Files" on iOS) instead of
+// playing it inline. Files otherwise only live on the server's Railway volume.
+//
+// Auth-gated (route-level `authenticate`): the frontend fetches this WITH the
+// Bearer token and saves via a blob URL — a native <a href download> can't send
+// the JWT, which lives in localStorage, not a cookie. See channelDownloader.
+// downloadFile, mirroring the smartClipper.downloadClip pattern.
+//
+// NOTE: the rest of this router is currently mounted WITHOUT `authenticate`
+// (server/index.js), so auth is applied here per-route to gate raw file egress
+// without breaking the existing unauthenticated jobs/start/status calls. The
+// broader unauthenticated-router gap is pre-existing and flagged for review.
+router.get('/file/:jobId/:filename', authenticate, (req, res) => {
   const job = req.db.prepare(`SELECT output_dir FROM download_jobs WHERE id=?`).get(req.params.jobId);
   if (!job || !job.output_dir) return res.status(404).json({ error: 'Job not found' });
 

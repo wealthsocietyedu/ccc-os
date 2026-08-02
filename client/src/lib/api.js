@@ -212,8 +212,25 @@ export const channelDownloader = {
   cleanup: (jobId) => fetch(`${BASE}/channel-downloader/cleanup/${jobId}`, { method: 'POST', headers: headers() }).then(handle),
   remove: (jobId) => fetch(`${BASE}/channel-downloader/job/${jobId}`, { method: 'DELETE', headers: headers() }).then(handle),
   storageStats: () => fetch(`${BASE}/channel-downloader/storage-stats`, { headers: headers() }).then(handle),
-  // Direct link for pulling a completed file to the user's machine (server streams it as an attachment).
-  fileUrl: (jobId, filename) => `${BASE}/channel-downloader/download/${jobId}/${encodeURIComponent(filename)}`,
+  // Pull one completed video to the user's device. The /file route is auth-gated,
+  // and a native <a href download> can't send the Bearer token (the JWT lives in
+  // localStorage, not a cookie) — so fetch the bytes WITH the header and save via
+  // a blob URL. Same pattern as smartClipper.downloadClip; works cross-device
+  // (desktop Downloads + iOS/iPadOS "Save to Files"). Must run inside the click
+  // handler so the save stays inside the user gesture (matters on iOS Safari).
+  downloadFile: async (jobId, filename, saveAs) => {
+    const res = await fetch(`${BASE}/channel-downloader/file/${jobId}/${encodeURIComponent(filename)}`,
+      { headers: { Authorization: `Bearer ${getToken()}` } });
+    if (!res.ok) throw Object.assign(new Error(`Download failed (HTTP ${res.status})`), { status: res.status });
+    const url = URL.createObjectURL(await res.blob());
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = saveAs || filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  },
 };
 
 // ─── VIDEO DOWNLOADER ─────────────────────────────────────────────────────────

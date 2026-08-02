@@ -443,6 +443,31 @@ function Alert({ type, children }) {
   );
 }
 
+// ─── Per-file "save to device" button ─────────────────────────────────────────
+// Fetches the file WITH the auth header and saves it via a blob URL (see
+// channelDownloader.downloadFile) — one native download per video, no zip, so it
+// lands wherever the device puts downloads (Files app on iOS, Downloads on
+// desktop). Manages its own busy/error state so each row is independent.
+function FileDownloadButton({ jobId, filename, saveAs, label = '↓ Download' }) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(false);
+  const go = async () => {
+    setBusy(true); setErr(false);
+    try {
+      await channelDownloader.downloadFile(jobId, filename, saveAs || filename);
+    } catch {
+      setErr(true);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Button size="sm" variant={err ? 'danger' : 'secondary'} onClick={go} disabled={busy} style={{ flexShrink: 0 }}>
+      {busy ? '⟳ Saving…' : err ? '↻ Retry' : label}
+    </Button>
+  );
+}
+
 // ─── Job card (shared between Queue and Library) ──────────────────────────────
 function JobCard({ job, onCancel, onResume, onDelete, onAnalyze, onCleanup, expanded, onToggleExpand, analysis }) {
   const p = PLATFORMS[job.platform] || PLATFORMS.tiktok;
@@ -450,11 +475,27 @@ function JobCard({ job, onCancel, onResume, onDelete, onAnalyze, onCleanup, expa
 
   // Load the downloadable file list when a completed job is expanded.
   const [files, setFiles] = useState([]);
+  const [dlAll, setDlAll] = useState(false);
   useEffect(() => {
     if (expanded && job.status === 'completed') {
       channelDownloader.files(job.id).then(d => setFiles(d.files || [])).catch(() => setFiles([]));
     }
   }, [expanded, job.id, job.status]);
+
+  // "Download all" = trigger each file's own download in sequence (NOT a zip),
+  // with a short stagger so rapid-fire saves aren't dropped by the browser. Note:
+  // desktop browsers may ask to allow multiple downloads, and iOS Safari commonly
+  // only saves the first of a burst (it drops saves once the user gesture ends) —
+  // so per-file buttons remain the reliable path on mobile.
+  const downloadAll = async () => {
+    setDlAll(true);
+    for (const f of files) {
+      try { await channelDownloader.downloadFile(job.id, f.filename, f.filename); }
+      catch { /* keep going; the per-file button can retry a failed one */ }
+      await new Promise(r => setTimeout(r, 800));
+    }
+    setDlAll(false);
+  };
 
   return (
     <div style={{
@@ -548,9 +589,16 @@ function JobCard({ job, onCancel, onResume, onDelete, onAnalyze, onCleanup, expa
       {/* Expanded: file list + analysis */}
       {expanded && (
         <div style={{ borderTop: `1px solid ${C.border}`, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-          {/* Downloadable files — pull completed files from the server to this machine */}
+          {/* Downloadable files — save each video from the server to this device */}
           <div>
-            <Label>Files {files.length ? `(${files.length})` : ''}</Label>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Label>Files {files.length ? `(${files.length})` : ''}</Label>
+              {files.length > 1 && (
+                <Button size="sm" variant="ghost" onClick={downloadAll} disabled={dlAll}>
+                  {dlAll ? '⟳ Saving all…' : '↓ Download all'}
+                </Button>
+              )}
+            </div>
             {files.length === 0 ? (
               <div style={{ fontSize: 12, color: C.textMut, fontFamily: C.mono, marginTop: 8 }}>
                 {job.file_count > 0 ? 'Loading files…' : 'No files on disk (they may have been cleaned up).'}
@@ -561,9 +609,7 @@ function JobCard({ job, onCancel, onResume, onDelete, onAnalyze, onCleanup, expa
                   <div key={f.filename} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', background: C.bg, borderRadius: 8, border: `1px solid ${C.border}` }}>
                     <span style={{ flex: 1, minWidth: 0, fontSize: 12, color: C.textPri, fontFamily: C.sans, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.filename}</span>
                     <span style={{ fontSize: 11, color: C.textSec, fontFamily: C.mono, flexShrink: 0 }}>{fmtMB(f.sizeMB || 0)}</span>
-                    <a href={channelDownloader.fileUrl(job.id, f.filename)} download style={{ textDecoration: 'none', flexShrink: 0 }}>
-                      <Button size="sm" variant="secondary">↓ Download</Button>
-                    </a>
+                    <FileDownloadButton jobId={job.id} filename={f.filename} />
                   </div>
                 ))}
               </div>
