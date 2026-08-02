@@ -261,6 +261,27 @@ export const smartClipper = {
     }),
   status: (jobId) => fetch(`${BASE}/smart-clipper/status/${jobId}`, { headers: headers() }).then(handle),
   remove: (jobId) => fetch(`${BASE}/smart-clipper/job/${jobId}`, { method: 'DELETE', headers: headers() }).then(handle),
-  previewUrl: (jobId, filename) => `${BASE}/smart-clipper/preview/${jobId}/${encodeURIComponent(filename)}`,
-  downloadUrl: (jobId, filename) => `${BASE}/smart-clipper/download/${jobId}/${encodeURIComponent(filename)}`,
+  // The preview/download routes require the Bearer token, but a native <video src>
+  // or <a href download> can't send an Authorization header (the JWT lives in
+  // localStorage, not a cookie) — so those requests 401. Fetch the bytes WITH the
+  // auth header instead and hand back a blob object URL. Callers must revoke it.
+  fetchClipObjectUrl: async (jobId, filename) => {
+    const res = await fetch(`${BASE}/smart-clipper/preview/${jobId}/${encodeURIComponent(filename)}`,
+      { headers: { Authorization: `Bearer ${getToken()}` } });
+    if (!res.ok) throw Object.assign(new Error(`Preview failed (HTTP ${res.status})`), { status: res.status });
+    return URL.createObjectURL(await res.blob());
+  },
+  downloadClip: async (jobId, filename, saveAs) => {
+    const res = await fetch(`${BASE}/smart-clipper/download/${jobId}/${encodeURIComponent(filename)}`,
+      { headers: { Authorization: `Bearer ${getToken()}` } });
+    if (!res.ok) throw Object.assign(new Error(`Download failed (HTTP ${res.status})`), { status: res.status });
+    const url = URL.createObjectURL(await res.blob());
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = saveAs || filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  },
 };

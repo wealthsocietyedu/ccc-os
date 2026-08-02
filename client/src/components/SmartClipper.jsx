@@ -89,9 +89,55 @@ function ProgressBar({ stage, progress }) {
 // ─── Clip Card ────────────────────────────────────────────────────────────────
 function ClipCard({ clip, jobId, onSendToScheduler }) {
   const [playing, setPlaying] = useState(false);
+  const [blobUrl, setBlobUrl] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+  const [mediaError, setMediaError] = useState(null);
   const videoRef = useRef(null);
-  const previewUrl = smartClipper.previewUrl(jobId, clip.file);
-  const downloadUrl = smartClipper.downloadUrl(jobId, clip.file);
+
+  // Preview bytes are fetched with the auth header (native <video src> can't send
+  // it), then played from a blob URL. Revoke it when the card unmounts.
+  useEffect(() => () => { if (blobUrl) URL.revokeObjectURL(blobUrl); }, [blobUrl]);
+
+  // Once the blob URL is bound to the <video>, start playback. Doing this in an
+  // effect (rather than right after setBlobUrl) avoids a race where play() runs
+  // before React commits the new src.
+  useEffect(() => {
+    if (blobUrl && videoRef.current) {
+      videoRef.current.play().then(() => setPlaying(true)).catch(() => {});
+    }
+  }, [blobUrl]);
+
+  const loadAndPlay = async () => {
+    setMediaError(null);
+    if (blobUrl) {
+      videoRef.current?.play();
+      setPlaying(true);
+      return;
+    }
+    try {
+      setLoading(true);
+      const url = await smartClipper.fetchClipObjectUrl(jobId, clip.file);
+      setBlobUrl(url); // the effect above starts playback once src is committed
+    } catch (e) {
+      setMediaError('Preview unavailable');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDownload = async () => {
+    try {
+      setMediaError(null);
+      setDownloading(true);
+      await smartClipper.downloadClip(jobId, clip.file, `clip_${clip.clip_number}.mp4`);
+    } catch (e) {
+      setMediaError('Download failed');
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   const emotionColors = { curiosity: C.teal, surprise: C.amber, inspiration: '#4ADE80', relatability: '#A78BFA', controversy: C.red };
   const emotionColor = emotionColors[clip.emotion] || C.text3;
   return (
@@ -100,14 +146,16 @@ function ClipCard({ clip, jobId, onSendToScheduler }) {
       <div style={{ position: 'relative', background: '#000', aspectRatio: '16/9' }}>
         <video
           ref={videoRef}
-          src={previewUrl}
+          src={blobUrl || undefined}
           style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-          onClick={() => { playing ? videoRef.current.pause() : videoRef.current.play(); setPlaying(!playing); }}
+          onClick={() => { if (!blobUrl) return loadAndPlay(); playing ? videoRef.current.pause() : videoRef.current.play(); setPlaying(!playing); }}
           onEnded={() => setPlaying(false)}
         />
         {!playing && (
-          <div onClick={() => { videoRef.current.play(); setPlaying(true); }} style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', background: 'rgba(0,0,0,0.4)' }}>
-            <div style={{ width: 48, height: 48, borderRadius: '50%', background: `rgba(240,168,0,0.9)`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>▶</div>
+          <div onClick={loadAndPlay} style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', background: 'rgba(0,0,0,0.4)' }}>
+            <div style={{ width: 48, height: 48, borderRadius: '50%', background: `rgba(240,168,0,0.9)`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>
+              {loading ? '…' : mediaError ? '⚠' : '▶'}
+            </div>
           </div>
         )}
         {/* Badges */}
@@ -140,15 +188,16 @@ function ClipCard({ clip, jobId, onSendToScheduler }) {
           {clip.why_viral}
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <a href={downloadUrl} download={`clip_${clip.clip_number}.mp4`} style={{ textDecoration: 'none', flex: 1 }}>
-            <Button variant="primary" size="sm" style={{ width: '100%' }}>
-              ↓ Download
-            </Button>
-          </a>
+          <Button variant="primary" size="sm" style={{ flex: 1 }} onClick={handleDownload} disabled={downloading}>
+            {downloading ? 'Downloading…' : '↓ Download'}
+          </Button>
           <Button variant="secondary" size="sm" style={{ color: C.tealText, borderColor: C.tealDim }} onClick={() => onSendToScheduler(clip)}>
             📅 Schedule
           </Button>
         </div>
+        {mediaError && (
+          <div style={{ marginTop: 8, fontSize: 11, color: C.red, fontFamily: C.mono }}>{mediaError}</div>
+        )}
       </div>
     </div>
   );
