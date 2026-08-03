@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { colors, radius, font, glass, gradients, glow } from '../lib/theme.js';
 import { Button, Card, StatCard, SectionLabel } from './ui/index.js';
 import { channelDownloader } from '../lib/api.js';
+import { useIsMobile, cols } from '../lib/useIsMobile.js';
 
 const API = '/api/channel-downloader';
 
@@ -180,6 +181,7 @@ function Section({ title, children, action }) {
 
 // ─── TAB 1 — Download ─────────────────────────────────────────────────────────
 function DownloadTab({ onJobStarted }) {
+  const isMobile = useIsMobile();
   const [url, setUrl] = useState('');
   const [maxVideos, setMaxVideos] = useState(25);
   const [allVideos, setAllVideos] = useState(false);
@@ -216,7 +218,7 @@ function DownloadTab({ onJobStarted }) {
   };
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 24, maxWidth: 1100 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: cols(isMobile, '1fr 320px'), gap: 24, maxWidth: 1100 }}>
 
       {/* Left: URL + main controls */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -912,6 +914,7 @@ function SettingsTab() {
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function ChannelDownloader() {
+  const isMobile = useIsMobile();
   const [activeTab, setActiveTab] = useState('download');
   const [jobs, setJobs] = useState([]);
   const pollRef = useRef(null);
@@ -1031,10 +1034,12 @@ export default function ChannelDownloader() {
         </div>
       </div>
 
-      {/* Tabs */}
+      {/* Tabs — scroll horizontally on mobile so all tabs stay reachable
+          instead of overflowing the pill off-screen. */}
       <div style={{
         display: 'flex', gap: 4, background: C.bgCard, borderRadius: radius.pill,
-        padding: 4, width: 'fit-content', marginBottom: 28, border: `1px solid ${C.border}`,
+        padding: 4, width: isMobile ? '100%' : 'fit-content', maxWidth: '100%',
+        overflowX: 'auto', marginBottom: 28, border: `1px solid ${C.border}`,
       }}>
         {tabs.map(t => (
           <TabBtn key={t.id} active={activeTab === t.id} onClick={() => setActiveTab(t.id)}

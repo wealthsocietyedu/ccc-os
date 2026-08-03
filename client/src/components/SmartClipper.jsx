@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { colors, radius, font, glass, gradients, glow } from '../lib/theme.js';
 import { Button, Card, StatCard, SectionLabel } from './ui/index.js';
 import { smartClipper } from '../lib/api.js';
+import { useIsMobile, cols } from '../lib/useIsMobile.js';
 
 // ─── Design tokens (TVA theme — re-pointed to shared theme.js) ───────────────
 const C = {
@@ -265,6 +266,7 @@ function DropZone({ file, onPick, onClear, disabled }) {
 
 // ─── Main Component (upload-only) ─────────────────────────────────────────────
 export default function SmartClipper() {
+  const isMobile = useIsMobile();
   const [file, setFile] = useState(null);
   const [pillars, setPillars] = useState('');
   const [niche, setNiche] = useState('');
@@ -393,7 +395,7 @@ export default function SmartClipper() {
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: clips.length ? '360px 1fr' : '500px 1fr', gap: 28 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: cols(isMobile, clips.length ? '360px 1fr' : '500px 1fr'), gap: 28 }}>
         {/* Controls */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <DropZone file={file} onPick={handlePick} onClear={() => setFile(null)} disabled={loading} />

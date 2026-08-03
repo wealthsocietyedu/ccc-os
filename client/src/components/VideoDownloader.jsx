@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import { colors, radius, font, glass, gradients, glow } from '../lib/theme.js';
 import { Button, Card, StatCard, SectionLabel } from './ui/index.js';
+import { useIsMobile, cols } from '../lib/useIsMobile.js';
 
 const API_BASE = '/api/video-downloader';
 
@@ -335,6 +336,7 @@ function HistoryItem({ item }) {
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function VideoDownloader() {
+  const isMobile = useIsMobile();
   const [url, setUrl] = useState('');
   const [videoInfo, setVideoInfo] = useState(null);
   const [infoLoading, setInfoLoading] = useState(false);
@@ -477,7 +479,7 @@ export default function VideoDownloader() {
       </div>
 
       {/* Main layout */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: '28px', maxWidth: '1100px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: cols(isMobile, '1fr 380px'), gap: '28px', maxWidth: '1100px' }}>
 
         {/* Left: URL Input + Preview */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>

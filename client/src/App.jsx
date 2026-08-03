@@ -5,6 +5,7 @@ import { PricingPage, BillingManagement, UpgradePrompt, SuccessScreen } from './
 import { useContentStore } from './lib/store/useContentStore.ts';
 import { MODULES } from './modules.js';
 import { Button, Card, StatCard, SectionLabel, PillNav } from './components/ui';
+import { useIsMobile, cols } from './lib/useIsMobile.js';
 
 // ─── AUTH CONTEXT ─────────────────────────────────────────────────────────────
 const AuthCtx = createContext(null);
@@ -491,6 +492,21 @@ const STYLES = `
     .hero-title { font-size: 38px; }
     .bento > * { grid-column: span 12 !important; }
   }
+
+  /* Phones: the nav rail becomes an off-canvas drawer (see PillNav), so the
+     shell no longer reserves a column for it. Reclaim the space for content,
+     and clear the fixed hamburger in the topbar. */
+  @media (max-width: 768px) {
+    .shell { padding: 10px; gap: 0; }
+    .topbar-float { padding: 9px 12px 9px 66px; }
+    .topbar-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+    .topbar-acts { flex-shrink: 0; }
+    .content-scroll { border-radius: 18px; }
+    /* Kanban pipeline: 6 fixed columns are unreadable on a phone. Switch to a
+       horizontal swipe — each column ~78% wide so the next one peeks. */
+    .pipeline { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: 78%; overflow-x: auto; scroll-snap-type: x proximity; -webkit-overflow-scrolling: touch; }
+    .pipe-col { scroll-snap-align: start; }
+  }
 `;
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
 const fmt = (n) => { if (n >= 1e6) return (n/1e6).toFixed(1)+'M'; if (n >= 1e3) return (n/1e3).toFixed(1)+'K'; return String(n||0); };
@@ -924,6 +940,7 @@ function CommandCenter({ activeBrand, setPage, user, onQuickAdd }) {
   );
 }
 function BrandDealsSection({ activeBrand }) {
+  const isMobile = useIsMobile();
   const [deals, setDeals] = useState([]);
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState({ partner_name:'', deal_type:'Paid', amount:0, status:'Inbound', deliverables:'', deadline:'', notes:'' });
@@ -971,7 +988,7 @@ function BrandDealsSection({ activeBrand }) {
       </div>
 
       {/* Stats row */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:8, marginBottom:16 }}>
+      <div style={{ display:'grid', gridTemplateColumns:cols(isMobile, 'repeat(4,1fr)', '1fr 1fr'), gap:8, marginBottom:16 }}>
         <div className="cc-stat-card">
           <div style={{ fontSize:10, color:'var(--text3)', fontWeight:700, textTransform:'uppercase', marginBottom:4 }}>Total Revenue</div>
           <div style={{ fontFamily:'var(--font-d)', fontSize:20, fontWeight:800, color:'var(--green)' }}>{money(totalRevenue)}</div>

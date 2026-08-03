@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { useIsMobile, cols } from '../lib/useIsMobile.js';
 
 const API_ADVISOR = '/api/advisor';
 const API_IMPORT = '/api/csv-import';
@@ -290,6 +291,7 @@ function ImportTab({ onImportDone }) {
 // ─── TAB 2: ANALYZE ───────────────────────────────────────────────────────────
 
 function AnalyzeTab() {
+  const isMobile = useIsMobile();
   const [period, setPeriod] = useState('30');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
@@ -331,7 +333,7 @@ function AnalyzeTab() {
 
       {result?.hasData && (
         <>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: cols(isMobile, 'repeat(4, 1fr)', '1fr 1fr'), gap: '12px' }}>
             <StatCard label="Posts" value={result.stats.totalPosts} />
             <StatCard label="Views" value={(result.stats.totalViews || 0).toLocaleString()} />
             <StatCard label="Leads" value={result.stats.totalLeads} />
@@ -369,6 +371,7 @@ function AnalyzeTab() {
 // ─── TAB 3: WRITE ─────────────────────────────────────────────────────────────
 
 function WriteTab() {
+  const isMobile = useIsMobile();
   const [topic, setTopic] = useState('');
   const [format, setFormat] = useState('Short Form Video');
   const [platform, setPlatform] = useState('Instagram');
@@ -410,7 +413,7 @@ function WriteTab() {
   const platforms = ['Instagram','X (Twitter)','YouTube','TikTok','LinkedIn'];
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr', gap: '20px' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: cols(isMobile, '300px 1fr'), gap: '20px' }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
           <div style={S.label}>Topic or Idea</div>
@@ -603,6 +606,7 @@ function InterviewTab() {
 // ─── TAB 5: WEEKLY REVIEW ─────────────────────────────────────────────────────
 
 function WeeklyReviewTab() {
+  const isMobile = useIsMobile();
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
@@ -629,7 +633,7 @@ function WeeklyReviewTab() {
 
       {result && (
         <>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: cols(isMobile, 'repeat(4, 1fr)', '1fr 1fr'), gap: '12px' }}>
             {[['Posts', result.thisWeek.posts, result.lastWeek.posts],['Views', result.thisWeek.views, result.lastWeek.views],['Leads', result.thisWeek.leads, result.lastWeek.leads],['Followers', result.thisWeek.followers, result.lastWeek.followers]].map(([label, thisVal, lastVal]) => (
               <StatCard key={label} label={label} value={(thisVal||0).toLocaleString()} sub={delta(thisVal,lastVal) ? `${delta(thisVal,lastVal)} vs last week` : undefined} color={thisVal >= lastVal ? '#F0A800' : '#EF4444'} />
             ))}
@@ -732,6 +736,7 @@ function ChatBubble() {
 // ─── MAIN ─────────────────────────────────────────────────────────────────────
 
 export default function ContentAdvisor() {
+  const isMobile = useIsMobile();
   const [activeTab, setActiveTab] = useState('import');
   const [dataRefresh, setDataRefresh] = useState(0);
 
@@ -767,7 +772,7 @@ export default function ContentAdvisor() {
       </div>
 
       {/* Tab bar */}
-      <div style={{ display: 'flex', gap: '3px', background: '#1A1A2E', borderRadius: '10px', padding: '4px', width: 'fit-content', marginBottom: '22px', border: '1px solid #2D2D44' }}>
+      <div style={{ display: 'flex', gap: '3px', background: '#1A1A2E', borderRadius: '10px', padding: '4px', width: isMobile ? '100%' : 'fit-content', maxWidth: '100%', overflowX: 'auto', marginBottom: '22px', border: '1px solid #2D2D44' }}>
         {tabs.map(t => <TabBtn key={t.id} active={activeTab === t.id} onClick={() => setActiveTab(t.id)} label={t.label} icon={t.icon} />)}
       </div>
 

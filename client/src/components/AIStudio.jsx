@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { useIsMobile, cols } from '../lib/useIsMobile.js';
 
 const API_BASE = '/api/ai-studio';
 
@@ -409,6 +410,7 @@ function ImageGenerator() {
 
 // ─── VideoGenerator ───────────────────────────────────────────────────────────
 function VideoGenerator() {
+  const isMobile = useIsMobile();
   const [mode, setMode] = useState('kling'); // 'kling' | 'blotato'
 
   // Kling state
@@ -512,7 +514,7 @@ function VideoGenerator() {
             <Field label="Subject / Scene Description">
               <Input value={kSubject} onChange={setKSubject} placeholder="e.g. a lone entrepreneur working at midnight in a neon-lit office" />
             </Field>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: cols(isMobile, '1fr 1fr 1fr', '1fr 1fr'), gap: '12px' }}>
               <Select label="Mood" value={kMood} onChange={setKMood} options={[
                 { value: 'cinematic', label: 'Cinematic' },
                 { value: 'dark', label: 'Dark & Moody' },
@@ -550,7 +552,7 @@ function VideoGenerator() {
             <Field label="Video Topic">
               <Input value={bTopic} onChange={setBTopic} placeholder="e.g. 5 habits that changed my life" />
             </Field>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: cols(isMobile, '1fr 1fr 1fr', '1fr 1fr'), gap: '12px' }}>
               <Select label="Niche" value={bNiche} onChange={setBNiche} options={[
                 { value: '', label: 'General' },
                 { value: 'finance', label: 'Finance' },
@@ -622,6 +624,7 @@ function VideoGenerator() {
 
 // ─── SmartPromptBuilder ───────────────────────────────────────────────────────
 function SmartPromptBuilder() {
+  const isMobile = useIsMobile();
   const [topic, setTopic] = useState('');
   const [niche, setNiche] = useState('');
   const [emotion, setEmotion] = useState('');
@@ -651,7 +654,7 @@ function SmartPromptBuilder() {
           <Field label="Content Topic">
             <Input value={topic} onChange={setTopic} placeholder="e.g. How I went from broke to $10k/month in 6 months" />
           </Field>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: cols(isMobile, '1fr 1fr 1fr', '1fr 1fr'), gap: '12px' }}>
             <Field label="Niche">
               <Input value={niche} onChange={setNiche} placeholder="e.g. personal finance" />
             </Field>
@@ -785,6 +788,7 @@ function SceneImage({ taskId }) {
 }
 
 function StoryboardGenerator() {
+  const isMobile = useIsMobile();
   const [sbMode, setSbMode] = useState('quick');
   const [input, setInput] = useState('');
   const [sbPlatform, setSbPlatform] = useState('youtube');
@@ -868,7 +872,7 @@ function StoryboardGenerator() {
             />
           </Field>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: cols(isMobile, '1fr 1fr 1fr', '1fr 1fr'), gap: '12px' }}>
             <Select label="Platform" value={sbPlatform} onChange={setSbPlatform} options={[
               { value: 'youtube', label: 'YouTube 16:9' },
               { value: 'reels', label: 'Reels 9:16' },
@@ -948,7 +952,7 @@ function StoryboardGenerator() {
           </div>
 
           {!exportView && scene && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '16px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: cols(isMobile, '1fr 340px'), gap: '16px' }}>
               {/* Large active scene view */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 <Card>
@@ -1034,7 +1038,7 @@ function StoryboardGenerator() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               {storyboard.scenes.map((s, i) => (
                 <Card key={i}>
-                  <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', gap: '16px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: cols(isMobile, '220px 1fr'), gap: '16px' }}>
                     <SceneImage taskId={s.imageTaskId} />
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                       <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>

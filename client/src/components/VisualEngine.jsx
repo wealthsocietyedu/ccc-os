@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useIsMobile, cols } from '../lib/useIsMobile.js';
 const API = '/api/visual-engine';
 async function apiFetch(endpoint, body, method='POST') {
   const opts = { method, headers: { 'Content-Type': 'application/json' } };
@@ -118,6 +119,7 @@ function ProviderStatus({ providers }) {
 }
 // ─── Tab: Plan ────────────────────────────────────────────────────────────────
 function PlanTab({ credits, onCreditUpdate }) {
+  const isMobile = useIsMobile();
   const [brief, setBrief] = useState('');
   const [niche, setNiche] = useState('');
   const [platform, setPlatform] = useState('instagram');
@@ -136,7 +138,7 @@ function PlanTab({ credits, onCreditUpdate }) {
     finally { setLoading(false); }
   };
   return (
-    <div style={{ display:'grid',gridTemplateColumns:'360px 1fr',gap:24 }}>
+    <div style={{ display:'grid',gridTemplateColumns:cols(isMobile,'360px 1fr'),gap:24 }}>
       <div style={{ display:'flex',flexDirection:'column',gap:14 }}>
         <div style={{ background:C.amberSub,border:`1px solid ${C.amberDim}`,borderRadius:8,padding:12 }}>
           <div style={{ fontFamily:C.mono,fontSize:9,color:C.amberText,textTransform:'uppercase',letterSpacing:'0.1em',marginBottom:4 }}>✦ Content Planner</div>
@@ -207,6 +209,7 @@ function PlanTab({ credits, onCreditUpdate }) {
 }
 // ─── Tab: Images ──────────────────────────────────────────────────────────────
 function ImageTab({ credits, onCreditUpdate }) {
+  const isMobile = useIsMobile();
   const [prompt, setPrompt] = useState('');
   const [style, setStyle] = useState('photorealistic');
   const [aspect, setAspect] = useState('16:9');
@@ -226,7 +229,7 @@ function ImageTab({ credits, onCreditUpdate }) {
     finally { setLoading(false); }
   };
   return (
-    <div style={{ display:'grid',gridTemplateColumns:'340px 1fr',gap:24 }}>
+    <div style={{ display:'grid',gridTemplateColumns:cols(isMobile,'340px 1fr'),gap:24 }}>
       <div style={{ display:'flex',flexDirection:'column',gap:14 }}>
         <Input label="Image Prompt" value={prompt} onChange={setPrompt} placeholder="Person typing on a laptop, dark minimal office, warm desk lamp, shallow depth of field..." multiline rows={4} />
         <Select label="Style" value={style} onChange={setStyle} options={[{value:'photorealistic',label:'📷 Photorealistic'},{value:'cinematic',label:'🎬 Cinematic'},{value:'artistic',label:'🎨 Artistic'},{value:'minimal',label:'⬜ Minimal'},{value:'dark',label:'🌑 Dark & Moody'},{value:'vibrant',label:'🌈 Vibrant'}]} />
@@ -297,6 +300,7 @@ function ImageTab({ credits, onCreditUpdate }) {
 }
 // ─── Tab: Video ───────────────────────────────────────────────────────────────
 function VideoTab({ credits, onCreditUpdate }) {
+  const isMobile = useIsMobile();
   const [mode, setMode] = useState('faceless');
   const [topic, setTopic] = useState('');
   const [script, setScript] = useState('');
@@ -342,7 +346,7 @@ function VideoTab({ credits, onCreditUpdate }) {
     finally { setLoading(false); }
   };
   return (
-    <div style={{ display:'grid',gridTemplateColumns:'360px 1fr',gap:24 }}>
+    <div style={{ display:'grid',gridTemplateColumns:cols(isMobile,'360px 1fr'),gap:24 }}>
       <div style={{ display:'flex',flexDirection:'column',gap:14 }}>
         <div style={{ display:'grid',gridTemplateColumns:'1fr 1fr',gap:8 }}>
           {[{id:'faceless',icon:'📱',label:'Faceless Video',sub:'Blotato · 25 credits'},{id:'broll',icon:'🎬',label:'B-Roll Prompt',sub:'LTX-2 · 5 credits'}].map(m=>(
@@ -457,6 +461,7 @@ function VideoTab({ credits, onCreditUpdate }) {
 }
 // ─── Tab: Carousel ────────────────────────────────────────────────────────────
 function CarouselTab({ credits, onCreditUpdate }) {
+  const isMobile = useIsMobile();
   const [topic, setTopic] = useState('');
   const [niche, setNiche] = useState('');
   const [platform, setPlatform] = useState('instagram');
@@ -474,7 +479,7 @@ function CarouselTab({ credits, onCreditUpdate }) {
     finally { setLoading(false); }
   };
   return (
-    <div style={{ display:'grid',gridTemplateColumns:'340px 1fr',gap:24 }}>
+    <div style={{ display:'grid',gridTemplateColumns:cols(isMobile,'340px 1fr'),gap:24 }}>
       <div style={{ display:'flex',flexDirection:'column',gap:14 }}>
         <Input label="Carousel Topic" value={topic} onChange={setTopic} placeholder="5 reasons most people never get rich..." multiline rows={3} />
         <Input label="Niche" value={niche} onChange={setNiche} placeholder="Business, Fitness, Faith..." />
@@ -550,6 +555,7 @@ function HistoryTab() {
 }
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function VisualEngine() {
+  const isMobile = useIsMobile();
   const [tab, setTab] = useState('plan');
   const [credits, setCredits] = useState(null);
   const [providers, setProviders] = useState(null);
@@ -603,7 +609,7 @@ export default function VisualEngine() {
       {/* Provider Status */}
       <ProviderStatus providers={providers} />
       {/* Tabs */}
-      <div style={{ display:'flex',gap:4,background:C.surface,borderRadius:10,padding:4,width:'fit-content',marginBottom:28,border:`1px solid ${C.border2}` }}>
+      <div style={{ display:'flex',gap:4,background:C.surface,borderRadius:10,padding:4,width:isMobile?'100%':'fit-content',maxWidth:'100%',overflowX:'auto',marginBottom:28,border:`1px solid ${C.border2}` }}>
         {tabs.map(t=>(
           <button key={t.id} onClick={()=>setTab(t.id)} style={{ display:'flex',alignItems:'center',gap:7,padding:'8px 18px',borderRadius:8,border:'none',cursor:'pointer',fontSize:13,fontFamily:C.font,fontWeight:tab===t.id?600:400,background:tab===t.id?C.amber:'transparent',color:tab===t.id?'#0C0A07':C.text3,transition:'all .15s' }}>
             <span>{t.icon}</span>{t.label}

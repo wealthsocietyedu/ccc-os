@@ -1,6 +1,7 @@
 // client/src/components/ui/PillNav.jsx
 import { useState } from 'react';
 import { colors, radius, font, gradients, glassCard } from '../../lib/theme.js';
+import { useIsMobile } from '../../lib/useIsMobile.js';
 
 const RAIL = {
   width: 236,
@@ -81,20 +82,81 @@ export default function PillNav({
   footer = null,
   style = {},
 }) {
+  const isMobile = useIsMobile();
+  const [open, setOpen] = useState(false);
+
+  // On mobile, picking an item should also close the drawer.
+  const handleSelect = (id) => {
+    onSelect(id);
+    if (isMobile) setOpen(false);
+  };
+
+  const itemList = (
+    <div style={{ flex: 1, overflowY: 'auto', margin: '10px -4px', padding: '0 4px' }}>
+      {items.map((it) => (
+        <PillItem
+          key={it.id}
+          item={it}
+          active={it.id === activeId}
+          onSelect={handleSelect}
+          renderIcon={renderIcon}
+        />
+      ))}
+    </div>
+  );
+
+  // ─── Mobile: off-canvas drawer + hamburger ──────────────────────────────────
+  // The 236px rail would eat ~63% of a phone screen, crushing content to a
+  // sliver. Instead float a hamburger button and slide the full rail in from
+  // the left as an overlay, leaving the main content full-width underneath.
+  if (isMobile) {
+    return (
+      <>
+        <button
+          type="button"
+          aria-label={open ? 'Close menu' : 'Open menu'}
+          aria-expanded={open}
+          onClick={() => setOpen((o) => !o)}
+          style={{
+            position: 'fixed', top: 14, left: 14, zIndex: 60,
+            width: 44, height: 44, borderRadius: 14,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            ...glassCard, border: `1px solid ${colors.border2}`,
+            color: colors.text, fontSize: 18, cursor: 'pointer', padding: 0,
+          }}
+        >
+          {open ? '✕' : '☰'}
+        </button>
+
+        {open && (
+          <>
+            <div
+              onClick={() => setOpen(false)}
+              style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 55 }}
+            />
+            <nav
+              style={{
+                ...RAIL,
+                position: 'fixed', top: 0, left: 0, height: '100vh',
+                width: '82vw', maxWidth: 300, borderRadius: 0, zIndex: 56,
+                paddingTop: 68, // clear the fixed hamburger
+              }}
+            >
+              {header && <div style={{ flexShrink: 0 }}>{header}</div>}
+              {itemList}
+              {footer && <div style={{ flexShrink: 0 }}>{footer}</div>}
+            </nav>
+          </>
+        )}
+      </>
+    );
+  }
+
+  // ─── Desktop: static rail (unchanged) ───────────────────────────────────────
   return (
     <nav style={{ ...RAIL, ...style }}>
       {header && <div style={{ flexShrink: 0 }}>{header}</div>}
-      <div style={{ flex: 1, overflowY: 'auto', margin: '10px -4px', padding: '0 4px' }}>
-        {items.map((it) => (
-          <PillItem
-            key={it.id}
-            item={it}
-            active={it.id === activeId}
-            onSelect={onSelect}
-            renderIcon={renderIcon}
-          />
-        ))}
-      </div>
+      {itemList}
       {footer && <div style={{ flexShrink: 0 }}>{footer}</div>}
     </nav>
   );

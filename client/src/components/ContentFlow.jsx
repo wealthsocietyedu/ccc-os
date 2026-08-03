@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useIsMobile, cols } from '../lib/useIsMobile.js';
 
 const API_BASE = '/api/flows';
 
@@ -20,6 +21,7 @@ const TEMPLATES = [
 ];
 
 export default function ContentFlow() {
+  const isMobile = useIsMobile();
   const [topic, setTopic] = useState('');
   const [activeNodes, setActiveNodes] = useState([]);
   const [running, setRunning] = useState(false);
@@ -81,7 +83,7 @@ export default function ContentFlow() {
     header: { marginBottom: '32px' },
     title: { fontSize: '24px', fontWeight: '700', color: '#F0A800', margin: '0 0 4px' },
     sub: { fontSize: '13px', color: '#6B7280', fontFamily: 'DM Mono, monospace' },
-    grid: { display: 'grid', gridTemplateColumns: '320px 1fr', gap: '24px' },
+    grid: { display: 'grid', gridTemplateColumns: cols(isMobile, '320px 1fr'), gap: '24px' },
     panel: { background: '#1A1614', border: '1px solid #2A2520', borderRadius: '12px', padding: '20px' },
     label: { fontSize: '11px', color: '#9CA3AF', fontFamily: 'DM Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' },
     input: { width: '100%', background: '#0C0A07', border: '1px solid #2A2520', borderRadius: '8px', color: '#E5E7EB', padding: '10px 12px', fontSize: '14px', fontFamily: 'Sora, sans-serif', boxSizing: 'border-box' },
