@@ -27,9 +27,18 @@ const C = {
 
 // ─── Fetch helper ─────────────────────────────────────────────────────────────
 async function api(path, opts = {}) {
+  // The channel-downloader router is auth-gated (server/index.js), so every call
+  // needs the Bearer token — the JWT lives in localStorage, not a cookie, so it
+  // won't ride along automatically. Same token key ('ccc_token') the shared
+  // api.js client uses. Without this, gating the router 401s the whole UI.
+  const token = localStorage.getItem('ccc_token');
   const res = await fetch(`${API}${path}`, {
-    headers: { 'Content-Type': 'application/json' },
     ...opts,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(opts.headers || {}),
+    },
     body: opts.body ? JSON.stringify(opts.body) : undefined,
   });
   if (!res.ok) {

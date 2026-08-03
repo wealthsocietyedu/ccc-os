@@ -81,7 +81,7 @@ app.use('/api/flows', authenticate, contentFlowRoutes);
 app.use('/api/video-downloader', videoDownloaderRoutes);
 app.use('/api/csv-import', csvImportRoutes);
 app.use('/api/advisor', advisorRoutes);
-app.use('/api/channel-downloader', channelDownloaderRoutes);
+app.use('/api/channel-downloader', authenticate, channelDownloaderRoutes);
 
 // ─── ADMIN ENDPOINTS ──────────────────────────────────────────────────────────
 

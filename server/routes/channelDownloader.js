@@ -7,7 +7,6 @@ const { v4: uuidv4 } = require('uuid');
 const Anthropic = require('@anthropic-ai/sdk');
 const { getDB } = require('../db');
 const { cookieArgs } = require('../utils/ytdlpCookies');
-const { authenticate } = require('../middleware/auth');
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -645,16 +644,12 @@ router.get('/files/:jobId', (req, res) => {
 // saves it (Downloads folder on desktop, "Save to Files" on iOS) instead of
 // playing it inline. Files otherwise only live on the server's Railway volume.
 //
-// Auth-gated (route-level `authenticate`): the frontend fetches this WITH the
-// Bearer token and saves via a blob URL — a native <a href download> can't send
-// the JWT, which lives in localStorage, not a cookie. See channelDownloader.
-// downloadFile, mirroring the smartClipper.downloadClip pattern.
-//
-// NOTE: the rest of this router is currently mounted WITHOUT `authenticate`
-// (server/index.js), so auth is applied here per-route to gate raw file egress
-// without breaking the existing unauthenticated jobs/start/status calls. The
-// broader unauthenticated-router gap is pre-existing and flagged for review.
-router.get('/file/:jobId/:filename', authenticate, (req, res) => {
+// Auth-gated (the whole router is mounted behind `authenticate` in
+// server/index.js): the frontend fetches this WITH the Bearer token and saves
+// via a blob URL — a native <a href download> can't send the JWT, which lives
+// in localStorage, not a cookie. See channelDownloader.downloadFile, mirroring
+// the smartClipper.downloadClip pattern.
+router.get('/file/:jobId/:filename', (req, res) => {
   const job = req.db.prepare(`SELECT output_dir FROM download_jobs WHERE id=?`).get(req.params.jobId);
   if (!job || !job.output_dir) return res.status(404).json({ error: 'Job not found' });
 
