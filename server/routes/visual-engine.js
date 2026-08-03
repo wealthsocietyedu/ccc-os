@@ -84,21 +84,21 @@ function logGen(userId, type, provider, credits, prompt, status, url, meta) {
 }
 
 function requireAuth(req, res, next) {
-  if (!req.user) return res.status(401).json({ error: 'Unauthorized' });
+  if (!req.userId) return res.status(401).json({ error: 'Unauthorized' });
   next();
 }
 
 // ─── GET: Credits ────────────────────────────────────────────────────────────
 router.get('/credits', requireAuth, (req, res) => {
-  const credits = getCredits(req.user.id);
-  const history = db.prepare('SELECT * FROM credit_transactions WHERE user_id=? ORDER BY created_at DESC LIMIT 20').all(req.user.id);
-  const gens = db.prepare('SELECT * FROM visual_generations WHERE user_id=? ORDER BY created_at DESC LIMIT 10').all(req.user.id);
+  const credits = getCredits(req.userId);
+  const history = db.prepare('SELECT * FROM credit_transactions WHERE user_id=? ORDER BY created_at DESC LIMIT 20').all(req.userId);
+  const gens = db.prepare('SELECT * FROM visual_generations WHERE user_id=? ORDER BY created_at DESC LIMIT 10').all(req.userId);
   res.json({ success: true, balance: credits.balance, total_earned: credits.total_earned, total_spent: credits.total_spent, history, recent_generations: gens, credit_costs: CREDIT_COSTS });
 });
 
 // ─── GET: History ────────────────────────────────────────────────────────────
 router.get('/history', requireAuth, (req, res) => {
-  const gens = db.prepare('SELECT * FROM visual_generations WHERE user_id=? ORDER BY created_at DESC LIMIT 50').all(req.user.id);
+  const gens = db.prepare('SELECT * FROM visual_generations WHERE user_id=? ORDER BY created_at DESC LIMIT 50').all(req.userId);
   res.json({ success: true, generations: gens });
 });
 
@@ -123,7 +123,7 @@ router.post('/plan', requireAuth, async (req, res) => {
   if (!brief) return res.status(400).json({ error: 'Brief required' });
 
   const cost = CREDIT_COSTS['plan-prompt'];
-  const credits = getCredits(req.user.id);
+  const credits = getCredits(req.userId);
   if (credits.balance < cost) return res.status(402).json({ error: 'Insufficient credits', balance: credits.balance, required: cost });
 
   try {
@@ -150,8 +150,8 @@ Return ONLY valid JSON:
     });
 
     const plan = JSON.parse(msg.content[0].text.trim().replace(/```json\n?|\n?```/g, ''));
-    spendCredits(req.user.id, cost, `Plan: ${brief.slice(0, 50)}`);
-    logGen(req.user.id, 'plan-prompt', 'claude', cost, brief, 'completed', null, plan);
+    spendCredits(req.userId, cost, `Plan: ${brief.slice(0, 50)}`);
+    logGen(req.userId, 'plan-prompt', 'claude', cost, brief, 'completed', null, plan);
     res.json({ success: true, plan, credits_used: cost, remaining: credits.balance - cost });
   } catch (e) {
     res.status(500).json({ error: 'Plan generation failed', details: e.message });
@@ -165,7 +165,7 @@ router.post('/generate/image', requireAuth, async (req, res) => {
 
   const provider = (useFlux && process.env.REPLICATE_API_TOKEN) ? 'flux' : 'pollinations';
   const cost = provider === 'flux' ? CREDIT_COSTS['image-flux'] : 0;
-  const credits = getCredits(req.user.id);
+  const credits = getCredits(req.userId);
   if (credits.balance < cost) return res.status(402).json({ error: 'Insufficient credits', balance: credits.balance, required: cost });
 
   const styleMap = {
@@ -212,8 +212,8 @@ router.post('/generate/image', requireAuth, async (req, res) => {
     }
 
     if (!imageUrl) throw new Error('No image URL returned');
-    spendCredits(req.user.id, cost, `Image: ${prompt.slice(0, 50)}`);
-    const g = logGen(req.user.id, `image-${provider}`, provider, cost, enhanced, 'completed', imageUrl, { style, aspectRatio, w, h });
+    spendCredits(req.userId, cost, `Image: ${prompt.slice(0, 50)}`);
+    const g = logGen(req.userId, `image-${provider}`, provider, cost, enhanced, 'completed', imageUrl, { style, aspectRatio, w, h });
     res.json({ success: true, imageUrl, provider, originalPrompt: prompt, enhancedPrompt: enhanced, credits_used: cost, remaining: credits.balance - cost, generation_id: g.lastInsertRowid });
   } catch (e) {
     res.status(500).json({ error: 'Image generation failed', details: e.message });
@@ -226,7 +226,7 @@ router.post('/generate/faceless-video', requireAuth, async (req, res) => {
   if (!script && !topic) return res.status(400).json({ error: 'Script or topic required' });
 
   const cost = CREDIT_COSTS['video-faceless'];
-  const credits = getCredits(req.user.id);
+  const credits = getCredits(req.userId);
   if (credits.balance < cost) return res.status(402).json({ error: 'Insufficient credits', balance: credits.balance, required: cost });
   if (!process.env.BLOTATO_API_KEY) return res.status(503).json({ error: 'Blotato not connected', message: 'Add BLOTATO_API_KEY to Railway env vars', setupUrl: 'https://my.blotato.com' });
 
@@ -249,8 +249,8 @@ router.post('/generate/faceless-video', requireAuth, async (req, res) => {
     const d = await r.json();
     if (!r.ok) throw new Error(d.error || d.message || 'Blotato error');
 
-    spendCredits(req.user.id, cost, `Faceless video: ${(topic || script || '').slice(0, 50)}`);
-    const g = logGen(req.user.id, 'video-faceless', 'blotato', cost, finalScript, 'processing', null, { platform, visualStyle, jobId: d.job_id || d.id });
+    spendCredits(req.userId, cost, `Faceless video: ${(topic || script || '').slice(0, 50)}`);
+    const g = logGen(req.userId, 'video-faceless', 'blotato', cost, finalScript, 'processing', null, { platform, visualStyle, jobId: d.job_id || d.id });
     res.json({ success: true, job_id: d.job_id || d.id, status: 'processing', script: finalScript, provider: 'blotato', estimated_time: '2-3 minutes', credits_used: cost, remaining: credits.balance - cost, generation_id: g.lastInsertRowid, poll_url: `/api/visual-engine/status/${d.job_id || d.id}` });
   } catch (e) {
     res.status(500).json({ error: 'Faceless video failed', details: e.message });
@@ -263,7 +263,7 @@ router.post('/generate/carousel', requireAuth, async (req, res) => {
   if (!topic) return res.status(400).json({ error: 'Topic required' });
 
   const cost = CREDIT_COSTS['carousel'];
-  const credits = getCredits(req.user.id);
+  const credits = getCredits(req.userId);
   if (credits.balance < cost) return res.status(402).json({ error: 'Insufficient credits', balance: credits.balance, required: cost });
   if (!process.env.BLOTATO_API_KEY) return res.status(503).json({ error: 'Blotato not connected', message: 'Add BLOTATO_API_KEY to Railway env vars' });
 
@@ -286,8 +286,8 @@ router.post('/generate/carousel', requireAuth, async (req, res) => {
     const d = await r.json();
     if (!r.ok) throw new Error(d.error || 'Blotato carousel error');
 
-    spendCredits(req.user.id, cost, `Carousel: ${topic.slice(0, 50)}`);
-    const g = logGen(req.user.id, 'carousel', 'blotato', cost, topic, 'processing', null, { slides: slideContent, jobId: d.job_id });
+    spendCredits(req.userId, cost, `Carousel: ${topic.slice(0, 50)}`);
+    const g = logGen(req.userId, 'carousel', 'blotato', cost, topic, 'processing', null, { slides: slideContent, jobId: d.job_id });
     res.json({ success: true, job_id: d.job_id || d.id, status: 'processing', slides: slideContent, provider: 'blotato', credits_used: cost, remaining: credits.balance - cost, generation_id: g.lastInsertRowid });
   } catch (e) {
     res.status(500).json({ error: 'Carousel generation failed', details: e.message });
@@ -300,7 +300,7 @@ router.post('/generate/broll', requireAuth, async (req, res) => {
   if (!subject) return res.status(400).json({ error: 'Subject required' });
 
   const cost = CREDIT_COSTS['video-broll'];
-  const credits = getCredits(req.user.id);
+  const credits = getCredits(req.userId);
   if (credits.balance < cost) return res.status(402).json({ error: 'Insufficient credits', balance: credits.balance, required: cost });
 
   try {
@@ -312,8 +312,8 @@ router.post('/generate/broll', requireAuth, async (req, res) => {
     });
 
     const prompt = msg.content[0].text.trim();
-    spendCredits(req.user.id, cost, `B-roll: ${subject.slice(0, 50)}`);
-    logGen(req.user.id, 'video-broll', 'ltx2', cost, prompt, 'completed', null, { subject, mood, platform });
+    spendCredits(req.userId, cost, `B-roll: ${subject.slice(0, 50)}`);
+    logGen(req.userId, 'video-broll', 'ltx2', cost, prompt, 'completed', null, { subject, mood, platform });
     res.json({ success: true, prompt, negativePrompt: 'shaky, glitchy, low quality, deformed, motion smear, bad anatomy, static, blurry', provider: 'ltx2', ltxPlaygroundUrl: 'https://app.ltx.studio/ltx-2-playground/t2v', credits_used: cost, remaining: credits.balance - cost });
   } catch (e) {
     res.status(500).json({ error: 'B-roll prompt failed', details: e.message });
@@ -341,9 +341,12 @@ router.get('/status/:jobId', requireAuth, async (req, res) => {
 router.post('/credits/add', requireAuth, (req, res) => {
   const { amount, description } = req.body;
   if (!amount || amount <= 0) return res.status(400).json({ error: 'Invalid amount' });
-  if (!req.user.is_admin) return res.status(403).json({ error: 'Admin only' });
-  addCredits(req.user.id, amount, description || 'Manual credit add');
-  const c = getCredits(req.user.id);
+  // authenticate only sets req.userId; look up admin flag from the DB (same
+  // convention as the /api/admin/reseed route in server/index.js).
+  const admin = db.prepare('SELECT is_admin FROM users WHERE id = ?').get(req.userId);
+  if (!admin?.is_admin) return res.status(403).json({ error: 'Admin only' });
+  addCredits(req.userId, amount, description || 'Manual credit add');
+  const c = getCredits(req.userId);
   res.json({ success: true, balance: c.balance, added: amount });
 });
 
