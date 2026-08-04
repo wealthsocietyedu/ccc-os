@@ -166,8 +166,6 @@ export const scheduler = {
       fetch(`${BASE}/scheduler/posts/${id}`, { method: 'PATCH', headers: headers(), body: JSON.stringify(d) }).then(handle),
     delete: (id) =>
       fetch(`${BASE}/scheduler/posts/${id}`, { method: 'DELETE', headers: headers() }).then(handle),
-    publishNow: (id) =>
-      fetch(`${BASE}/scheduler/posts/${id}/publish`, { method: 'POST', headers: headers() }).then(handle),
   },
   // Auto-workflows
   workflows: {

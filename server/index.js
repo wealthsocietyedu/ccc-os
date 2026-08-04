@@ -23,7 +23,6 @@ const videoDownloaderRoutes = require('./routes/videoDownloader');
 const csvImportRoutes = require('./routes/csvImport');
 const advisorRoutes = require('./routes/advisor');
 const channelDownloaderRoutes = require('./routes/channelDownloader');
-const { startCron } = require('./scheduler/cron');
 const { getDB, reseedUserData } = require('./db');
 const { authenticate } = require('./middleware/auth');
 
@@ -165,8 +164,6 @@ app.listen(PORT, '0.0.0.0', () => {
   │   ENV: ${(process.env.NODE_ENV || 'development').padEnd(30)}│
   └─────────────────────────────────────────┘
   `);
-  // Start 5-minute publish cron job
-  startCron();
 });
 
 module.exports = app;

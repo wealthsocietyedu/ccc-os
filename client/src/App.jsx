@@ -1268,27 +1268,14 @@ function DestBadge({ id }) {
   );
 }
 
-function SchedulerRoom({ activeBrand, user }) {
-  const isAdmin = user?.is_admin === 1;
+function SchedulerRoom({ activeBrand }) {
+  const isMobile = useIsMobile();
   const [tab, setTab] = useState('queue');
-  const [connections, setConnections] = useState([]);
   const [posts, setPosts] = useState([]);
-  const [workflows, setWorkflows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
-  const [showAddWorkflow, setShowAddWorkflow] = useState(false);
-  const [wfForm, setWfForm] = useState({ source:'', dests:[], label:'' });
-  const [connecting, setConnecting] = useState(null);
-  const [manualConnect, setManualConnect] = useState(null); // { platform, setupUrl }
-  const [manualForm, setManualForm] = useState({ handle:'', access_token:'' });
   const [toast, setToast] = useState(null);
   const [form, setForm] = useState({ title:'', caption:'', format:'Short Form Video', scheduledDate:'', scheduledTime:'09:00', dests:[], mediaUrl:'' });
-
-  // ── Repurpose Rules state ──────────────────────────────────────────────────
-  const [repurposeRules, setRepurposeRules] = useState([]);
-  const [showAddRule, setShowAddRule] = useState(false);
-  const [editingRule, setEditingRule] = useState(null); // rule object for edit
-  const [ruleForm, setRuleForm] = useState({ source_platform:'', dest_platforms:[], delay_hours:2, adapt_captions:1, caption_notes:'' });
 
   const showToast = (msg, type='green') => {
     setToast({ msg, type });
@@ -1297,156 +1284,18 @@ function SchedulerRoom({ activeBrand, user }) {
 
   const load = useCallback(async () => {
     setLoading(true);
-    // Use allSettled so a failed call never blocks others from showing
-    const [connsRes, wflowsRes, rulesRes] = await Promise.allSettled([
-      api.scheduler.platforms.list(),
-      api.scheduler.workflows.list(),
-      api.scheduler.repurposeRules.list(),
-    ]);
-    if (connsRes.status === 'fulfilled') setConnections(connsRes.value);
-    else console.error('[Scheduler] platforms/list failed:', connsRes.reason);
-    if (wflowsRes.status === 'fulfilled') setWorkflows(wflowsRes.value);
-    else console.error('[Scheduler] workflows/list failed:', wflowsRes.reason);
-    if (rulesRes.status === 'fulfilled') setRepurposeRules(rulesRes.value);
-    else console.error('[Scheduler] repurpose-rules/list failed:', rulesRes.reason);
     if (activeBrand) {
       try {
         const p = await api.scheduler.posts.list(activeBrand.id);
-        setPosts(p);
+        // Normalize any legacy engine status to a planner status — this is a
+        // manual planner, so a post is only ever 'scheduled' or 'done'.
+        setPosts(p.map(x => ({ ...x, status: x.status === 'done' ? 'done' : 'scheduled' })));
       } catch(e) { console.error('[Scheduler] posts/list failed:', e); }
     }
     setLoading(false);
   }, [activeBrand?.id]);
 
   useEffect(() => { load(); }, [load]);
-
-  // Handle OAuth popup result — listens for postMessage from /oauth-callback.html
-  // Also handles the same-tab fallback (when popup was blocked) via sessionStorage
-  useEffect(() => {
-    // Popup path: postMessage from oauth-callback.html
-    const onMessage = (evt) => {
-      if (evt.data?.type !== 'ccc_oauth_result') return;
-      const { status, platform } = evt.data;
-      const name = platform ? platform.charAt(0).toUpperCase() + platform.slice(1) : 'Platform';
-      if (status === 'success') {
-        showToast(`✓ ${name} connected!`, 'green');
-        setTab('connect');
-        load();
-      } else {
-        const reason = evt.data.reason ? ` — ${decodeURIComponent(evt.data.reason).replace(/\+/g,' ')}` : '';
-        showToast(`${name} connection failed${reason}`, 'red');
-        setTab('connect');
-      }
-      setConnecting(null);
-    };
-    window.addEventListener('message', onMessage);
-
-    // Same-tab fallback: if popup was blocked, server redirects back to /?oauth=...
-    // The App-level useEffect writes that to sessionStorage; read it here.
-    const raw = sessionStorage.getItem('oauth_result');
-    if (raw) {
-      sessionStorage.removeItem('oauth_result');
-      try {
-        const { status, platform } = JSON.parse(raw);
-        const name = platform ? platform.charAt(0).toUpperCase() + platform.slice(1) : 'Platform';
-        if (status === 'success') {
-          showToast(`✓ ${name} connected!`, 'green');
-          setTab('connect');
-          load();
-        } else {
-          showToast(`${name} connection failed — check OAuth credentials in Railway`, 'red');
-          setTab('connect');
-        }
-      } catch(e) { /* ignore */ }
-    }
-
-    return () => window.removeEventListener('message', onMessage);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const handleConnect = async (platformId) => {
-    setConnecting(platformId);
-    try {
-      const data = await api.scheduler.platforms.getOAuthUrl(platformId);
-
-      // If client_id is empty the server env vars aren't set — fall back to manual form
-      const urlParams = new URL(data.oauth_url);
-      const clientId = urlParams.searchParams.get('client_id');
-      if (!clientId || !clientId.trim()) {
-        setConnecting(null);
-        setManualConnect({ platform: platformId, setupUrl: null });
-        setManualForm({ handle:'', access_token:'' });
-        return;
-      }
-
-      // ── Open OAuth popup (600×700, centered) ──────────────────────────────
-      const W = 600, H = 700;
-      const left = Math.round(window.screenX + (window.outerWidth  - W) / 2);
-      const top  = Math.round(window.screenY + (window.outerHeight - H) / 2);
-      const popup = window.open(
-        data.oauth_url,
-        'ccc_oauth',
-        `width=${W},height=${H},left=${left},top=${top},scrollbars=yes,resizable=yes,noopener=no`
-      );
-
-      if (!popup || popup.closed) {
-        // Popup blocked — fall back to same-tab redirect (existing sessionStorage flow handles result)
-        if (activeBrand?.id) sessionStorage.setItem('oauth_return_brand', activeBrand.id);
-        window.location.href = data.oauth_url;
-        return;
-      }
-
-      // Poll for popup close as a safety net in case postMessage misfires
-      const poll = setInterval(() => {
-        try {
-          if (popup.closed) {
-            clearInterval(poll);
-            setConnecting(null);
-            load(); // refresh connections regardless — if connected it'll show
-          }
-        } catch(e) { clearInterval(poll); }
-      }, 600);
-
-    } catch(e) {
-      setConnecting(null);
-      if (e?.status === 422 || e?.error === 'oauth_not_configured') {
-        setManualConnect({ platform: platformId, setupUrl: e?.setup_url });
-        setManualForm({ handle:'', access_token:'' });
-      } else {
-        showToast('Connection failed — is the server running?', 'red');
-      }
-    }
-  };
-
-  const handleManualConnect = async () => {
-    if (!manualForm.handle.trim()) return showToast('Enter your account handle or name', 'amber');
-    if (!manualForm.access_token.trim()) return showToast('Enter your access token', 'amber');
-    try {
-      await api.scheduler.platforms.connect(manualConnect.platform, {
-        handle: manualForm.handle.trim(),
-        access_token: manualForm.access_token.trim(),
-      });
-      const platform = manualConnect.platform;
-      setManualConnect(null);
-      setManualForm({ handle:'', access_token:'' });
-      await load(); // wait for refresh so the new connection shows immediately
-      showToast(`✓ ${platform.charAt(0).toUpperCase() + platform.slice(1)} connected`, 'green');
-    } catch(e) {
-      showToast(e?.message || 'Failed to save connection — check server is running', 'red');
-    }
-  };
-
-  const handleDisconnect = async (platformId) => {
-    await api.scheduler.platforms.disconnect(platformId);
-    load();
-    showToast('Platform disconnected');
-  };
-
-  const handleDisconnectById = async (connId, handle) => {
-    await api.scheduler.platforms.disconnectById(connId);
-    load();
-    showToast(`Disconnected ${handle || 'account'}`);
-  };
 
   const handleAddPost = async () => {
     if (!form.title.trim()) return showToast('Add a title', 'amber');
@@ -1472,53 +1321,19 @@ function SchedulerRoom({ activeBrand, user }) {
     } catch(e) { showToast('Failed to schedule post', 'red'); }
   };
 
-  const handlePublishNow = async (postId, title) => {
-    try {
-      setPosts(p => p.map(x => x.id===postId ? {...x, status:'publishing'} : x));
-      const result = await api.scheduler.posts.publishNow(postId);
-      load();
-      showToast(`✓ "${title.slice(0,28)}..." published to ${result.results?.filter(r=>r.success).length || 0} platforms`, 'green');
-    } catch(e) { showToast('Publish failed', 'red'); }
+  const handleMarkDone = async (id) => {
+    await api.scheduler.posts.update(id, { status: 'done' });
+    load();
+  };
+
+  const handleReopen = async (id) => {
+    await api.scheduler.posts.update(id, { status: 'scheduled' });
+    load();
   };
 
   const handleDeletePost = async (id) => {
     await api.scheduler.posts.delete(id);
     load();
-  };
-
-  const handleToggleWorkflow = async (id, currentActive) => {
-    await api.scheduler.workflows.update(id, { active: !currentActive });
-    load();
-  };
-
-  const handleDeleteWorkflow = async (id) => {
-    await api.scheduler.workflows.delete(id);
-    load();
-  };
-
-  const handleAddWorkflow = async () => {
-    if (!wfForm.source) return showToast('Pick a source platform', 'amber');
-    if (!wfForm.dests.length) return showToast('Pick at least one destination', 'amber');
-    if (wfForm.dests.includes(wfForm.source)) return showToast('Source and destination can\'t be the same', 'amber');
-    try {
-      await api.scheduler.workflows.create({
-        brand_id: activeBrand?.id,
-        source_platform: wfForm.source,
-        destinations: wfForm.dests,
-        label: wfForm.label.trim() || undefined,
-      });
-      setWfForm({ source:'', dests:[], label:'' });
-      setShowAddWorkflow(false);
-      load();
-      showToast('✓ Workflow created', 'green');
-    } catch(e) { showToast('Failed to create workflow', 'red'); }
-  };
-
-  const toggleWfDest = (id) => {
-    setWfForm(f => ({
-      ...f,
-      dests: f.dests.includes(id) ? f.dests.filter(d=>d!==id) : [...f.dests, id]
-    }));
   };
 
   const toggleDest = (id) => {
@@ -1528,74 +1343,10 @@ function SchedulerRoom({ activeBrand, user }) {
     }));
   };
 
-  // ── Repurpose Rule handlers ────────────────────────────────────────────────
-  const toggleRuleDest = (id) => {
-    setRuleForm(f => ({
-      ...f,
-      dest_platforms: f.dest_platforms.includes(id) ? f.dest_platforms.filter(d=>d!==id) : [...f.dest_platforms, id]
-    }));
-  };
-
-  const openAddRule = () => {
-    setEditingRule(null);
-    setRuleForm({ source_platform:'', dest_platforms:[], delay_hours:2, adapt_captions:1, caption_notes:'' });
-    setShowAddRule(true);
-  };
-
-  const openEditRule = (rule) => {
-    setEditingRule(rule);
-    setRuleForm({
-      source_platform: rule.source_platform,
-      dest_platforms: rule.dest_platforms || [],
-      delay_hours: rule.delay_hours ?? 2,
-      adapt_captions: rule.adapt_captions ?? 1,
-      caption_notes: rule.caption_notes || '',
-    });
-    setShowAddRule(true);
-  };
-
-  const handleSaveRule = async () => {
-    if (!ruleForm.source_platform) return showToast('Pick a source platform', 'amber');
-    if (!ruleForm.dest_platforms.length) return showToast('Pick at least one destination', 'amber');
-    if (ruleForm.dest_platforms.includes(ruleForm.source_platform)) return showToast("Source and destination can't be the same", 'amber');
-    try {
-      const payload = {
-        brand_id: activeBrand?.id,
-        source_platform: ruleForm.source_platform,
-        dest_platforms: ruleForm.dest_platforms,
-        delay_hours: Number(ruleForm.delay_hours) || 2,
-        adapt_captions: ruleForm.adapt_captions ? 1 : 0,
-        caption_notes: ruleForm.caption_notes.trim(),
-      };
-      if (editingRule) {
-        await api.scheduler.repurposeRules.update(editingRule.id, payload);
-        showToast('✓ Rule updated', 'green');
-      } else {
-        await api.scheduler.repurposeRules.create(payload);
-        showToast('✓ Repurpose rule created', 'green');
-      }
-      setShowAddRule(false);
-      setEditingRule(null);
-      load();
-    } catch(e) { showToast(e?.message || 'Failed to save rule', 'red'); }
-  };
-
-  const handleToggleRule = async (rule) => {
-    await api.scheduler.repurposeRules.update(rule.id, { active: !rule.active });
-    load();
-  };
-
-  const handleDeleteRule = async (id) => {
-    await api.scheduler.repurposeRules.delete(id);
-    load();
-    showToast('Rule deleted');
-  };
-
   if (loading) return <div className="page"><div className="loading"><I n="refresh" s={16} c="spin" /> Loading scheduler...</div></div>;
 
-  const connectedPlatforms = PLATFORM_DEFS.filter(p => connections.find(c => c.platform===p.id && c.connected));
-  const queued = posts.filter(p => p.status === 'queued').length;
-  const published = posts.filter(p => p.status === 'published').length;
+  const scheduledCount = posts.filter(p => p.status !== 'done').length;
+  const doneCount = posts.filter(p => p.status === 'done').length;
   const today = new Date();
   const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 
@@ -1618,17 +1369,12 @@ function SchedulerRoom({ activeBrand, user }) {
       {/* Header */}
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20 }}>
         <div>
-          <div style={{ fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:'.1em', color:'var(--text3)', marginBottom:4 }}>Distribution Layer</div>
-          <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-            <span style={{ fontSize:11.5, color: connectedPlatforms.length>0?'var(--green)':'var(--amber)', fontWeight:600 }}>
-              {connectedPlatforms.length>0 ? `● ${connectedPlatforms.length} platform${connectedPlatforms.length>1?'s':''} live` : '○ No platforms connected yet'}
-            </span>
+          <div style={{ fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:'.1em', color:'var(--text3)', marginBottom:4 }}>Content Planner</div>
+          <div style={{ fontSize:11.5, color:'var(--text3)', fontWeight:500 }}>
+            Plan and track your posts. CCC OS does not post on your behalf.
           </div>
         </div>
         <div style={{ display:'flex', gap:8 }}>
-          <button className="btn btn-ghost" onClick={() => setTab('connect')}>
-            <I n="plus" s={13} /> Connect Platform
-          </button>
           <button className="btn btn-primary" onClick={() => setShowAdd(true)}>
             <I n="calendar" s={13} /> Schedule Post
           </button>
@@ -1636,12 +1382,10 @@ function SchedulerRoom({ activeBrand, user }) {
       </div>
 
       {/* Stats */}
-      <div className="grid-4" style={{ marginBottom:20 }}>
+      <div className="grid-4" style={{ marginBottom:20, gridTemplateColumns: cols(isMobile, 'repeat(2,1fr)', '1fr 1fr') }}>
         {[
-          ['Queued', queued, 'var(--accent2)', 'calendar'],
-          ['Published', published, 'var(--green)', 'check'],
-          ['Connected', connectedPlatforms.length, 'var(--cyan)', 'link'],
-          ['Workflows', workflows.filter(w=>w.active).length, 'var(--amber)', 'zap'],
+          ['Scheduled', scheduledCount, 'var(--accent2)', 'calendar'],
+          ['Done', doneCount, 'var(--green)', 'check'],
         ].map(([lbl,val,col,icon]) => (
           <div className="panel" key={lbl} style={{ textAlign:'center', padding:'16px 12px' }}>
             <I n={icon} s={18} style={{ color:col, marginBottom:8, display:'block', margin:'0 auto 8px' }} />
@@ -1653,7 +1397,8 @@ function SchedulerRoom({ activeBrand, user }) {
 
       {/* Calendar strip */}
       <div className="sec-hdr"><div className="sec-title"><I n="calendar" s={13} /> This Week</div></div>
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:6, marginBottom:22 }}>
+      <div style={{ overflowX: isMobile ? 'auto' : 'visible', marginBottom:22 }}>
+      <div style={{ display:'grid', gridTemplateColumns: cols(isMobile, 'repeat(7,1fr)', 'repeat(7, 64px)'), gap:6 }}>
         {weekDays.map((d,i) => {
           const isToday = d.toDateString() === today.toDateString();
           const dayPosts = posts.filter(p => {
@@ -1674,34 +1419,40 @@ function SchedulerRoom({ activeBrand, user }) {
           );
         })}
       </div>
+      </div>
 
       {/* Tabs */}
-      <div className="tabs">
-        {[['queue','📋 Queue'],['repurpose','🔄 Repurpose'],['workflows','⚡ Workflows'],['connect','🔌 Platforms'],['log','📊 Log']].map(([t,lbl]) => (
-          <button key={t} className={`tab ${tab===t?'active':''}`} onClick={() => setTab(t)}>{lbl}</button>
+      <div className="tabs" style={{ width: isMobile ? '100%' : undefined, maxWidth:'100%', overflowX:'auto' }}>
+        {[['queue','📋 Planner']].map(([t,lbl]) => (
+          <button key={t} className={`tab ${tab===t?'active':''}`} style={{ flexShrink:0, whiteSpace:'nowrap' }} onClick={() => setTab(t)}>{lbl}</button>
         ))}
       </div>
 
-      {/* ── Queue Tab ── */}
+      {/* ── Planner Tab ── */}
       {tab === 'queue' && (
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 280px', gap:20, alignItems:'start' }}>
+        <div style={{ display:'grid', gridTemplateColumns: cols(isMobile, '1fr 280px'), gap:20, alignItems:'start' }}>
           <div>
             <div className="sec-hdr">
-              <div className="sec-title">Publishing Queue</div>
+              <div className="sec-title">Your Content Plan</div>
               <span style={{ fontSize:11, color:'var(--text3)' }}>{posts.length} posts total</span>
             </div>
             {posts.length === 0 && (
               <div className="panel empty">
-                No posts scheduled yet. Click "Schedule Post" to add your first one.
+                No posts planned yet. Click "Schedule Post" to add your first one.
               </div>
             )}
             {posts.map(post => {
               const sTime = new Date(post.scheduled_at);
               const timeStr = sTime.toLocaleDateString('en-US',{month:'short',day:'numeric'}) + ' · ' + sTime.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
-              const STATUS_COLOR = { queued:'var(--text3)', publishing:'var(--amber)', published:'var(--green)', failed:'var(--red)', partial:'var(--amber)' };
-              const STATUS_ICON = { queued:'·', publishing:'↑', published:'✓', failed:'✗', partial:'⚠' };
+              const isDone = post.status === 'done';
+              const isPastDue = !isDone && sTime < today;
+              const chip = isDone
+                ? { icon:'✓', color:'var(--green)', bg:'var(--green-d)', label:'Done', labelColor:'var(--green)' }
+                : isPastDue
+                  ? { icon:'!', color:'var(--amber)', bg:'var(--amber-d)', label:'Past due', labelColor:'var(--amber)' }
+                  : { icon:'·', color:'var(--text3)', bg:'var(--surface2)', label:'Scheduled', labelColor:'var(--text3)' };
               return (
-                <div key={post.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 14px', background:'var(--surface)', border:`1px solid ${post.status==='published'?'rgba(34,197,94,.2)':post.status==='failed'?'rgba(239,68,68,.2)':'var(--border)'}`, borderRadius:'var(--r-sm)', marginBottom:8, opacity:post.status==='published'?.65:1, transition:'border-color .15s' }}>
+                <div key={post.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 14px', background:'var(--surface)', border:`1px solid ${isDone?'rgba(34,197,94,.2)':'var(--border)'}`, borderRadius:'var(--r-sm)', marginBottom:8, opacity:isDone?.7:1, transition:'border-color .15s' }}>
                   <div style={{ width:40, height:40, borderRadius:8, background:'var(--surface2)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:18, flexShrink:0 }}>
                     🎬
                   </div>
@@ -1713,18 +1464,23 @@ function SchedulerRoom({ activeBrand, user }) {
                     </div>
                   </div>
                   <div style={{ textAlign:'right', flexShrink:0 }}>
-                    <div style={{ fontSize:11.5, color:'var(--text2)', fontWeight:500, marginBottom:4 }}>{timeStr}</div>
+                    <div style={{ fontSize:11.5, color:'var(--text2)', fontWeight:500, marginBottom:2 }}>{timeStr}</div>
+                    <div style={{ fontSize:10, color:chip.labelColor, fontWeight:600, marginBottom:4 }}>{chip.label}</div>
                     <div style={{ display:'flex', gap:5, justifyContent:'flex-end' }}>
-                      {post.status === 'queued' && (
-                        <button className="btn btn-ghost btn-sm" style={{ fontSize:10.5, padding:'3px 9px' }} onClick={() => handlePublishNow(post.id, post.title)}>
-                          Publish Now
+                      {isDone ? (
+                        <button className="btn btn-ghost btn-sm" style={{ fontSize:10.5, padding:'3px 9px' }} onClick={() => handleReopen(post.id)}>
+                          Reopen
+                        </button>
+                      ) : (
+                        <button className="btn btn-ghost btn-sm" style={{ fontSize:10.5, padding:'3px 9px' }} onClick={() => handleMarkDone(post.id)}>
+                          Mark Done
                         </button>
                       )}
                       <button className="btn btn-ghost btn-sm btn-icon" onClick={() => handleDeletePost(post.id)}><I n="trash" s={11} /></button>
                     </div>
                   </div>
-                  <div style={{ width:22, height:22, borderRadius:'50%', background: post.status==='published'?'var(--green-d)':post.status==='publishing'?'var(--amber-d)':post.status==='failed'?'var(--red-d)':'var(--surface2)', color:STATUS_COLOR[post.status]||'var(--text3)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:700, flexShrink:0 }}>
-                    {STATUS_ICON[post.status]||'·'}
+                  <div style={{ width:22, height:22, borderRadius:'50%', background: chip.bg, color:chip.color, display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:700, flexShrink:0 }}>
+                    {chip.icon}
                   </div>
                 </div>
               );
@@ -1743,461 +1499,12 @@ function SchedulerRoom({ activeBrand, user }) {
               ))}
             </div>
             <div className="panel">
-              <div className="sec-title" style={{ marginBottom:10, fontSize:12 }}>Publishing Rules</div>
+              <div className="sec-title" style={{ marginBottom:10, fontSize:12 }}>Posting Tips</div>
               {['Every post needs a CTA','Space posts 3h+ apart per platform','Batch-schedule on Mondays','Review analytics at 48h'].map(r => (
                 <div key={r} style={{ display:'flex', gap:7, padding:'5px 0', borderBottom:'1px solid var(--border)', fontSize:11.5, color:'var(--text2)', lineHeight:1.4 }}>
                   <span style={{ color:'var(--accent2)', flexShrink:0 }}>→</span>{r}
                 </div>
               ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── Repurpose Tab ── */}
-      {tab === 'repurpose' && (
-        <div>
-          <div className="sec-hdr">
-            <div className="sec-title">Auto-Repurpose Engine</div>
-            <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-              <span style={{ fontSize:11, color:'var(--text3)' }}>Publish once → auto-schedule everywhere</span>
-              <button className="btn btn-primary btn-sm" onClick={openAddRule}>
-                <I n="plus" s={12} /> New Rule
-              </button>
-            </div>
-          </div>
-
-          {/* Explainer banner */}
-          <div style={{ background:'var(--accent3)', border:'1px solid rgba(108,71,255,.2)', borderRadius:'var(--r-sm)', padding:'12px 16px', marginBottom:18, display:'flex', gap:12, alignItems:'flex-start' }}>
-            <span style={{ fontSize:20, flexShrink:0 }}>🔄</span>
-            <div>
-              <div style={{ fontSize:12.5, fontWeight:700, color:'var(--accent2)', marginBottom:3 }}>How the Repurpose Engine Works</div>
-              <div style={{ fontSize:11.5, color:'var(--text2)', lineHeight:1.6 }}>
-                When a post publishes to a source platform, CCC OS automatically schedules derivative posts to your chosen destinations — with AI-adapted captions per platform. Like repurpose.io, but built in.
-              </div>
-            </div>
-          </div>
-
-          {/* Rules list */}
-          {repurposeRules.length === 0 && (
-            <div className="panel empty">
-              No repurpose rules yet. Create one to auto-distribute your content across platforms.
-            </div>
-          )}
-          {repurposeRules.map(rule => {
-            const srcDef = PLATFORM_DEFS.find(p => p.id === rule.source_platform);
-            const destDefs = (rule.dest_platforms || []).map(d => PLATFORM_DEFS.find(p => p.id === d)).filter(Boolean);
-            return (
-              <div key={rule.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'13px 16px', background:'var(--surface)', border:`1px solid ${rule.active ? 'rgba(108,71,255,.2)' : 'var(--border)'}`, borderRadius:'var(--r-sm)', marginBottom:8, opacity: rule.active ? 1 : 0.6, transition:'all .15s' }}>
-                {/* Source */}
-                <div style={{ display:'flex', alignItems:'center', gap:7, flexShrink:0 }}>
-                  <span style={{ fontSize:18 }}>{srcDef?.icon || '•'}</span>
-                  <div>
-                    <div style={{ fontSize:11.5, fontWeight:700, color:'var(--text)' }}>{srcDef?.name || rule.source_platform}</div>
-                    <div style={{ fontSize:10, color:'var(--text3)' }}>source</div>
-                  </div>
-                </div>
-
-                {/* Arrow */}
-                <div style={{ color:'var(--accent2)', fontSize:16, fontWeight:700, flexShrink:0 }}>→</div>
-
-                {/* Destinations */}
-                <div style={{ display:'flex', gap:5, flex:1, flexWrap:'wrap', alignItems:'center' }}>
-                  {destDefs.map(d => <DestBadge key={d.id} id={d.id} />)}
-                </div>
-
-                {/* Meta */}
-                <div style={{ display:'flex', flexDirection:'column', gap:3, alignItems:'flex-end', flexShrink:0 }}>
-                  <span style={{ fontSize:10.5, color:'var(--text3)' }}>⏱ {rule.delay_hours}h delay</span>
-                  <span style={{ fontSize:10.5, color: rule.adapt_captions ? 'var(--accent2)' : 'var(--text3)' }}>
-                    {rule.adapt_captions ? '✦ AI captions' : '○ Copy caption'}
-                  </span>
-                </div>
-
-                {/* Active toggle */}
-                <div style={{ display:'flex', alignItems:'center', gap:8, flexShrink:0 }}>
-                  <span style={{ fontSize:10.5, color: rule.active ? 'var(--green)' : 'var(--text3)', fontWeight:600 }}>{rule.active ? 'Active' : 'Paused'}</span>
-                  <button onClick={() => handleToggleRule(rule)}
-                    style={{ width:36, height:20, borderRadius:10, background: rule.active ? 'var(--green)' : 'var(--surface2)', border:'none', cursor:'pointer', position:'relative', transition:'background .15s', flexShrink:0 }}>
-                    <span style={{ position:'absolute', top:2, left: rule.active ? 18 : 2, width:16, height:16, borderRadius:'50%', background:'#fff', transition:'left .15s', display:'block' }} />
-                  </button>
-                </div>
-
-                {/* Edit / Delete */}
-                <div style={{ display:'flex', gap:5, flexShrink:0 }}>
-                  <button className="btn btn-ghost btn-sm btn-icon" onClick={() => openEditRule(rule)} title="Edit rule"><I n="edit" s={11} /></button>
-                  <button className="btn btn-ghost btn-sm btn-icon" onClick={() => handleDeleteRule(rule.id)} title="Delete rule"><I n="trash" s={11} /></button>
-                </div>
-              </div>
-            );
-          })}
-
-          {/* Stats footer */}
-          {repurposeRules.length > 0 && (
-            <div style={{ marginTop:14, padding:'10px 14px', background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'var(--r-sm)', display:'flex', gap:24, fontSize:11.5, color:'var(--text3)' }}>
-              <span>📋 <strong style={{ color:'var(--text)' }}>{repurposeRules.length}</strong> rule{repurposeRules.length!==1?'s':''} total</span>
-              <span>✅ <strong style={{ color:'var(--green)' }}>{repurposeRules.filter(r=>r.active).length}</strong> active</span>
-              <span>✦ <strong style={{ color:'var(--accent2)' }}>{repurposeRules.filter(r=>r.adapt_captions).length}</strong> using AI captions</span>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ── Workflows Tab ── */}
-      {tab === 'workflows' && (
-        <div>
-          <div className="sec-hdr">
-            <div className="sec-title">Auto-Distribution Workflows</div>
-            <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-              <span style={{ fontSize:11, color:'var(--text3)' }}>Post once → publish everywhere</span>
-              <button className="btn btn-primary btn-sm" onClick={() => setShowAddWorkflow(true)}>
-                <I n="plus" s={12} /> Add Workflow
-              </button>
-            </div>
-          </div>
-          <div style={{ background:'var(--accent3)', border:'1px solid rgba(108,71,255,.2)', borderRadius:'var(--r-sm)', padding:'12px 16px', marginBottom:18, display:'flex', gap:10, alignItems:'center' }}>
-            <span style={{ fontSize:18 }}>⚡</span>
-            <div>
-              <div style={{ fontSize:12.5, fontWeight:700, color:'var(--accent2)', marginBottom:2 }}>How Workflows Work</div>
-              <div style={{ fontSize:11.5, color:'var(--text2)' }}>Post to your source platform — CCC OS auto-distributes to all destinations. No watermarks. No manual uploads.</div>
-            </div>
-          </div>
-          {workflows.map(w => {
-            const srcDef = PLATFORM_DEFS.find(p => p.id === w.source_platform);
-            return (
-              <div key={w.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'11px 14px', background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'var(--r-sm)', marginBottom:8 }}>
-                <span style={{ fontSize:15 }}>{srcDef?.icon || '•'}</span>
-                <span style={{ fontSize:12.5, fontWeight:600, color:'var(--text)', minWidth:100 }}>{srcDef?.name || w.source_platform}</span>
-                <span style={{ color:'var(--accent2)', fontSize:14 }}>→</span>
-                <div style={{ display:'flex', gap:5, flex:1, flexWrap:'wrap' }}>
-                  {w.destinations.map(d => <DestBadge key={d} id={d} />)}
-                </div>
-                <span style={{ fontSize:10.5, color: w.active?'var(--green)':'var(--text3)', fontWeight:600 }}>{w.active?'Active':'Paused'}</span>
-                <button onClick={() => handleToggleWorkflow(w.id, w.active)}
-                  style={{ width:36, height:20, borderRadius:10, background: w.active?'var(--green)':'var(--surface2)', border:'none', cursor:'pointer', position:'relative', transition:'background .15s', flexShrink:0 }}>
-                  <span style={{ position:'absolute', top:2, left: w.active?18:2, width:16, height:16, borderRadius:'50%', background:'#fff', transition:'left .15s', display:'block' }} />
-                </button>
-                <button className="btn btn-ghost btn-sm btn-icon" onClick={() => handleDeleteWorkflow(w.id)}><I n="trash" s={11} /></button>
-              </div>
-            );
-          })}
-          {workflows.length === 0 && <div className="panel empty">No workflows yet. Connect platforms first, then workflows will appear here.</div>}
-        </div>
-      )}
-
-      {/* ── Connect Tab ── */}
-      {tab === 'connect' && (
-        <div>
-          <div className="sec-hdr">
-            <div className="sec-title">Connect Your Platforms</div>
-            <button className="btn btn-ghost btn-sm" onClick={load} title="Refresh connections">
-              <I n="refresh" s={12} /> Refresh
-            </button>
-          </div>
-          <div style={{ background:'var(--green-d)', border:'1px solid rgba(34,197,94,.2)', borderRadius:'var(--r-sm)', padding:'11px 15px', marginBottom:18, fontSize:11.5, color:'var(--text2)' }}>
-            🔒 Platforms connect via secure OAuth 2.0. We store only an access token — never your password. Disconnect any time.
-          </div>
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:12 }}>
-            {PLATFORM_DEFS.map(p => {
-              // All connected accounts for this platform
-              const platformConns = connections.filter(c => c.platform === p.id && c.connected);
-              const conn = platformConns[0]; // primary (first)
-              const isConnecting = connecting === p.id;
-              return (
-                <div key={p.id} style={{ background: conn?'var(--green-d)':p.comingSoon?'var(--surface)':'var(--surface)', border:`2px solid ${conn?'rgba(34,197,94,.35)':'var(--border)'}`, borderRadius:'var(--r)', padding:'18px 14px', textAlign:'center', opacity: p.comingSoon?.5:1 }}>
-                  <div style={{ fontSize:28, marginBottom:8 }}>{p.icon}</div>
-                  <div style={{ fontFamily:'var(--font-d)', fontSize:12.5, fontWeight:700, color:'var(--text)', marginBottom:6 }}>{p.name}</div>
-
-                  {/* Show all connected accounts */}
-                  {platformConns.length > 0 && (
-                    <div style={{ marginBottom:8 }}>
-                      {platformConns.map(c => (
-                        <div key={c.id} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:6, padding:'4px 6px', background:'rgba(34,197,94,.08)', borderRadius:6, marginBottom:4, fontSize:10.5 }}>
-                          <span style={{ color:'var(--green)', fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', maxWidth:120 }}>● {c.handle || 'Connected'}</span>
-                          {isAdmin && (
-                            <button className="btn btn-ghost btn-sm btn-icon" style={{ padding:'1px 4px', minWidth:'unset' }} onClick={() => handleDisconnectById(c.id, c.handle)} title="Disconnect this account">
-                              <I n="x" s={9} />
-                            </button>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {!conn && !p.comingSoon && <div style={{ fontSize:10.5, color:'var(--text3)', marginBottom:8 }}>Not connected</div>}
-                  {p.comingSoon && <div style={{ fontSize:10.5, color:'var(--text3)', marginBottom:8 }}>Coming Soon</div>}
-
-                  {!p.comingSoon && (
-                    <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-                      {/* Connect / Add another button */}
-                      <button
-                        className="btn btn-primary btn-sm"
-                        style={{ width:'100%', justifyContent:'center', background: isConnecting?'var(--surface2)':'var(--accent)' }}
-                        onClick={() => handleConnect(p.id)}
-                        disabled={isConnecting}
-                      >
-                        {isConnecting ? 'Connecting...' : conn ? (isAdmin ? '+ Add Account' : 'Reconnect') : 'Connect →'}
-                      </button>
-                      {/* Disconnect all (non-admin, or admin convenience) */}
-                      {conn && !isAdmin && (
-                        <button className="btn btn-danger btn-sm" style={{ width:'100%', justifyContent:'center' }} onClick={() => handleDisconnect(p.id)}>
-                          Disconnect
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-          <div style={{ marginTop:20, padding:'14px 18px', background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'var(--r)', fontSize:12, color:'var(--text3)', lineHeight:1.6 }}>
-            <strong style={{ color:'var(--text2)' }}>All 8 platforms supported:</strong> YouTube, Instagram, TikTok, X/Twitter, Threads, Facebook, LinkedIn, Pinterest. To enable OAuth for each platform, add the corresponding credentials to the <code style={{ background:'var(--surface2)', padding:'1px 5px', borderRadius:4, fontSize:11 }}>.env</code> file. Threads reuses your Instagram/Meta app credentials — no separate app needed.
-          </div>
-        </div>
-      )}
-
-      {/* ── Log Tab ── */}
-      {tab === 'log' && <SchedulerLogTab activeBrand={activeBrand} />}
-
-      {/* ── Manual Connect Modal ── */}
-      {manualConnect && (
-        <div className="modal-overlay" onClick={() => setManualConnect(null)}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
-            <div className="modal-title">
-              {PLATFORM_DEFS.find(p => p.id === manualConnect.platform)?.icon} Manual Connect — {manualConnect.platform.charAt(0).toUpperCase() + manualConnect.platform.slice(1)}
-            </div>
-
-            <div style={{ background:'var(--amber-d)', border:'1px solid rgba(245,158,11,.25)', borderRadius:'var(--r-sm)', padding:'11px 14px', marginBottom:18, fontSize:12, color:'var(--text2)', lineHeight:1.6 }}>
-              ⚠️ <strong style={{ color:'var(--amber)' }}>OAuth credentials not set up yet.</strong><br />
-              You can paste an access token directly to connect now, or{' '}
-              {manualConnect.setupUrl && <><a href={manualConnect.setupUrl} target="_blank" rel="noreferrer" style={{ color:'var(--accent2)' }}>create a developer app here</a> and add the credentials to your </>}
-              <code style={{ background:'var(--surface2)', padding:'1px 5px', borderRadius:4, fontSize:11 }}>.env</code> file to enable full OAuth.
-            </div>
-
-            <div className="form-row">
-              <label className="form-label">Account Handle / Name</label>
-              <input
-                className="form-input"
-                placeholder={manualConnect.platform === 'youtube' ? 'My YouTube Channel' : manualConnect.platform === 'instagram' ? '@yourusername' : manualConnect.platform === 'linkedin' ? 'urn:li:person:xxxx' : 'Page ID or name'}
-                value={manualForm.handle}
-                onChange={e => setManualForm(f => ({ ...f, handle: e.target.value }))}
-                autoFocus
-              />
-            </div>
-
-            <div className="form-row">
-              <label className="form-label">Access Token</label>
-              <textarea
-                className="form-textarea"
-                rows={3}
-                placeholder="Paste your access token here..."
-                value={manualForm.access_token}
-                onChange={e => setManualForm(f => ({ ...f, access_token: e.target.value }))}
-                style={{ fontFamily:'monospace', fontSize:11 }}
-              />
-              <div style={{ fontSize:11, color:'var(--text3)', marginTop:5, lineHeight:1.5 }}>
-                {manualConnect.platform === 'youtube' && 'Get from Google OAuth Playground: oauth2.googleapis.com/device/code — needs youtube.upload scope.'}
-                {manualConnect.platform === 'instagram' && 'Get from Meta Graph Explorer (graph.facebook.com/explorer) — needs instagram_content_publish scope.'}
-                {manualConnect.platform === 'facebook' && 'Get from Meta Graph Explorer — Page access token with pages_manage_posts scope.'}
-                {manualConnect.platform === 'linkedin' && 'Get from LinkedIn OAuth token generator — needs w_member_social scope.'}
-              </div>
-            </div>
-
-            <div className="modal-acts">
-              <button className="btn btn-ghost" onClick={() => setManualConnect(null)}>Cancel</button>
-              <button className="btn btn-primary" onClick={handleManualConnect}>
-                <I n="link" s={13} /> Save Connection
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── Add Workflow Modal ── */}
-      {showAddWorkflow && (
-        <div className="modal-overlay" onClick={() => setShowAddWorkflow(false)}>
-          <div className="modal modal-lg" onClick={e => e.stopPropagation()}>
-            <div className="modal-title">New Auto-Distribution Workflow</div>
-            <div style={{ fontSize:12, color:'var(--text3)', marginBottom:18, lineHeight:1.5 }}>
-              Choose where you post first (source), then where CCC OS should auto-distribute it.
-            </div>
-
-            {/* Source platform */}
-            <div className="form-row">
-              <label className="form-label">Source Platform <span style={{ color:'var(--text3)', fontWeight:400 }}>(where you post first)</span></label>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
-                {PLATFORM_DEFS.filter(p => !p.comingSoon).map(p => {
-                  const sel = wfForm.source === p.id;
-                  const conn = connections.find(c => c.platform === p.id && c.connected);
-                  return (
-                    <div key={p.id} onClick={() => setWfForm(f => ({ ...f, source: p.id }))}
-                      style={{ display:'flex', alignItems:'center', gap:9, padding:'9px 12px', background: sel ? 'var(--accent3)' : 'var(--surface)', border:`1px solid ${sel ? 'var(--accent)' : 'var(--border)'}`, borderRadius:'var(--r-sm)', cursor:'pointer', transition:'all .12s' }}>
-                      <div style={{ width:16, height:16, borderRadius:'50%', border:`2px solid ${sel ? 'var(--accent)' : 'var(--border2)'}`, background: sel ? 'var(--accent)' : 'transparent', display:'flex', alignItems:'center', justifyContent:'center', fontSize:9, color:'#fff', flexShrink:0 }}>{sel ? '●' : ''}</div>
-                      <span style={{ fontSize:15 }}>{p.icon}</span>
-                      <span style={{ fontSize:12, fontWeight:600, color:'var(--text)', flex:1 }}>{p.name}</span>
-                      {!conn && <span style={{ fontSize:10, color:'var(--amber)' }}>Not connected</span>}
-                      {conn && <span style={{ fontSize:10, color:'var(--green)' }}>● Live</span>}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Destination platforms */}
-            <div className="form-row">
-              <label className="form-label">Distribute To <span style={{ color:'var(--text3)', fontWeight:400 }}>(auto-post to these)</span></label>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
-                {PLATFORM_DEFS.filter(p => !p.comingSoon && p.id !== wfForm.source).map(p => {
-                  const sel = wfForm.dests.includes(p.id);
-                  const conn = connections.find(c => c.platform === p.id && c.connected);
-                  return (
-                    <div key={p.id} onClick={() => toggleWfDest(p.id)}
-                      style={{ display:'flex', alignItems:'center', gap:9, padding:'9px 12px', background: sel ? 'var(--accent3)' : 'var(--surface)', border:`1px solid ${sel ? 'var(--accent)' : 'var(--border)'}`, borderRadius:'var(--r-sm)', cursor:'pointer', transition:'all .12s' }}>
-                      <div style={{ width:16, height:16, borderRadius:4, border:`1px solid ${sel ? 'var(--accent)' : 'var(--border2)'}`, background: sel ? 'var(--accent)' : 'transparent', display:'flex', alignItems:'center', justifyContent:'center', fontSize:10, color:'#fff', flexShrink:0 }}>{sel ? '✓' : ''}</div>
-                      <span style={{ fontSize:15 }}>{p.icon}</span>
-                      <span style={{ fontSize:12, fontWeight:600, color:'var(--text)', flex:1 }}>{p.name}</span>
-                      {!conn && <span style={{ fontSize:10, color:'var(--amber)' }}>Not connected</span>}
-                      {conn && <span style={{ fontSize:10, color:'var(--green)' }}>● Live</span>}
-                    </div>
-                  );
-                })}
-                {!wfForm.source && (
-                  <div style={{ gridColumn:'1/-1', fontSize:11.5, color:'var(--text3)', padding:'8px 0' }}>
-                    Pick a source platform first to see destinations.
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Optional label */}
-            <div className="form-row">
-              <label className="form-label">Label <span style={{ color:'var(--text3)', fontWeight:400 }}>(optional)</span></label>
-              <input className="form-input" placeholder={wfForm.source ? `${PLATFORM_DEFS.find(p=>p.id===wfForm.source)?.name || wfForm.source} → auto` : 'e.g. YouTube → everywhere'} value={wfForm.label} onChange={e => setWfForm(f => ({ ...f, label: e.target.value }))} />
-            </div>
-
-            {/* Preview */}
-            {wfForm.source && wfForm.dests.length > 0 && (
-              <div style={{ background:'var(--accent3)', border:'1px solid rgba(108,71,255,.2)', borderRadius:'var(--r-sm)', padding:'10px 14px', marginBottom:14, display:'flex', alignItems:'center', gap:10, fontSize:12 }}>
-                <span style={{ fontSize:16 }}>{PLATFORM_DEFS.find(p=>p.id===wfForm.source)?.icon}</span>
-                <strong style={{ color:'var(--text)' }}>{PLATFORM_DEFS.find(p=>p.id===wfForm.source)?.name}</strong>
-                <span style={{ color:'var(--accent2)', fontWeight:700 }}>→</span>
-                <div style={{ display:'flex', gap:5, flexWrap:'wrap' }}>
-                  {wfForm.dests.map(d => <DestBadge key={d} id={d} />)}
-                </div>
-                <span style={{ color:'var(--text3)', marginLeft:'auto' }}>will auto-distribute</span>
-              </div>
-            )}
-
-            <div className="modal-acts">
-              <button className="btn btn-ghost" onClick={() => { setShowAddWorkflow(false); setWfForm({ source:'', dests:[], label:'' }); }}>Cancel</button>
-              <button className="btn btn-primary" onClick={handleAddWorkflow}>
-                <I n="zap" s={13} /> Create Workflow
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── Add / Edit Repurpose Rule Modal ── */}
-      {showAddRule && (
-        <div className="modal-overlay" onClick={() => { setShowAddRule(false); setEditingRule(null); }}>
-          <div className="modal modal-lg" onClick={e => e.stopPropagation()}>
-            <div className="modal-title">{editingRule ? '✏️ Edit Repurpose Rule' : '🔄 New Repurpose Rule'}</div>
-            <div style={{ fontSize:12, color:'var(--text3)', marginBottom:18, lineHeight:1.5 }}>
-              When a post publishes to the <strong style={{ color:'var(--text2)' }}>source</strong> platform, CCC OS will auto-schedule it to the <strong style={{ color:'var(--text2)' }}>destinations</strong> after a delay — with AI-adapted captions.
-            </div>
-
-            {/* Source platform */}
-            <div className="form-row">
-              <label className="form-label">Source Platform <span style={{ color:'var(--text3)', fontWeight:400 }}>(when this publishes…)</span></label>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
-                {PLATFORM_DEFS.map(p => {
-                  const sel = ruleForm.source_platform === p.id;
-                  const conn = connections.find(c => c.platform === p.id && c.connected);
-                  return (
-                    <div key={p.id} onClick={() => setRuleForm(f => ({ ...f, source_platform: p.id, dest_platforms: f.dest_platforms.filter(d => d !== p.id) }))}
-                      style={{ display:'flex', alignItems:'center', gap:9, padding:'9px 12px', background: sel ? 'var(--accent3)' : 'var(--surface)', border:`1px solid ${sel ? 'var(--accent)' : 'var(--border)'}`, borderRadius:'var(--r-sm)', cursor:'pointer', transition:'all .12s' }}>
-                      <div style={{ width:16, height:16, borderRadius:'50%', border:`2px solid ${sel ? 'var(--accent)' : 'var(--border2)'}`, background: sel ? 'var(--accent)' : 'transparent', display:'flex', alignItems:'center', justifyContent:'center', fontSize:9, color:'#fff', flexShrink:0 }}>{sel ? '●' : ''}</div>
-                      <span style={{ fontSize:15 }}>{p.icon}</span>
-                      <span style={{ fontSize:12, fontWeight:600, color:'var(--text)', flex:1 }}>{p.name}</span>
-                      {conn && <span style={{ fontSize:10, color:'var(--green)' }}>● Live</span>}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Destination platforms */}
-            <div className="form-row">
-              <label className="form-label">Auto-Schedule To <span style={{ color:'var(--text3)', fontWeight:400 }}>(…then post to these)</span></label>
-              {!ruleForm.source_platform && <div style={{ fontSize:11.5, color:'var(--text3)', padding:'6px 0' }}>Pick a source platform first.</div>}
-              {ruleForm.source_platform && (
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
-                  {PLATFORM_DEFS.filter(p => p.id !== ruleForm.source_platform).map(p => {
-                    const sel = ruleForm.dest_platforms.includes(p.id);
-                    const conn = connections.find(c => c.platform === p.id && c.connected);
-                    return (
-                      <div key={p.id} onClick={() => toggleRuleDest(p.id)}
-                        style={{ display:'flex', alignItems:'center', gap:9, padding:'9px 12px', background: sel ? 'var(--accent3)' : 'var(--surface)', border:`1px solid ${sel ? 'var(--accent)' : 'var(--border)'}`, borderRadius:'var(--r-sm)', cursor:'pointer', transition:'all .12s' }}>
-                        <div style={{ width:16, height:16, borderRadius:4, border:`1px solid ${sel ? 'var(--accent)' : 'var(--border2)'}`, background: sel ? 'var(--accent)' : 'transparent', display:'flex', alignItems:'center', justifyContent:'center', fontSize:10, color:'#fff', flexShrink:0 }}>{sel ? '✓' : ''}</div>
-                        <span style={{ fontSize:15 }}>{p.icon}</span>
-                        <span style={{ fontSize:12, fontWeight:600, color:'var(--text)', flex:1 }}>{p.name}</span>
-                        {conn && <span style={{ fontSize:10, color:'var(--green)' }}>● Connected</span>}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-            {/* Delay + AI toggle */}
-            <div className="form-row-2">
-              <div>
-                <label className="form-label">Delay After Publish</label>
-                <select className="form-select" value={ruleForm.delay_hours} onChange={e => setRuleForm(f => ({ ...f, delay_hours: Number(e.target.value) }))}>
-                  {[0,1,2,4,6,12,24,48].map(h => <option key={h} value={h}>{h === 0 ? 'Immediately' : `${h} hour${h !== 1 ? 's' : ''}`}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="form-label">Caption Adaptation</label>
-                <div style={{ display:'flex', gap:8, marginTop:2 }}>
-                  {[{ v:1, lbl:'✦ AI-adapted', desc:'Rewrite per platform style' }, { v:0, lbl:'○ Copy as-is', desc:'Same caption on all' }].map(opt => (
-                    <div key={opt.v} onClick={() => setRuleForm(f => ({ ...f, adapt_captions: opt.v }))}
-                      style={{ flex:1, padding:'8px 10px', background: ruleForm.adapt_captions === opt.v ? 'var(--accent3)' : 'var(--surface)', border:`1px solid ${ruleForm.adapt_captions === opt.v ? 'var(--accent)' : 'var(--border)'}`, borderRadius:'var(--r-sm)', cursor:'pointer', transition:'all .12s' }}>
-                      <div style={{ fontSize:11.5, fontWeight:700, color: ruleForm.adapt_captions === opt.v ? 'var(--accent2)' : 'var(--text)' }}>{opt.lbl}</div>
-                      <div style={{ fontSize:10.5, color:'var(--text3)', marginTop:2 }}>{opt.desc}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* Caption notes (only when AI is on) */}
-            {ruleForm.adapt_captions === 1 && (
-              <div className="form-row">
-                <label className="form-label">AI Caption Notes <span style={{ color:'var(--text3)', fontWeight:400 }}>(optional — hints for the AI)</span></label>
-                <input className="form-input" placeholder='e.g. "Always add 3 hashtags, keep it under 100 words, end with a question"' value={ruleForm.caption_notes} onChange={e => setRuleForm(f => ({ ...f, caption_notes: e.target.value }))} />
-              </div>
-            )}
-
-            {/* Preview */}
-            {ruleForm.source_platform && ruleForm.dest_platforms.length > 0 && (
-              <div style={{ background:'var(--accent3)', border:'1px solid rgba(108,71,255,.2)', borderRadius:'var(--r-sm)', padding:'10px 14px', marginBottom:14, display:'flex', alignItems:'center', gap:10, fontSize:12, flexWrap:'wrap' }}>
-                <span style={{ fontSize:16 }}>{PLATFORM_DEFS.find(p => p.id === ruleForm.source_platform)?.icon}</span>
-                <strong style={{ color:'var(--text)' }}>{PLATFORM_DEFS.find(p => p.id === ruleForm.source_platform)?.name}</strong>
-                <span style={{ color:'var(--accent2)', fontWeight:700 }}>→</span>
-                <div style={{ display:'flex', gap:5, flexWrap:'wrap' }}>
-                  {ruleForm.dest_platforms.map(d => <DestBadge key={d} id={d} />)}
-                </div>
-                <span style={{ color:'var(--text3)', fontSize:11 }}>after {ruleForm.delay_hours}h · {ruleForm.adapt_captions ? 'AI captions' : 'copy caption'}</span>
-              </div>
-            )}
-
-            <div className="modal-acts">
-              <button className="btn btn-ghost" onClick={() => { setShowAddRule(false); setEditingRule(null); }}>Cancel</button>
-              <button className="btn btn-primary" onClick={handleSaveRule}>
-                <I n="zap" s={13} /> {editingRule ? 'Save Changes' : 'Create Rule'}
-              </button>
             </div>
           </div>
         </div>
@@ -2233,17 +1540,14 @@ function SchedulerRoom({ activeBrand, user }) {
               </select>
             </div>
             <div className="form-row">
-              <label className="form-label">Publish To</label>
+              <label className="form-label">Platforms</label>
               {PLATFORM_DEFS.filter(p=>!p.comingSoon).map(p => {
                 const sel = form.dests.includes(p.id);
-                const conn = connections.find(c=>c.platform===p.id&&c.connected);
                 return (
                   <div key={p.id} onClick={() => toggleDest(p.id)} style={{ display:'flex', alignItems:'center', gap:9, padding:'9px 12px', background: sel?'var(--accent3)':'var(--surface)', border:`1px solid ${sel?'var(--accent)':'var(--border)'}`, borderRadius:'var(--r-sm)', marginBottom:6, cursor:'pointer', transition:'all .12s' }}>
                     <div style={{ width:16, height:16, borderRadius:4, border:`1px solid ${sel?'var(--accent)':'var(--border2)'}`, background:sel?'var(--accent)':'transparent', display:'flex', alignItems:'center', justifyContent:'center', fontSize:10, color:'#fff', flexShrink:0 }}>{sel?'✓':''}</div>
                     <span style={{ fontSize:15 }}>{p.icon}</span>
                     <span style={{ fontSize:12.5, fontWeight:600, color:'var(--text)', flex:1 }}>{p.name}</span>
-                    {!conn && <span style={{ fontSize:10, color:'var(--amber)' }}>Not connected</span>}
-                    {conn && <span style={{ fontSize:10, color:'var(--green)' }}>● Ready</span>}
                   </div>
                 );
               })}
@@ -2264,14 +1568,13 @@ function SchedulerRoom({ activeBrand, user }) {
                   onChange={e => setForm({...form, mediaUrl: e.target.value})}
                 />
                 <div style={{ fontSize:11, color:'var(--text3)', marginTop:5, lineHeight:1.5 }}>
-                  {form.dests.includes('youtube') && '▶ YouTube: must be a direct .mp4 or .mov URL. CCC streams it straight to YouTube. '}
-                  {form.dests.includes('instagram') && '📷 Instagram: image URL for a photo post, .mp4/.mov URL for a Reel.'}
+                  Optional reference link to the media you plan to post — kept with the plan so it's ready when you post it.
                 </div>
               </div>
             )}
 
             <div style={{ background:'var(--accent3)', border:'1px solid rgba(108,71,255,.2)', borderRadius:'var(--r-sm)', padding:'10px 13px', marginBottom:14, fontSize:11.5, color:'var(--text2)' }}>
-              💡 CCC OS will cross-post to all selected platforms at the scheduled time automatically.
+              💡 This adds the post to your planner. CCC OS does not auto-post — post it yourself on each platform, then mark it done.
             </div>
             <div className="modal-acts">
               <button className="btn btn-ghost" onClick={() => setShowAdd(false)}>Cancel</button>
@@ -2282,48 +1585,6 @@ function SchedulerRoom({ activeBrand, user }) {
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-function SchedulerLogTab({ activeBrand }) {
-  const [log, setLog] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    import('./lib/api').then(({ scheduler: s }) =>
-      s.log(activeBrand?.id).then(setLog).catch(() => {}).finally(() => setLoading(false))
-    );
-  }, [activeBrand?.id]);
-
-  if (loading) return <div className="loading"><I n="refresh" s={14} c="spin" /> Loading log...</div>;
-
-  const STATUS_ICON = { success:'✅', failed:'❌', skipped:'⏭', partial:'⚠️' };
-  const STATUS_COLOR = { success:'var(--green)', failed:'var(--red)', skipped:'var(--text3)', partial:'var(--amber)' };
-
-  return (
-    <div>
-      <div className="sec-hdr">
-        <div className="sec-title">Publish Log</div>
-        <span style={{ fontSize:11, color:'var(--text3)' }}>Last 50 publish attempts</span>
-      </div>
-      <div className="panel">
-        <table className="data-table">
-          <thead><tr><th>Platform</th><th>Status</th><th>Post</th><th>Error</th><th>Time</th></tr></thead>
-          <tbody>
-            {log.map(l => (
-              <tr key={l.id}>
-                <td><span className="tag">{l.platform}</span></td>
-                <td><span style={{ color:STATUS_COLOR[l.status]||'var(--text3)', fontWeight:700 }}>{STATUS_ICON[l.status]||'·'} {l.status}</span></td>
-                <td style={{ maxWidth:200, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', color:'var(--text2)', fontSize:12 }}>{l.post_id ? l.post_id.slice(0,12)+'...' : '—'}</td>
-                <td style={{ fontSize:11.5, color:'var(--red)', maxWidth:180, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{l.error_msg||'—'}</td>
-                <td style={{ fontSize:11, color:'var(--text3)' }}>{new Date(l.published_at).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {log.length === 0 && <div className="empty">No publish activity yet.</div>}
-      </div>
     </div>
   );
 }
@@ -2456,7 +1717,7 @@ function SettingsRoom({ user }) {
             <div className="settings-section-label">Email Alerts</div>
             <div className="panel" style={{ padding: '4px 16px', background: 'var(--bg3)' }}>
               {[
-                { key: 'email',   label: 'Email notifications',    desc: 'System alerts, publish confirmations, errors' },
+                { key: 'email',   label: 'Email notifications',    desc: 'System alerts and errors' },
                 { key: 'weekly',  label: 'Weekly digest',          desc: 'Your top content performance every Monday' },
                 { key: 'newDeals',label: 'New brand deal alerts',  desc: 'Get notified when a deal matches your niche' },
               ].map(({ key, label, desc }) => (
@@ -2498,13 +1759,13 @@ function SettingsRoom({ user }) {
       case 'platforms': return (
         <>
           <div className="settings-hdr">
-            <div className="settings-hdr-title">Connected Platforms</div>
-            <div className="settings-hdr-sub">Authorize CCC OS to publish and pull analytics on your behalf.</div>
+            <div className="settings-hdr-title">Platforms</div>
+            <div className="settings-hdr-sub">The platforms you create content for. CCC OS is a planner — it does not connect to or post on your accounts.</div>
           </div>
 
           <div style={{ marginBottom: 18, padding: '10px 14px', background: 'var(--accent3)', border: '1px solid rgba(108,71,255,.2)', borderRadius: 'var(--r-sm)', fontSize: 12, color: 'var(--accent2)', display: 'flex', gap: 8, alignItems: 'center' }}>
             <I n="zap" s={13} />
-            Connect your platforms from the <strong>Scheduler</strong> room — OAuth flows live there. Use this page to review which accounts are linked.
+            CCC OS does not auto-post. Use the <strong>Scheduler</strong> room to plan and track your posts, then post manually on each platform.
           </div>
 
           {PLATFORMS.map(p => (
@@ -2527,7 +1788,7 @@ function SettingsRoom({ user }) {
           ))}
 
           <div style={{ fontSize: 11.5, color: 'var(--text3)', marginTop: 10 }}>
-            Platform OAuth is managed per brand in the <button className="btn btn-ghost btn-sm" style={{ padding: '2px 8px', fontSize: 11 }}>Scheduler room ↗</button>
+            Plan and track posts per brand in the <button className="btn btn-ghost btn-sm" style={{ padding: '2px 8px', fontSize: 11 }}>Scheduler room ↗</button>
           </div>
         </>
       );
@@ -2833,7 +2094,7 @@ export default function App() {
   ];
   const PAGE_TITLES = {
     dashboard: 'Command Center',
-    scheduler: 'Scheduler & Distributor',
+    scheduler: 'Scheduler',
     billing: 'Plans & Billing',
     studio: 'Content Studio',
     'ai-studio':     'AI Studio',
@@ -2849,7 +2110,7 @@ export default function App() {
     const props = { activeBrand, setPage };
     switch(page) {
       case 'dashboard': return <CommandCenter {...props} user={user} onQuickAdd={() => setQuickAdd(true)} />;
-      case 'scheduler': return <SchedulerRoom {...props} user={user} />;
+      case 'scheduler': return <SchedulerRoom {...props} />;
       case 'studio': return <ContentStudioRoom activeBrand={activeBrand} />;
       default: {
         const mod = MODULES.find(m => m.id === page);

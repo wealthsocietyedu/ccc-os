@@ -11,7 +11,6 @@ const crypto = require('crypto');
 const { getDB } = require('../db');
 const { authenticate } = require('../middleware/auth');
 const { requireSubscription, isAdmin } = require('../middleware/subscription');
-const { publishPost } = require('../scheduler/publish');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret';
 const SERVER_URL = process.env.SERVER_URL || 'http://localhost:3001';
@@ -545,24 +544,6 @@ router.delete('/posts/:id', requireSubscription, (req, res) => {
   const db = getDB();
   db.prepare('DELETE FROM scheduled_posts WHERE id = ? AND user_id = ?').run(req.params.id, req.userId);
   res.json({ success: true });
-});
-
-// POST /api/scheduler/posts/:id/publish — publish immediately
-router.post('/posts/:id/publish', requireSubscription, async (req, res) => {
-  const db = getDB();
-  const post = db.prepare(
-    'SELECT * FROM scheduled_posts WHERE id = ? AND user_id = ?'
-  ).get(req.params.id, req.userId);
-  if (!post) return res.status(404).json({ error: 'Post not found' });
-
-  try {
-    db.prepare("UPDATE scheduled_posts SET status = 'publishing', updated_at = datetime('now') WHERE id = ?").run(post.id);
-    const { results, status } = await publishPost(post, req.userId);
-    res.json({ success: true, results, status });
-  } catch (err) {
-    db.prepare("UPDATE scheduled_posts SET status = 'failed', error_log = ?, updated_at = datetime('now') WHERE id = ?").run(err.message, post.id);
-    res.status(500).json({ error: 'Publish failed', details: err.message });
-  }
 });
 
 // ─── AUTO-WORKFLOWS ───────────────────────────────────────────────────────────
