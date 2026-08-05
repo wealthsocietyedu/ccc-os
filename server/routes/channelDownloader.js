@@ -74,6 +74,19 @@ function ensureSchema(db) {
     } catch (e) {
       console.error('[ChannelDownloader] Orphan reconciliation failed:', e.message);
     }
+    // Report how many jobs predate the tenant-isolation migration. These have a
+    // NULL user_id, so every scoped query (AND user_id=?) hides them from all
+    // users — fail-closed, not a leak, but a real behavior change worth surfacing.
+    try {
+      const orphanOwners = db.prepare(`SELECT COUNT(*) AS c FROM download_jobs WHERE user_id IS NULL`).get().c;
+      if (orphanOwners > 0) {
+        console.log(`[ChannelDownloader] tenant-isolation migration: ${orphanOwners} pre-existing job(s) have no user_id and are now hidden from all users (fail-closed)`);
+      } else {
+        console.log('[ChannelDownloader] tenant-isolation migration: 0 pre-existing job(s) without user_id');
+      }
+    } catch (e) {
+      console.error('[ChannelDownloader] user_id orphan count failed:', e.message);
+    }
   }
 }
 
