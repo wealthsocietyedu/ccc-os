@@ -28,7 +28,7 @@ const Btn = ({ children, onClick, variant='primary', disabled, style={} }) => {
     danger: { background:C.redSub, color:C.redText, border:`1px solid ${C.red}` },
   };
   return (
-    <button onClick={onClick} disabled={disabled} style={{ display:'inline-flex',alignItems:'center',gap:7,padding:'8px 16px',borderRadius:8,fontFamily:C.font,fontSize:13,fontWeight:600,cursor:disabled?'not-allowed':'pointer',opacity:disabled?0.5:1,transition:'all .15s',...variants[variant],...style }}>
+    <button onClick={onClick} disabled={disabled} style={{ display:'inline-flex',alignItems:'center',gap:7,padding:'8px 16px',borderRadius:12,fontFamily:C.font,fontSize:13,fontWeight:600,cursor:disabled?'not-allowed':'pointer',opacity:disabled?0.5:1,transition:'all .15s',...variants[variant],...style }}>
       {children}
     </button>
   );
@@ -37,15 +37,15 @@ const Input = ({ label, value, onChange, placeholder, multiline, rows=3, style={
   <div style={{ display:'flex',flexDirection:'column',gap:5 }}>
     {label && <label style={{ fontFamily:C.mono,fontSize:10,color:C.text3,textTransform:'uppercase',letterSpacing:'0.1em' }}>{label}</label>}
     {multiline
-      ? <textarea value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder} rows={rows} style={{ background:C.surface,border:`1px solid ${C.border2}`,borderRadius:8,color:C.text,padding:'10px 12px',fontSize:13,fontFamily:C.font,outline:'none',resize:'vertical',...style }} />
-      : <input value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder} style={{ background:C.surface,border:`1px solid ${C.border2}`,borderRadius:8,color:C.text,padding:'10px 12px',fontSize:13,fontFamily:C.font,outline:'none',...style }} />
+      ? <textarea value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder} rows={rows} style={{ background:C.surface,border:`1px solid ${C.border2}`,borderRadius:12,color:C.text,padding:'10px 12px',fontSize:13,fontFamily:C.font,outline:'none',resize:'vertical',...style }} />
+      : <input value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder} style={{ background:C.surface,border:`1px solid ${C.border2}`,borderRadius:12,color:C.text,padding:'10px 12px',fontSize:13,fontFamily:C.font,outline:'none',...style }} />
     }
   </div>
 );
 const Select = ({ label, value, onChange, options }) => (
   <div style={{ display:'flex',flexDirection:'column',gap:5 }}>
     {label && <label style={{ fontFamily:C.mono,fontSize:10,color:C.text3,textTransform:'uppercase',letterSpacing:'0.1em' }}>{label}</label>}
-    <select value={value} onChange={e=>onChange(e.target.value)} style={{ background:C.surface,border:`1px solid ${C.border2}`,borderRadius:8,color:C.text,padding:'10px 12px',fontSize:13,fontFamily:C.font,outline:'none',appearance:'none' }}>
+    <select value={value} onChange={e=>onChange(e.target.value)} style={{ background:C.surface,border:`1px solid ${C.border2}`,borderRadius:12,color:C.text,padding:'10px 12px',fontSize:13,fontFamily:C.font,outline:'none',appearance:'none' }}>
       {options.map(o=><option key={o.value} value={o.value}>{o.label}</option>)}
     </select>
   </div>
@@ -71,7 +71,7 @@ function CreditBar({ credits, onRefresh }) {
   if (!credits) return null;
   const pct = Math.min(100, (credits.balance / Math.max(credits.total_earned, 100)) * 100);
   return (
-    <div style={{ background:C.surface,border:`1px solid ${C.border2}`,borderRadius:10,padding:'12px 16px',display:'flex',alignItems:'center',gap:16,marginBottom:24 }}>
+    <div style={{ background:C.surface,border:`1px solid ${C.border2}`,borderRadius:14,padding:'12px 16px',display:'flex',alignItems:'center',gap:16,marginBottom:24 }}>
       <div style={{ flex:1 }}>
         <div style={{ display:'flex',alignItems:'baseline',gap:8,marginBottom:6 }}>
           <span style={{ fontSize:22,fontWeight:800,color:C.amber,letterSpacing:'-0.03em' }}>{credits.balance}</span>
@@ -100,7 +100,7 @@ function ProviderStatus({ providers }) {
   return (
     <div style={{ display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10,marginBottom:24 }}>
       {list.map(([key,p])=>(
-        <div key={key} style={{ background:C.surface,border:`1px solid ${p.status==='connected'?C.tealDim:p.status==='coming_soon'?C.border:C.redSub}`,borderRadius:10,padding:'12px 14px' }}>
+        <div key={key} style={{ background:C.surface,border:`1px solid ${p.status==='connected'?C.tealDim:p.status==='coming_soon'?C.border:C.redSub}`,borderRadius:14,padding:'12px 14px' }}>
           <div style={{ display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:4 }}>
             <span style={{ fontSize:12,fontWeight:600,color:C.text }}>{p.name}</span>
             <Tag color={p.status==='connected'?'teal':p.status==='coming_soon'?'neutral':'neutral'}>
@@ -140,7 +140,7 @@ function PlanTab({ credits, onCreditUpdate }) {
   return (
     <div style={{ display:'grid',gridTemplateColumns:cols(isMobile,'360px 1fr'),gap:24 }}>
       <div style={{ display:'flex',flexDirection:'column',gap:14 }}>
-        <div style={{ background:C.amberSub,border:`1px solid ${C.amberDim}`,borderRadius:8,padding:12 }}>
+        <div style={{ background:C.amberSub,border:`1px solid ${C.amberDim}`,borderRadius:12,padding:12 }}>
           <div style={{ fontFamily:C.mono,fontSize:9,color:C.amberText,textTransform:'uppercase',letterSpacing:'0.1em',marginBottom:4 }}>✦ Content Planner</div>
           <div style={{ fontSize:12,color:C.text3 }}>Describe your content idea — Claude builds optimized prompts for every format.</div>
         </div>
@@ -151,17 +151,17 @@ function PlanTab({ credits, onCreditUpdate }) {
         <Btn onClick={handlePlan} disabled={loading||!brief.trim()}>
           {loading ? '⟳ Planning...' : `✦ Plan Content (${1} credit)`}
         </Btn>
-        {error && <div style={{ background:C.redSub,border:`1px solid ${C.red}`,borderRadius:8,padding:12,color:C.redText,fontSize:12,fontFamily:C.mono }}>{error}</div>}
+        {error && <div style={{ background:C.redSub,border:`1px solid ${C.red}`,borderRadius:12,padding:12,color:C.redText,fontSize:12,fontFamily:C.mono }}>{error}</div>}
       </div>
       <div style={{ display:'flex',flexDirection:'column',gap:14 }}>
         {loading && (
-          <div style={{ background:C.surface,border:`1px solid ${C.border2}`,borderRadius:12,minHeight:400,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:12 }}>
+          <div style={{ background:C.surface,border:`1px solid ${C.border2}`,borderRadius:20,minHeight:400,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:12 }}>
             <Spinner /><div style={{ color:C.amberText,fontSize:13 }}>Building your content plan...</div>
           </div>
         )}
         {plan && !loading && (
           <>
-            <div style={{ background:C.surface,border:`1px solid ${C.amberDim}`,borderRadius:12,padding:16 }}>
+            <div style={{ background:C.surface,border:`1px solid ${C.amberDim}`,borderRadius:20,padding:16 }}>
               <div style={{ fontFamily:C.mono,fontSize:10,color:C.amberText,textTransform:'uppercase',marginBottom:8 }}>Visual Direction</div>
               <p style={{ color:C.text2,fontSize:13,margin:0,lineHeight:1.6 }}>{plan.visualStyle}</p>
               <div style={{ marginTop:8,display:'flex',gap:8 }}>
@@ -174,7 +174,7 @@ function PlanTab({ credits, onCreditUpdate }) {
               { key:'videoPrompt', label:'🎬 Video Prompt (LTX-2)', color:C.amberSub, borderColor:C.amberDim },
               { key:'facelessVideoScript', label:'📱 Faceless Video Script', color:C.tealSub, borderColor:C.tealDim },
             ].map(({ key, label, color, borderColor }) => (
-              <div key={key} style={{ background:color,border:`1px solid ${borderColor}`,borderRadius:12,padding:16 }}>
+              <div key={key} style={{ background:color,border:`1px solid ${borderColor}`,borderRadius:20,padding:16 }}>
                 <div style={{ display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8 }}>
                   <span style={{ fontFamily:C.mono,fontSize:10,color:C.text2,textTransform:'uppercase' }}>{label}</span>
                   <CopyBtn text={plan[key]} />
@@ -183,7 +183,7 @@ function PlanTab({ credits, onCreditUpdate }) {
               </div>
             ))}
             {plan.carouselSlides && (
-              <div style={{ background:C.surface,border:`1px solid ${C.border2}`,borderRadius:12,padding:16 }}>
+              <div style={{ background:C.surface,border:`1px solid ${C.border2}`,borderRadius:20,padding:16 }}>
                 <div style={{ fontFamily:C.mono,fontSize:10,color:C.text3,textTransform:'uppercase',marginBottom:8 }}>📊 Carousel Slides</div>
                 <div style={{ display:'flex',flexDirection:'column',gap:6 }}>
                   {plan.carouselSlides.map((s,i)=>(
@@ -198,7 +198,7 @@ function PlanTab({ credits, onCreditUpdate }) {
           </>
         )}
         {!plan && !loading && (
-          <div style={{ background:C.surface,border:`1px solid ${C.border}`,borderRadius:12,minHeight:400,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:10 }}>
+          <div style={{ background:C.surface,border:`1px solid ${C.border}`,borderRadius:20,minHeight:400,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:10 }}>
             <span style={{ fontSize:40 }}>✦</span>
             <div style={{ color:C.text4,fontSize:13,fontFamily:C.font }}>Enter your content brief to get started</div>
           </div>
@@ -234,27 +234,27 @@ function ImageTab({ credits, onCreditUpdate }) {
         <Input label="Image Prompt" value={prompt} onChange={setPrompt} placeholder="Person typing on a laptop, dark minimal office, warm desk lamp, shallow depth of field..." multiline rows={4} />
         <Select label="Style" value={style} onChange={setStyle} options={[{value:'photorealistic',label:'📷 Photorealistic'},{value:'cinematic',label:'🎬 Cinematic'},{value:'artistic',label:'🎨 Artistic'},{value:'minimal',label:'⬜ Minimal'},{value:'dark',label:'🌑 Dark & Moody'},{value:'vibrant',label:'🌈 Vibrant'}]} />
         <Select label="Aspect Ratio" value={aspect} onChange={setAspect} options={[{value:'16:9',label:'16:9 — YouTube'},{value:'9:16',label:'9:16 — Reels/TikTok'},{value:'1:1',label:'1:1 — Square'},{value:'4:3',label:'4:3 — Standard'}]} />
-        <div style={{ display:'flex',alignItems:'center',justifyContent:'space-between',padding:'10px 12px',background:C.surface,border:`1px solid ${C.border2}`,borderRadius:8 }}>
+        <div style={{ display:'flex',alignItems:'center',justifyContent:'space-between',padding:'10px 12px',background:C.surface,border:`1px solid ${C.border2}`,borderRadius:12 }}>
           <div>
             <div style={{ fontSize:13,color:C.text,marginBottom:2 }}>FLUX 1.1 Pro</div>
             <div style={{ fontFamily:C.mono,fontSize:10,color:C.text3 }}>2 credits · highest quality</div>
           </div>
-          <div onClick={()=>setUseFlux(!useFlux)} style={{ width:44,height:24,borderRadius:12,background:useFlux?C.amber:C.border2,position:'relative',cursor:'pointer',transition:'background .2s' }}>
+          <div onClick={()=>setUseFlux(!useFlux)} style={{ width:44,height:24,borderRadius:20,background:useFlux?C.amber:C.border2,position:'relative',cursor:'pointer',transition:'background .2s' }}>
             <div style={{ position:'absolute',top:2,left:useFlux?22:2,width:20,height:20,borderRadius:'50%',background:'#fff',transition:'left .2s' }} />
           </div>
         </div>
         {!useFlux && (
-          <div style={{ padding:'8px 12px',background:C.tealSub,border:`1px solid ${C.tealDim}`,borderRadius:8,fontFamily:C.mono,fontSize:10,color:C.tealText }}>
+          <div style={{ padding:'8px 12px',background:C.tealSub,border:`1px solid ${C.tealDim}`,borderRadius:12,fontFamily:C.mono,fontSize:10,color:C.tealText }}>
             🆓 Free mode — Pollinations AI (standard quality)
           </div>
         )}
         <Btn onClick={handleGenerate} disabled={loading||!prompt.trim()}>
           {loading ? '⟳ Generating...' : `🎨 Generate Image${cost > 0 ? ` (${cost} credits)` : ' (Free)'}`}
         </Btn>
-        {error && <div style={{ background:C.redSub,border:`1px solid ${C.red}`,borderRadius:8,padding:12,color:C.redText,fontSize:12,fontFamily:C.mono }}>{error}</div>}
+        {error && <div style={{ background:C.redSub,border:`1px solid ${C.red}`,borderRadius:12,padding:12,color:C.redText,fontSize:12,fontFamily:C.mono }}>{error}</div>}
       </div>
       <div style={{ display:'flex',flexDirection:'column',gap:14 }}>
-        <div style={{ background:C.surface,border:`1px solid ${C.border2}`,borderRadius:12,minHeight:400,display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden',position:'relative' }}>
+        <div style={{ background:C.surface,border:`1px solid ${C.border2}`,borderRadius:20,minHeight:400,display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden',position:'relative' }}>
           {result?.imageUrl && !loading && (
             <>
               <img src={result.imageUrl} alt="Generated" style={{ width:'100%',maxHeight:520,objectFit:'contain' }} onError={e=>e.target.style.display='none'} />
@@ -286,7 +286,7 @@ function ImageTab({ credits, onCreditUpdate }) {
           )}
         </div>
         {result?.enhancedPrompt && result.enhancedPrompt !== result.originalPrompt && (
-          <div style={{ background:C.surface,border:`1px solid ${C.border}`,borderRadius:10,padding:14 }}>
+          <div style={{ background:C.surface,border:`1px solid ${C.border}`,borderRadius:14,padding:14 }}>
             <div style={{ display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:6 }}>
               <span style={{ fontFamily:C.mono,fontSize:9,color:C.amberText,textTransform:'uppercase' }}>Enhanced Prompt</span>
               <CopyBtn text={result.enhancedPrompt} />
@@ -350,7 +350,7 @@ function VideoTab({ credits, onCreditUpdate }) {
       <div style={{ display:'flex',flexDirection:'column',gap:14 }}>
         <div style={{ display:'grid',gridTemplateColumns:'1fr 1fr',gap:8 }}>
           {[{id:'faceless',icon:'📱',label:'Faceless Video',sub:'Blotato · 25 credits'},{id:'broll',icon:'🎬',label:'B-Roll Prompt',sub:'LTX-2 · 5 credits'}].map(m=>(
-            <div key={m.id} onClick={()=>{setMode(m.id);setResult(null);}} style={{ background:mode===m.id?C.amberSub:C.surface,border:`1px solid ${mode===m.id?C.amberDim:C.border2}`,borderRadius:8,padding:12,cursor:'pointer',transition:'all .15s' }}>
+            <div key={m.id} onClick={()=>{setMode(m.id);setResult(null);}} style={{ background:mode===m.id?C.amberSub:C.surface,border:`1px solid ${mode===m.id?C.amberDim:C.border2}`,borderRadius:12,padding:12,cursor:'pointer',transition:'all .15s' }}>
               <div style={{ fontSize:18,marginBottom:4 }}>{m.icon}</div>
               <div style={{ fontSize:12,fontWeight:600,color:mode===m.id?C.amberText:C.text2 }}>{m.label}</div>
               <div style={{ fontFamily:C.mono,fontSize:9,color:C.text3 }}>{m.sub}</div>
@@ -374,11 +374,11 @@ function VideoTab({ credits, onCreditUpdate }) {
         <Btn onClick={handleGenerate} disabled={loading||(mode==='faceless'?!topic.trim():!subject.trim())}>
           {loading ? '⟳ Generating...' : mode==='faceless' ? '📱 Generate Faceless Video (25 credits)' : '🎬 Generate B-Roll Prompt (5 credits)'}
         </Btn>
-        {error && <div style={{ background:C.redSub,border:`1px solid ${C.red}`,borderRadius:8,padding:12,color:C.redText,fontSize:12,fontFamily:C.mono }}>{error}</div>}
+        {error && <div style={{ background:C.redSub,border:`1px solid ${C.red}`,borderRadius:12,padding:12,color:C.redText,fontSize:12,fontFamily:C.mono }}>{error}</div>}
       </div>
       <div style={{ display:'flex',flexDirection:'column',gap:14 }}>
         {(loading || polling) && (
-          <div style={{ background:C.surface,border:`1px solid ${C.border2}`,borderRadius:12,minHeight:300,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:12 }}>
+          <div style={{ background:C.surface,border:`1px solid ${C.border2}`,borderRadius:20,minHeight:300,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:12 }}>
             <Spinner size={48} />
             <div style={{ color:C.amberText,fontSize:13 }}>{loading ? 'Submitting job...' : 'Generating your video...'}</div>
             <div style={{ color:C.text3,fontSize:11,fontFamily:C.mono }}>Faceless videos take 2-3 minutes</div>
@@ -387,7 +387,7 @@ function VideoTab({ credits, onCreditUpdate }) {
         {result && !loading && (
           <>
             {mode === 'faceless' && (
-              <div style={{ background:C.surface,border:`1px solid ${result.status==='completed'?C.amberDim:C.border2}`,borderRadius:12,padding:20 }}>
+              <div style={{ background:C.surface,border:`1px solid ${result.status==='completed'?C.amberDim:C.border2}`,borderRadius:20,padding:20 }}>
                 <div style={{ display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14 }}>
                   <div style={{ display:'flex',alignItems:'center',gap:8 }}>
                     <Tag color={result.status==='completed'?'amber':'neutral'}>{result.status==='completed'?'✓ Complete':'⟳ Processing'}</Tag>
@@ -397,7 +397,7 @@ function VideoTab({ credits, onCreditUpdate }) {
                 </div>
                 {result.status==='completed' && result.output_url && (
                   <div style={{ marginBottom:14 }}>
-                    <video src={result.output_url} controls style={{ width:'100%',borderRadius:8,maxHeight:400 }} />
+                    <video src={result.output_url} controls style={{ width:'100%',borderRadius:12,maxHeight:400 }} />
                     <div style={{ display:'flex',gap:8,marginTop:10 }}>
                       <a href={result.output_url} download="ccc-os-video.mp4" style={{ textDecoration:'none' }}>
                         <Btn variant="secondary" style={{ fontSize:12,padding:'6px 14px' }}>↓ Download</Btn>
@@ -406,7 +406,7 @@ function VideoTab({ credits, onCreditUpdate }) {
                     </div>
                   </div>
                 )}
-                <div style={{ background:C.surface2,borderRadius:8,padding:12 }}>
+                <div style={{ background:C.surface2,borderRadius:12,padding:12 }}>
                   <div style={{ fontFamily:C.mono,fontSize:9,color:C.text3,textTransform:'uppercase',marginBottom:6 }}>Script Used</div>
                   <p style={{ color:C.text2,fontSize:12,margin:0,lineHeight:1.6 }}>{result.script}</p>
                 </div>
@@ -419,14 +419,14 @@ function VideoTab({ credits, onCreditUpdate }) {
             )}
             {mode === 'broll' && (
               <>
-                <div style={{ background:C.surface,border:`1px solid ${C.amberDim}`,borderRadius:12,padding:20 }}>
+                <div style={{ background:C.surface,border:`1px solid ${C.amberDim}`,borderRadius:20,padding:20 }}>
                   <div style={{ display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12 }}>
                     <span style={{ fontFamily:C.mono,fontSize:10,color:C.amberText,textTransform:'uppercase' }}>🎬 LTX-2 Video Prompt</span>
                     <CopyBtn text={result.prompt} />
                   </div>
                   <p style={{ color:C.text,fontSize:13,margin:0,lineHeight:1.7 }}>{result.prompt}</p>
                 </div>
-                <div style={{ background:C.surface,border:`1px solid ${C.border}`,borderRadius:12,padding:16 }}>
+                <div style={{ background:C.surface,border:`1px solid ${C.border}`,borderRadius:20,padding:16 }}>
                   <div style={{ display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8 }}>
                     <span style={{ fontFamily:C.mono,fontSize:10,color:C.text3,textTransform:'uppercase' }}>Negative Prompt</span>
                     <CopyBtn text={result.negativePrompt} />
@@ -434,7 +434,7 @@ function VideoTab({ credits, onCreditUpdate }) {
                   <p style={{ color:C.text3,fontSize:12,margin:0,fontFamily:C.mono,lineHeight:1.5 }}>{result.negativePrompt}</p>
                 </div>
                 <a href={result.ltxPlaygroundUrl} target="_blank" rel="noopener noreferrer" style={{ textDecoration:'none' }}>
-                  <div style={{ background:'linear-gradient(135deg,#1C1C1C,#0A0A0A)',border:`1px solid ${C.amberDim}`,borderRadius:12,padding:16,display:'flex',alignItems:'center',justifyContent:'space-between',cursor:'pointer' }}>
+                  <div style={{ background:'linear-gradient(135deg,#1C1C1C,#0A0A0A)',border:`1px solid ${C.amberDim}`,borderRadius:20,padding:16,display:'flex',alignItems:'center',justifyContent:'space-between',cursor:'pointer' }}>
                     <div style={{ display:'flex',alignItems:'center',gap:12 }}>
                       <span style={{ fontSize:22 }}>🚀</span>
                       <div>
@@ -450,7 +450,7 @@ function VideoTab({ credits, onCreditUpdate }) {
           </>
         )}
         {!result && !loading && !polling && (
-          <div style={{ background:C.surface,border:`1px solid ${C.border}`,borderRadius:12,minHeight:400,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:10 }}>
+          <div style={{ background:C.surface,border:`1px solid ${C.border}`,borderRadius:20,minHeight:400,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:10 }}>
             <span style={{ fontSize:40 }}>🎬</span>
             <div style={{ color:C.text4,fontSize:13 }}>Your video will appear here</div>
           </div>
@@ -487,16 +487,16 @@ function CarouselTab({ credits, onCreditUpdate }) {
         <Btn onClick={handleGenerate} disabled={loading||!topic.trim()}>
           {loading ? '⟳ Building...' : '📊 Generate Carousel (8 credits)'}
         </Btn>
-        {error && <div style={{ background:C.redSub,border:`1px solid ${C.red}`,borderRadius:8,padding:12,color:C.redText,fontSize:12,fontFamily:C.mono }}>{error}</div>}
+        {error && <div style={{ background:C.redSub,border:`1px solid ${C.red}`,borderRadius:12,padding:12,color:C.redText,fontSize:12,fontFamily:C.mono }}>{error}</div>}
       </div>
       <div style={{ display:'flex',flexDirection:'column',gap:10 }}>
         {loading && (
-          <div style={{ background:C.surface,border:`1px solid ${C.border2}`,borderRadius:12,minHeight:300,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:12 }}>
+          <div style={{ background:C.surface,border:`1px solid ${C.border2}`,borderRadius:20,minHeight:300,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:12 }}>
             <Spinner /><div style={{ color:C.amberText,fontSize:13 }}>Building carousel slides...</div>
           </div>
         )}
         {result?.slides && !loading && result.slides.map((slide,i)=>(
-          <div key={i} style={{ background:C.surface,border:`1px solid ${slide.type==='hook'?C.amberDim:slide.type==='cta'?C.tealDim:C.border2}`,borderRadius:10,padding:'14px 16px',display:'flex',gap:12,alignItems:'flex-start' }}>
+          <div key={i} style={{ background:C.surface,border:`1px solid ${slide.type==='hook'?C.amberDim:slide.type==='cta'?C.tealDim:C.border2}`,borderRadius:14,padding:'14px 16px',display:'flex',gap:12,alignItems:'flex-start' }}>
             <div style={{ width:28,height:28,borderRadius:'50%',background:slide.type==='hook'?C.amberSub:slide.type==='cta'?C.tealSub:C.surface2,display:'flex',alignItems:'center',justifyContent:'center',fontFamily:C.mono,fontSize:10,color:slide.type==='hook'?C.amberText:slide.type==='cta'?C.tealText:C.text3,flexShrink:0 }}>{i+1}</div>
             <div style={{ flex:1 }}>
               <div style={{ fontSize:13,fontWeight:600,color:C.text,marginBottom:4 }}>{slide.headline}</div>
@@ -506,7 +506,7 @@ function CarouselTab({ credits, onCreditUpdate }) {
           </div>
         ))}
         {!result && !loading && (
-          <div style={{ background:C.surface,border:`1px solid ${C.border}`,borderRadius:12,minHeight:300,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:10 }}>
+          <div style={{ background:C.surface,border:`1px solid ${C.border}`,borderRadius:20,minHeight:300,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:10 }}>
             <span style={{ fontSize:40 }}>📊</span>
             <div style={{ color:C.text4,fontSize:13 }}>Your carousel slides will appear here</div>
           </div>
@@ -535,7 +535,7 @@ function HistoryTab() {
       ) : (
         <div style={{ display:'flex',flexDirection:'column',gap:8 }}>
           {gens.map((g,i)=>(
-            <div key={i} style={{ background:C.surface,border:`1px solid ${C.border2}`,borderRadius:10,padding:'12px 16px',display:'flex',gap:14,alignItems:'center' }}>
+            <div key={i} style={{ background:C.surface,border:`1px solid ${C.border2}`,borderRadius:14,padding:'12px 16px',display:'flex',gap:14,alignItems:'center' }}>
               <span style={{ fontSize:18,flexShrink:0 }}>{typeIcon[g.generation_type]||'✦'}</span>
               <div style={{ flex:1,minWidth:0 }}>
                 <div style={{ fontSize:12,color:C.text,fontWeight:500,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis' }}>{g.prompt||g.generation_type}</div>
@@ -609,9 +609,9 @@ export default function VisualEngine() {
       {/* Provider Status */}
       <ProviderStatus providers={providers} />
       {/* Tabs */}
-      <div style={{ display:'flex',gap:4,background:C.surface,borderRadius:10,padding:4,width:isMobile?'100%':'fit-content',maxWidth:'100%',overflowX:'auto',marginBottom:28,border:`1px solid ${C.border2}` }}>
+      <div style={{ display:'flex',gap:4,background:C.surface,borderRadius:14,padding:4,width:isMobile?'100%':'fit-content',maxWidth:'100%',overflowX:'auto',marginBottom:28,border:`1px solid ${C.border2}` }}>
         {tabs.map(t=>(
-          <button key={t.id} onClick={()=>setTab(t.id)} style={{ display:'flex',alignItems:'center',gap:7,padding:'8px 18px',borderRadius:8,border:'none',cursor:'pointer',fontSize:13,fontFamily:C.font,fontWeight:tab===t.id?600:400,background:tab===t.id?C.amber:'transparent',color:tab===t.id?'#fff':C.text3,transition:'all .15s' }}>
+          <button key={t.id} onClick={()=>setTab(t.id)} style={{ display:'flex',alignItems:'center',gap:7,padding:'8px 18px',borderRadius:12,border:'none',cursor:'pointer',fontSize:13,fontFamily:C.font,fontWeight:tab===t.id?600:400,background:tab===t.id?C.amber:'transparent',color:tab===t.id?'#fff':C.text3,transition:'all .15s' }}>
             <span>{t.icon}</span>{t.label}
           </button>
         ))}

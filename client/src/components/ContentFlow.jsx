@@ -84,20 +84,20 @@ export default function ContentFlow() {
     title: { fontSize: '24px', fontWeight: '700', color: '#FF6B5E', margin: '0 0 4px' },
     sub: { fontSize: '13px', color: '#A0A0A0', fontFamily: 'DM Mono, monospace' },
     grid: { display: 'grid', gridTemplateColumns: cols(isMobile, '320px 1fr'), gap: '24px' },
-    panel: { background: '#1C1C1C', border: '1px solid #2A2A2A', borderRadius: '12px', padding: '20px' },
+    panel: { background: '#1C1C1C', border: '1px solid #2A2A2A', borderRadius: '20px', padding: '20px' },
     label: { fontSize: '11px', color: '#A0A0A0', fontFamily: 'DM Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' },
-    input: { width: '100%', background: '#0A0A0A', border: '1px solid #2A2A2A', borderRadius: '8px', color: '#F5F5F5', padding: '10px 12px', fontSize: '14px', fontFamily: 'Sora, sans-serif', boxSizing: 'border-box' },
-    nodeChip: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#0A0A0A', border: '1px solid #2A2A2A', borderRadius: '8px', padding: '10px 12px', marginBottom: '8px' },
+    input: { width: '100%', background: '#0A0A0A', border: '1px solid #2A2A2A', borderRadius: '12px', color: '#F5F5F5', padding: '10px 12px', fontSize: '14px', fontFamily: 'Sora, sans-serif', boxSizing: 'border-box' },
+    nodeChip: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#0A0A0A', border: '1px solid #2A2A2A', borderRadius: '12px', padding: '10px 12px', marginBottom: '8px' },
     addBtn: { background: '#1C1C1C', border: '1px solid #FF6B5E', borderRadius: '6px', color: '#FF6B5E', padding: '6px 10px', fontSize: '12px', cursor: 'pointer', fontFamily: 'DM Mono, monospace' },
-    runBtn: { background: 'linear-gradient(135deg, #FF6B5E, #E8352B)', border: 'none', borderRadius: '10px', color: '#0A0A0A', padding: '12px 24px', fontSize: '14px', fontWeight: '700', cursor: 'pointer', width: '100%', marginTop: '16px', fontFamily: 'Sora, sans-serif' },
-    resultCard: { background: '#0A0A0A', border: '1px solid #2A2A2A', borderRadius: '10px', padding: '16px', marginBottom: '12px' },
+    runBtn: { background: 'linear-gradient(135deg, #FF6B5E, #E8352B)', border: 'none', borderRadius: '14px', color: '#0A0A0A', padding: '12px 24px', fontSize: '14px', fontWeight: '700', cursor: 'pointer', width: '100%', marginTop: '16px', fontFamily: 'Sora, sans-serif' },
+    resultCard: { background: '#0A0A0A', border: '1px solid #2A2A2A', borderRadius: '14px', padding: '16px', marginBottom: '12px' },
     resultLabel: { fontSize: '11px', color: '#FF6B5E', fontFamily: 'DM Mono, monospace', textTransform: 'uppercase', marginBottom: '8px' },
     resultText: { fontSize: '13px', color: '#F5F5F5', fontFamily: 'Sora, sans-serif', lineHeight: '1.7', whiteSpace: 'pre-wrap', margin: 0 },
     templateBtn: { background: '#0A0A0A', border: '1px solid #2A2A2A', borderRadius: '6px', color: '#A0A0A0', padding: '6px 12px', fontSize: '12px', cursor: 'pointer', marginRight: '8px', marginBottom: '8px', fontFamily: 'DM Mono, monospace' },
     removeBtn: { background: 'none', border: 'none', color: '#A0A0A0', cursor: 'pointer', fontSize: '16px', padding: '0 4px' },
     saveRow: { display: 'flex', gap: '8px', marginTop: '12px' },
-    saveInput: { flex: 1, background: '#0A0A0A', border: '1px solid #2A2A2A', borderRadius: '8px', color: '#F5F5F5', padding: '8px 12px', fontSize: '13px', fontFamily: 'Sora, sans-serif' },
-    saveBtn: { background: saved ? '#37B87A' : '#2A2A2A', border: 'none', borderRadius: '8px', color: saved ? '#fff' : '#A0A0A0', padding: '8px 16px', fontSize: '13px', cursor: 'pointer', fontFamily: 'DM Mono, monospace' },
+    saveInput: { flex: 1, background: '#0A0A0A', border: '1px solid #2A2A2A', borderRadius: '12px', color: '#F5F5F5', padding: '8px 12px', fontSize: '13px', fontFamily: 'Sora, sans-serif' },
+    saveBtn: { background: saved ? '#37B87A' : '#2A2A2A', border: 'none', borderRadius: '12px', color: saved ? '#fff' : '#A0A0A0', padding: '8px 16px', fontSize: '13px', cursor: 'pointer', fontFamily: 'DM Mono, monospace' },
   };
 
   return (
@@ -186,7 +186,7 @@ export default function ContentFlow() {
           )}
 
           {error && (
-            <div style={{ background: '#2A0E0C', border: '1px solid #5A1512', borderRadius: '8px', padding: '12px', color: '#FF6B5E', fontSize: '13px', marginTop: '12px', fontFamily: 'DM Mono, monospace' }}>
+            <div style={{ background: '#2A0E0C', border: '1px solid #5A1512', borderRadius: '12px', padding: '12px', color: '#FF6B5E', fontSize: '13px', marginTop: '12px', fontFamily: 'DM Mono, monospace' }}>
               {error}
             </div>
           )}

@@ -4,7 +4,7 @@ import * as api from './lib/api.js';
 import { PricingPage, BillingManagement, UpgradePrompt, SuccessScreen } from './pages/Billing.jsx';
 import { useContentStore } from './lib/store/useContentStore.ts';
 import { MODULES } from './modules.js';
-import { Button, Card, StatCard, SectionLabel, PillNav } from './components/ui';
+import { Button, Card, StatCard, SectionLabel, Sidebar } from './components/ui';
 import { useIsMobile, cols } from './lib/useIsMobile.js';
 
 // ─── AUTH CONTEXT ─────────────────────────────────────────────────────────────
@@ -88,7 +88,14 @@ const STYLES = `
     --amber: #E0A000; --amber-d: rgba(224,160,0,0.14);
     --cyan: #C4C4C4; --cyan-d: rgba(255,255,255,0.06);
     --font-d: 'Sora', sans-serif; --font-b: 'Sora', sans-serif;
-    --r: 12px; --r-sm: 8px;
+    /* Glow shape scale — lifts every class-based card/panel/input in the
+       in-app rooms (Scheduler, Settings, Content Studio, Brand Deals) to the
+       concept's rounded language in one place. */
+    --r: 20px; --r-sm: 12px; --r-icon: 13px; --r-pill: 999px;
+    --glow-red: 0 6px 20px rgba(232,53,43,0.35);
+    --glow-card: 0 12px 32px rgba(0,0,0,0.40);
+    --grad-red: linear-gradient(135deg, #E8352B, #B8241C);
+    --grad-red-solid: linear-gradient(135deg, #E8352B, #C82920);
   }
   html, body, #root { height: 100%; background: var(--bg); color: var(--text); font-family: var(--font-b); font-size: 14px; }
   ::-webkit-scrollbar { width: 3px; height: 3px; }
@@ -152,7 +159,7 @@ const STYLES = `
   .kpi-icon { position: absolute; top: 16px; right: 16px; opacity: .15; }
 
   /* ── Panels ── */
-  .panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 18px; }
+  .panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.30); }
   .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 22px; }
   .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 22px; }
   .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 18px; }
@@ -195,7 +202,7 @@ const STYLES = `
 
   /* ── Forms / Modals ── */
   .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.8); backdrop-filter: blur(6px); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 16px; }
-  .modal { background: var(--bg2); border: 1px solid var(--border2); border-radius: 14px; padding: 24px; width: 100%; max-width: 500px; max-height: 92vh; overflow-y: auto; animation: fadeUp .18s ease; }
+  .modal { background: var(--bg2); border: 1px solid var(--border2); border-radius: 20px; padding: 24px; width: 100%; max-width: 500px; max-height: 92vh; overflow-y: auto; animation: fadeUp .18s ease; }
   .modal-lg { max-width: 700px; }
   .modal-title { font-family: var(--font-d); font-size: 16px; font-weight: 800; color: var(--text); margin-bottom: 18px; letter-spacing: -0.02em; }
   .form-row { margin-bottom: 13px; }
@@ -214,7 +221,7 @@ const STYLES = `
 
   /* ── Auth Screen ── */
   .auth-screen { min-height: 100vh; display: flex; align-items: center; justify-content: center; background: var(--bg); padding: 20px; }
-  .auth-card { background: var(--bg2); border: 1px solid var(--border2); border-radius: 16px; padding: 36px; width: 100%; max-width: 420px; }
+  .auth-card { background: var(--bg2); border: 1px solid var(--border2); border-radius: 22px; padding: 36px; width: 100%; max-width: 420px; box-shadow: 0 12px 40px rgba(0,0,0,0.4); }
   .auth-logo { font-family: var(--font-d); font-size: 22px; font-weight: 800; color: var(--text); margin-bottom: 6px; letter-spacing: -0.02em; }
   .auth-logo span { color: var(--accent2); }
   .auth-sub { font-size: 13px; color: var(--text3); margin-bottom: 22px; }
@@ -445,10 +452,11 @@ const STYLES = `
   .cc-dashboard .cc-deal-row { background: var(--cc-surface); border: 1px solid var(--cc-border); border-radius: var(--cc-radius-sm); padding: 11px 14px; }
   .cc-dashboard .empty { color: var(--cc-text3); }
 
-  /* ── Floating shell (redesigned app frame) ── */
-  .shell { display: flex; gap: 14px; height: 100vh; padding: 14px; overflow: hidden; background: radial-gradient(1200px 600px at 78% -10%, rgba(232,53,43,0.08), transparent 60%), var(--bg); }
-  .main-float { flex: 1; display: flex; flex-direction: column; min-width: 0; overflow: hidden; }
-  .content-scroll { flex: 1; overflow-y: auto; border-radius: 24px; }
+  /* ── App shell (Glow concept: sidebar + main, red-glow wash) ── */
+  .shell { display: flex; height: 100vh; overflow: hidden; position: relative;
+    background: radial-gradient(900px 720px at 50% -26%, rgba(232,53,43,0.16), transparent 62%), var(--bg); }
+  .main-float { flex: 1; display: flex; flex-direction: column; min-width: 0; overflow: hidden; padding: 20px 30px 0; }
+  .content-scroll { flex: 1; overflow-y: auto; padding-bottom: 52px; }
 
   /* Reusable glass surface for downstream screens/components */
   .glass { background: linear-gradient(180deg, rgba(30,30,30,0.55), rgba(18,18,18,0.45)); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(232,53,43,0.12); border-radius: 22px; box-shadow: 0 10px 40px rgba(0,0,0,0.35); }
@@ -462,17 +470,32 @@ const STYLES = `
   .rail-logo-title { font-family: var(--font-d); font-size: 12.5px; font-weight: 800; line-height: 1.25; letter-spacing: -0.01em; color: var(--text); }
   .rail-user { display: flex; align-items: center; gap: 9px; padding: 10px 6px 4px; margin-top: 10px; border-top: 1px solid var(--border); }
 
-  /* ── Floating topbar (pill) ── */
-  .topbar-float { display: flex; align-items: center; gap: 14px; background: linear-gradient(180deg, rgba(30,30,30,0.6), rgba(18,18,18,0.5)); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid var(--border2); border-radius: 999px; padding: 9px 12px 9px 24px; margin-bottom: 14px; flex-shrink: 0; box-shadow: 0 12px 40px rgba(0,0,0,0.4); }
+  /* ── Glass pill topbar (concept .topbar) ── */
+  .topbar-float { display: flex; align-items: center; gap: 14px; background: rgba(20,20,20,0.70); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid var(--border); border-radius: 999px; padding: 10px 10px 10px 22px; margin-bottom: 24px; flex-shrink: 0; box-shadow: 0 12px 40px rgba(0,0,0,0.4); }
 
-  /* ── Dashboard hero + bento ── */
-  .dash { padding: 8px 24px 34px; }
-  .hero { display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 36px; align-items: center; margin: 12px 0 40px; }
-  .hero-title { font-family: var(--font-d); font-size: 46px; font-weight: 800; line-height: 1.04; letter-spacing: -0.035em; color: var(--text); margin: 16px 0 14px; }
-  .hero-sub { font-size: 14.5px; color: var(--text2); line-height: 1.65; max-width: 460px; margin-bottom: 24px; }
-  .hero-actions { display: flex; gap: 12px; flex-wrap: wrap; }
-  .hero-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-  .hero-stats > :nth-child(even) { transform: translateY(26px); }
+  /* ── Dashboard hero (concept .hero-block: centered, oversized) ── */
+  .dash { padding: 0; }
+  .hero-block { text-align: center; padding: 28px 20px 40px; position: relative; }
+  .hero-title { font-family: var(--font-d); font-size: clamp(30px, 4.4vw, 50px); font-weight: 800; line-height: 1.06; letter-spacing: -0.02em; color: var(--text); margin: 18px 0 12px; }
+  .hero-title .hl { color: var(--accent2); }
+  .hero-sub { font-size: 14px; color: var(--text2); line-height: 1.6; max-width: 460px; margin: 0 auto 4px; }
+  .hero-actions { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; margin-top: 22px; }
+  /* Floating backdrop-blur stat pills, centered and wrapping (concept .float-stats) */
+  .float-stats { display: flex; justify-content: center; gap: 14px; flex-wrap: wrap; margin-top: 30px; }
+  .float-stats > * { min-width: 150px; }
+
+  /* ── Module grid (concept .mod-grid: icon-square cards, hover lift+glow) ── */
+  .mod-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; margin: 36px 0 20px; }
+  .mod-head h2 { font-family: var(--font-d); font-size: 24px; font-weight: 800; letter-spacing: -0.01em; color: var(--text); }
+  .mod-head p { font-size: 12px; color: var(--text3); max-width: 280px; text-align: right; }
+  .mod-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .mod-card { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 22px; position: relative; overflow: hidden; cursor: pointer; text-align: left; width: 100%; font-family: var(--font-b); transition: transform .2s, border-color .2s, box-shadow .2s; }
+  .mod-card:hover { transform: translateY(-4px); border-color: rgba(232,53,43,0.4); box-shadow: var(--glow-card); }
+  .mod-icon { width: 42px; height: 42px; border-radius: 13px; background: var(--red-d); border: 1px solid rgba(232,53,43,0.25); display: flex; align-items: center; justify-content: center; margin-bottom: 16px; color: var(--accent2); }
+  .mod-card h4 { font-family: var(--font-d); font-size: 15px; font-weight: 700; color: var(--text); margin-bottom: 6px; }
+  .mod-card p { font-size: 12px; color: var(--text2); line-height: 1.5; }
+  .mod-live { position: absolute; top: 20px; right: 20px; display: flex; align-items: center; gap: 5px; font-family: var(--font-mono, 'DM Mono', monospace); font-size: 9px; color: var(--accent2); }
+  .mod-live .d { width: 5px; height: 5px; border-radius: 50%; background: var(--accent2); box-shadow: 0 0 6px var(--accent2); }
 
   .bento { display: grid; grid-template-columns: repeat(12, 1fr); gap: 14px; align-items: start; }
   .b-4 { grid-column: span 4; }
@@ -489,20 +512,24 @@ const STYLES = `
   .cc-deal-row { background: rgba(30,30,30,0.5); border: 1px solid var(--border2); border-radius: 14px; padding: 11px 14px; }
 
   @media (max-width: 1200px) {
-    .hero { grid-template-columns: 1fr; }
-    .hero-title { font-size: 38px; }
     .bento > * { grid-column: span 12 !important; }
+    .mod-grid { grid-template-columns: repeat(2, 1fr); }
   }
 
   /* Phones: the nav rail becomes an off-canvas drawer (see PillNav), so the
      shell no longer reserves a column for it. Reclaim the space for content,
      and clear the fixed hamburger in the topbar. */
   @media (max-width: 768px) {
-    .shell { padding: 10px; gap: 0; }
-    .topbar-float { padding: 9px 12px 9px 66px; }
+    .main-float { padding: 14px 14px 0; }
+    /* Clear the fixed hamburger the Sidebar renders on phones */
+    .topbar-float { padding: 10px 12px 10px 64px; margin-bottom: 18px; }
     .topbar-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
     .topbar-acts { flex-shrink: 0; }
-    .content-scroll { border-radius: 18px; }
+    .hero-block { padding: 12px 4px 28px; }
+    .mod-grid { grid-template-columns: 1fr; }
+    .mod-head { flex-direction: column; align-items: flex-start; gap: 6px; }
+    .mod-head p { text-align: left; }
+    .float-stats > * { min-width: calc(50% - 7px); }
     /* Kanban pipeline: 6 fixed columns are unreadable on a phone. Switch to a
        horizontal swipe — each column ~78% wide so the next one peeks. */
     .pipeline { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: 78%; overflow-x: auto; scroll-snap-type: x proximity; -webkit-overflow-scrolling: touch; }
@@ -821,29 +848,42 @@ function CommandCenter({ activeBrand, setPage, user, onQuickAdd }) {
     { label:'Leads Generated', value: fmt(tot.total_leads||0), delta:'30 days' },
     { label:'Est. Revenue', value: money(tot.total_revenue||0), delta:'This month' },
   ];
+  const pieceCount = assets.length;
+  const pipelineNote = pieceCount > 0
+    ? `${pieceCount} piece${pieceCount === 1 ? '' : 's'} in your pipeline`
+    : 'All systems nominal';
+  // Bottom "rooms" grid — every id maps to a real route (setPage).
+  const rooms = [
+    { id:'ai-studio', icon:'studio', title:'AI Studio', desc:'Image generation, video prompts, and full storyboards, built in.' },
+    { id:'smart-clipper', icon:'scissors', title:'Smart Clipper', desc:'Long-form video in, viral-ready clips out — fully automated.', live:true },
+    { id:'scheduler', icon:'calendar', title:'Scheduler', desc:'Plan and track your posts, honestly — no fake auto-publish.' },
+    { id:'visual-engine', icon:'image', title:'Visual Engine', desc:'On-brand visuals across every platform, one click away.' },
+    { id:'channel-downloader', icon:'download', title:'Channel Downloader', desc:"Archive a creator's full history — resumable, no cap." },
+    { id:'content-advisor', icon:'advisor', title:'Content Advisor', desc:'AI feedback on what to post next, and why.' },
+  ];
 
   return (
     <div className="dash">
-      {/* ── Hero ── */}
-      <section className="hero">
-        <div className="hero-left">
-          <SectionLabel>Mission Control</SectionLabel>
-          <h1 className="hero-title">{greeting}, {firstName}.<br />Let's grow {brandName}.</h1>
-          <p className="hero-sub">Your entire content engine in one view — pipeline, platforms, deals, and revenue. Pick the next move and ship it.</p>
-          <div className="hero-actions">
-            <Button variant="primary" size="lg" onClick={onQuickAdd}><I n="plus" s={15} /> New Content</Button>
-            <Button variant="secondary" size="lg" onClick={() => setPage('scheduler')}><I n="calendar" s={15} /> Open Scheduler</Button>
-          </div>
+      {/* ── Hero (concept .hero-block: centered, oversized) ── */}
+      <section className="hero-block">
+        <SectionLabel dot>{pipelineNote}</SectionLabel>
+        <h1 className="hero-title">{greeting}, {firstName}.<br />Let's grow <span className="hl">{brandName}</span>.</h1>
+        <p className="hero-sub">Your entire content engine in one view — pipeline, platforms, deals, and revenue. Pick the next move and ship it.</p>
+        <div className="hero-actions">
+          <Button variant="primary" size="lg" onClick={onQuickAdd}><I n="plus" s={15} /> New Content</Button>
+          <Button variant="secondary" size="lg" onClick={() => setPage('scheduler')}><I n="calendar" s={15} /> Open Scheduler</Button>
         </div>
-        <div className="hero-stats">
-          {kpis.map(k => <StatCard key={k.label} value={k.value} label={k.label} delta={k.delta} />)}
+        <div className="float-stats">
+          {kpis.map((k, i) => (
+            <StatCard key={k.label} value={k.value} label={k.label} delta={k.delta} red={i === 0 || i === 3} />
+          ))}
         </div>
       </section>
 
       {/* ── Bento ── */}
       <div className="bento">
         {/* Production Pipeline (large) */}
-        <Card className="b-8">
+        <Card className="b-8" accent>
           <div className="dash-sec-hdr">
             <div>
               <SectionLabel>Pipeline</SectionLabel>
@@ -937,6 +977,22 @@ function CommandCenter({ activeBrand, setPage, user, onQuickAdd }) {
           })}
         </Card>
       )}
+
+      {/* ── Module grid (concept .mod-grid: icon-square cards, hover lift+glow) ── */}
+      <div className="mod-head">
+        <h2>Every room your business needs</h2>
+        <p>Strategy, production, distribution, and revenue — one system.</p>
+      </div>
+      <div className="mod-grid">
+        {rooms.map(r => (
+          <button type="button" className="mod-card" key={r.id} onClick={() => setPage(r.id)}>
+            {r.live && <div className="mod-live"><span className="d" />LIVE</div>}
+            <div className="mod-icon"><I n={r.icon} s={18} /></div>
+            <h4>{r.title}</h4>
+            <p>{r.desc}</p>
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
@@ -1454,7 +1510,7 @@ function SchedulerRoom({ activeBrand }) {
                   : { icon:'·', color:'var(--text3)', bg:'var(--surface2)', label:'Scheduled', labelColor:'var(--text3)' };
               return (
                 <div key={post.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 14px', background:'var(--surface)', border:`1px solid ${isDone?'rgba(34,197,94,.2)':'var(--border)'}`, borderRadius:'var(--r-sm)', marginBottom:8, opacity:isDone?.7:1, transition:'border-color .15s' }}>
-                  <div style={{ width:40, height:40, borderRadius:8, background:'var(--surface2)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:18, flexShrink:0 }}>
+                  <div style={{ width:40, height:40, borderRadius:12, background:'var(--surface2)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:18, flexShrink:0 }}>
                     🎬
                   </div>
                   <div style={{ flex:1, minWidth:0 }}>
@@ -2085,14 +2141,31 @@ export default function App() {
     </>
   );
 
-  const NAV = [
-    { id:'dashboard', label:'Command Center', icon:'dashboard' },
-    { id:'scheduler', label:'Scheduler', icon:'calendar' },
-    { id:'studio', label:'Content Studio', icon:'studio', badge:'NEW' },
-    ...MODULES,
-    { id:'billing', label:'Plans & Billing', icon:'shield' },
-    { id:'settings', label:'Settings', icon:'settings' },
+  // Sectioned nav (concept sidebar: Operate / Produce / Acquire + Account).
+  // Every existing route is preserved — modules are grouped by what they do,
+  // not flattened. MODULES ids stay authoritative; look them up so labels/icons
+  // never drift from modules.js.
+  const mod = (id) => MODULES.find(m => m.id === id);
+  const NAV_SECTIONS = [
+    { label: 'Operate', items: [
+      { id:'dashboard', label:'Command Center', icon:'dashboard' },
+      { id:'studio', label:'Content Studio', icon:'studio', badge:'NEW' },
+      { id:'scheduler', label:'Scheduler', icon:'calendar' },
+    ]},
+    { label: 'Produce', items: [
+      mod('ai-studio'), mod('smart-clipper'), mod('visual-engine'),
+      mod('content-advisor'), mod('carousel-prompts'), mod('content-flow'),
+    ].filter(Boolean) },
+    { label: 'Acquire', items: [
+      mod('video-downloader'), mod('channel-downloader'),
+    ].filter(Boolean) },
+    { label: 'Account', items: [
+      { id:'billing', label:'Plans & Billing', icon:'shield' },
+      { id:'settings', label:'Settings', icon:'settings' },
+    ]},
   ];
+  // Flat list retained for title lookup / any id-based fallbacks.
+  const NAV = NAV_SECTIONS.flatMap(s => s.items);
   const PAGE_TITLES = {
     dashboard: 'Command Center',
     scheduler: 'Scheduler',
@@ -2242,12 +2315,12 @@ export default function App() {
     <>
       <style>{STYLES}</style>
       <div className="shell">
-        {/* Floating pill navigation rail */}
-        <PillNav
-          items={NAV}
+        {/* Fixed left sidebar (sectioned, gradient+glow active) */}
+        <Sidebar
+          sections={NAV_SECTIONS}
           activeId={page}
           onSelect={setPage}
-          renderIcon={(item) => <I n={item.icon} s={15} />}
+          renderIcon={(item) => <I n={item.icon} s={16} />}
           header={railHeader}
           footer={railFooter}
         />

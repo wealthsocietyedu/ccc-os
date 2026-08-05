@@ -4,3 +4,4 @@ export { default as Card } from './Card.jsx';
 export { default as StatCard } from './StatCard.jsx';
 export { default as SectionLabel } from './SectionLabel.jsx';
 export { default as PillNav } from './PillNav.jsx';
+export { default as Sidebar } from './Sidebar.jsx';

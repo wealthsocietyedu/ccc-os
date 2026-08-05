@@ -80,7 +80,7 @@ function TabButton({ active, onClick, icon, label }) {
       onClick={onClick}
       style={{
         display: 'flex', alignItems: 'center', gap: '8px',
-        padding: '10px 22px', borderRadius: '8px', border: 'none',
+        padding: '10px 22px', borderRadius: '12px', border: 'none',
         cursor: 'pointer', fontSize: '14px', fontFamily: font.sora,
         fontWeight: active ? '600' : '400',
         background: active ? C.amber : 'transparent',
@@ -117,7 +117,7 @@ function Input({ value, onChange, placeholder, type = 'text' }) {
       onChange={e => onChange(e.target.value)}
       placeholder={placeholder}
       style={{
-        background: C.card, border: `1px solid ${C.border}`, borderRadius: '8px',
+        background: C.card, border: `1px solid ${C.border}`, borderRadius: '12px',
         color: C.text, padding: '10px 14px', fontSize: '14px',
         fontFamily: font.sora, outline: 'none', width: '100%',
         boxSizing: 'border-box', transition: 'border-color 0.2s'
@@ -136,7 +136,7 @@ function Textarea({ value, onChange, placeholder, rows = 4 }) {
       placeholder={placeholder}
       rows={rows}
       style={{
-        background: C.card, border: `1px solid ${C.border}`, borderRadius: '8px',
+        background: C.card, border: `1px solid ${C.border}`, borderRadius: '12px',
         color: C.text, padding: '10px 14px', fontSize: '14px',
         fontFamily: font.sora, outline: 'none', width: '100%',
         boxSizing: 'border-box', resize: 'vertical', transition: 'border-color 0.2s'
@@ -154,7 +154,7 @@ function Select({ label, value, onChange, options }) {
         value={value}
         onChange={e => onChange(e.target.value)}
         style={{
-          background: C.card, border: `1px solid ${C.border}`, borderRadius: '8px',
+          background: C.card, border: `1px solid ${C.border}`, borderRadius: '12px',
           color: C.text, padding: '10px 14px', fontSize: '14px',
           fontFamily: font.sora, outline: 'none', appearance: 'none', cursor: 'pointer'
         }}
@@ -169,7 +169,7 @@ function Select({ label, value, onChange, options }) {
 
 function Btn({ onClick, disabled, loading, children, variant = 'primary', style: extraStyle = {} }) {
   const base = {
-    padding: '11px 22px', borderRadius: '8px', border: 'none',
+    padding: '11px 22px', borderRadius: '12px', border: 'none',
     cursor: disabled || loading ? 'not-allowed' : 'pointer',
     fontSize: '14px', fontFamily: font.sora, fontWeight: '600',
     display: 'inline-flex', alignItems: 'center', gap: '8px',
@@ -215,7 +215,7 @@ function Card({ children, style: s = {} }) {
   return (
     <div style={{
       background: C.card, border: `1px solid ${C.border}`,
-      borderRadius: '12px', padding: '20px', ...s
+      borderRadius: '20px', padding: '20px', ...s
     }}>
       {children}
     </div>
@@ -238,7 +238,7 @@ function PromptBox({ label, text, color = C.amber }) {
         </Btn>
       </div>
       <div style={{
-        background: C.surface, border: `1px solid ${C.border}`, borderRadius: '8px',
+        background: C.surface, border: `1px solid ${C.border}`, borderRadius: '12px',
         padding: '12px', fontFamily: font.mono, fontSize: '13px',
         color: C.textMid, lineHeight: '1.6', whiteSpace: 'pre-wrap'
       }}>
@@ -376,7 +376,7 @@ function ImageGenerator() {
               {images.map((url, i) => (
                 <a key={i} href={url} target="_blank" rel="noreferrer">
                   <img src={url} alt={`Generated ${i + 1}`}
-                    style={{ width: '100%', borderRadius: '8px', display: 'block', border: `1px solid ${C.border}` }} />
+                    style={{ width: '100%', borderRadius: '12px', display: 'block', border: `1px solid ${C.border}` }} />
                 </a>
               ))}
             </div>
@@ -397,7 +397,7 @@ function ImageGenerator() {
               {variImages.map((url, i) => (
                 <a key={i} href={url} target="_blank" rel="noreferrer">
                   <img src={url} alt={`Variation ${i + 1}`}
-                    style={{ width: '100%', borderRadius: '8px', display: 'block', border: `1px solid ${C.border}` }} />
+                    style={{ width: '100%', borderRadius: '12px', display: 'block', border: `1px solid ${C.border}` }} />
                 </a>
               ))}
             </div>
@@ -503,7 +503,7 @@ function VideoGenerator() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-      <div style={{ display: 'flex', gap: '4px', background: C.surface, padding: '4px', borderRadius: '10px', alignSelf: 'flex-start' }}>
+      <div style={{ display: 'flex', gap: '4px', background: C.surface, padding: '4px', borderRadius: '14px', alignSelf: 'flex-start' }}>
         {modeBtn('kling', '🎬 Kling 2.1 B-Roll')}
         {modeBtn('blotato', '🤖 Blotato Faceless')}
       </div>
@@ -594,7 +594,7 @@ function VideoGenerator() {
           )}
           {videoUrl && (
             <video src={videoUrl} controls style={{
-              width: '100%', borderRadius: '10px', marginTop: '16px',
+              width: '100%', borderRadius: '14px', marginTop: '16px',
               border: `1px solid ${C.border}`, background: '#000'
             }} />
           )}
@@ -612,7 +612,7 @@ function VideoGenerator() {
           )}
           {bVideoUrl && (
             <video src={bVideoUrl} controls style={{
-              width: '100%', borderRadius: '10px', marginTop: '16px',
+              width: '100%', borderRadius: '14px', marginTop: '16px',
               border: `1px solid ${C.border}`, background: '#000'
             }} />
           )}
@@ -750,7 +750,7 @@ function SceneImage({ taskId }) {
   if (!taskId) return (
     <div style={{
       width: '100%', aspectRatio: '16/9', background: C.surface,
-      borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+      borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center',
       border: `1px solid ${C.border}`
     }}>
       <span style={{ color: C.textDim, fontSize: '12px', fontFamily: font.mono }}>No image</span>
@@ -760,7 +760,7 @@ function SceneImage({ taskId }) {
   if (polling) return (
     <div style={{
       width: '100%', aspectRatio: '16/9', background: C.surface,
-      borderRadius: '8px', display: 'flex', flexDirection: 'column',
+      borderRadius: '12px', display: 'flex', flexDirection: 'column',
       alignItems: 'center', justifyContent: 'center', gap: '10px',
       border: `1px solid ${C.border}`
     }}>
@@ -771,7 +771,7 @@ function SceneImage({ taskId }) {
 
   if (imgUrl) return (
     <img src={imgUrl} alt="Scene" style={{
-      width: '100%', borderRadius: '8px', display: 'block',
+      width: '100%', borderRadius: '12px', display: 'block',
       border: `1px solid ${C.border}`
     }} />
   );
@@ -779,7 +779,7 @@ function SceneImage({ taskId }) {
   return (
     <div style={{
       width: '100%', aspectRatio: '16/9', background: C.surface,
-      borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+      borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center',
       border: `1px solid ${C.border}`
     }}>
       <span style={{ color: C.red, fontSize: '12px', fontFamily: font.mono }}>Failed</span>
@@ -849,7 +849,7 @@ function StoryboardGenerator() {
       <Card>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
           {/* Mode toggle */}
-          <div style={{ display: 'flex', gap: '4px', background: C.surface, padding: '4px', borderRadius: '10px', alignSelf: 'flex-start' }}>
+          <div style={{ display: 'flex', gap: '4px', background: C.surface, padding: '4px', borderRadius: '14px', alignSelf: 'flex-start' }}>
             {['quick', 'script'].map(m => (
               <button key={m} onClick={() => setSbMode(m)} style={{
                 padding: '7px 16px', borderRadius: '6px', border: 'none', cursor: 'pointer',
@@ -1009,7 +1009,7 @@ function StoryboardGenerator() {
                     key={i}
                     onClick={() => setActiveScene(i)}
                     style={{
-                      padding: '12px', borderRadius: '8px', cursor: 'pointer',
+                      padding: '12px', borderRadius: '12px', cursor: 'pointer',
                       border: `1px solid ${i === activeScene ? C.amber : C.border}`,
                       background: i === activeScene ? C.amber + '11' : C.card,
                       transition: 'all 0.15s'

@@ -36,10 +36,10 @@ async function uploadFile(endpoint, file, fields = {}) {
 // ─── SHARED UI ────────────────────────────────────────────────────────────────
 
 const S = {
-  panel: { background: '#242424', border: '1px solid #242424', borderRadius: '12px', padding: '20px' },
-  innerCard: { background: '#141414', border: '1px solid #242424', borderRadius: '10px', padding: '16px' },
+  panel: { background: '#1C1C1C', border: '1px solid #2A2A2A', borderRadius: '20px', padding: '22px', boxShadow: '0 1px 3px rgba(0,0,0,0.30)' },
+  innerCard: { background: '#141414', border: '1px solid #2A2A2A', borderRadius: '14px', padding: '16px' },
   label: { fontSize: '11px', color: '#A0A0A0', fontFamily: 'DM Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' },
-  input: { background: '#141414', border: '1px solid #242424', borderRadius: '8px', color: '#F5F5F5', padding: '10px 12px', fontSize: '14px', fontFamily: 'Sora, sans-serif', outline: 'none', width: '100%', boxSizing: 'border-box' },
+  input: { background: '#141414', border: '1px solid #2A2A2A', borderRadius: '12px', color: '#F5F5F5', padding: '10px 12px', fontSize: '14px', fontFamily: 'Sora, sans-serif', outline: 'none', width: '100%', boxSizing: 'border-box' },
 };
 
 function TabBtn({ active, onClick, label, icon }) {

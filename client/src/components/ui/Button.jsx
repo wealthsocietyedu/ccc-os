@@ -10,10 +10,10 @@ const SIZES = {
 
 const VARIANTS = {
   primary: {
-    background: gradients.amber,
-    color: colors.bg,
+    background: gradients.redSolid,
+    color: '#fff',
     fontWeight: 700,
-    boxShadow: glow.amber,
+    boxShadow: glow.redSm,
   },
   secondary: {
     background: 'rgba(232,53,43,0.07)',
@@ -36,7 +36,7 @@ const VARIANTS = {
 };
 
 const HOVER = {
-  primary: { boxShadow: glow.amberStrong, filter: 'brightness(1.05)' },
+  primary: { boxShadow: glow.red, filter: 'brightness(1.06)' },
   secondary: { background: 'rgba(232,53,43,0.14)', borderColor: colors.accent },
   ghost: { background: 'rgba(232,53,43,0.06)', color: colors.text, borderColor: colors.accent },
   danger: { background: colors.red, color: '#fff' },

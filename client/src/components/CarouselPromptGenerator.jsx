@@ -488,7 +488,7 @@ export default function CarouselPromptGenerator() {
       background: 'linear-gradient(135deg, #FF6B5E, #E8352B)',
       color: '#0A0A0A',
       border: 'none',
-      borderRadius: '8px',
+      borderRadius: '12px',
       fontSize: '13px',
       fontWeight: '800',
       cursor: 'pointer',
@@ -539,7 +539,7 @@ export default function CarouselPromptGenerator() {
     },
     emptyCard: (color) => ({
       padding: '16px', background: '#0A0A0A',
-      borderRadius: '8px', border: `1px solid ${color}22`,
+      borderRadius: '12px', border: `1px solid ${color}22`,
       textAlign: 'left',
     }),
 
@@ -587,7 +587,7 @@ export default function CarouselPromptGenerator() {
       background: '#0A0A0A',
       border: `1px solid #1C1C1C`,
       borderLeft: `3px solid ${color}`,
-      borderRadius: '10px',
+      borderRadius: '16px',
       padding: '22px',
       paddingTop: '44px',
       fontSize: '12px',
