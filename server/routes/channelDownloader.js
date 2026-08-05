@@ -47,6 +47,16 @@ function ensureSchema(db) {
     );
   `);
 
+  // Multi-tenant isolation: download_jobs originally had no owner column, so every
+  // authenticated user could see/download/delete every other user's jobs. Add a
+  // user_id column if missing. Pre-existing jobs get NULL → they belong to nobody
+  // and are invisible to all users (fail-closed), which is the safe default for a
+  // shared-history table that never should have been shared.
+  const cols = db.prepare(`PRAGMA table_info(download_jobs)`).all();
+  if (!cols.some(c => c.name === 'user_id')) {
+    db.exec(`ALTER TABLE download_jobs ADD COLUMN user_id TEXT`);
+  }
+
   // A job left 'running'/'queued' at server start can only be orphaned — the
   // in-memory process map is always empty on a fresh boot, so nothing is
   // actually still downloading. Without this, a container restart mid-job
@@ -525,9 +535,9 @@ router.post('/start', async (req, res) => {
   }
 
   req.db.prepare(`
-    INSERT INTO download_jobs (id, url, platform, channel_handle, status, options, created_at, total_videos)
-    VALUES (?, ?, ?, ?, 'queued', ?, ?, ?)
-  `).run(jobId, url.trim(), platform, channelHandle, JSON.stringify(options), new Date().toISOString(), options.maxVideos);
+    INSERT INTO download_jobs (id, user_id, url, platform, channel_handle, status, options, created_at, total_videos)
+    VALUES (?, ?, ?, ?, ?, 'queued', ?, ?, ?)
+  `).run(jobId, req.userId, url.trim(), platform, channelHandle, JSON.stringify(options), new Date().toISOString(), options.maxVideos);
 
   // Fire and forget
   runDownloadJob(req.db, jobId, url.trim(), platform, channelHandle, options)
@@ -551,7 +561,7 @@ router.post('/start', async (req, res) => {
 
 // ─── GET /status/:jobId ───────────────────────────────────────────────────────
 router.get('/status/:jobId', (req, res) => {
-  const job = req.db.prepare(`SELECT * FROM download_jobs WHERE id=?`).get(req.params.jobId);
+  const job = req.db.prepare(`SELECT * FROM download_jobs WHERE id=? AND user_id=?`).get(req.params.jobId, req.userId);
   if (!job) return res.status(404).json({ error: 'Job not found' });
 
   res.json({
@@ -565,7 +575,7 @@ router.get('/status/:jobId', (req, res) => {
 
 // ─── POST /cancel/:jobId ──────────────────────────────────────────────────────
 router.post('/cancel/:jobId', (req, res) => {
-  const job = req.db.prepare(`SELECT * FROM download_jobs WHERE id=?`).get(req.params.jobId);
+  const job = req.db.prepare(`SELECT * FROM download_jobs WHERE id=? AND user_id=?`).get(req.params.jobId, req.userId);
   if (!job) return res.status(404).json({ error: 'Job not found' });
 
   const proc = activeProcesses.get(req.params.jobId);
@@ -587,7 +597,7 @@ router.post('/cancel/:jobId', (req, res) => {
 // restart. This is how a large channel that got IP-blocked, hit an auth wall, or
 // was interrupted partway gets finished without re-pulling every video.
 router.post('/resume/:jobId', async (req, res) => {
-  const job = req.db.prepare(`SELECT * FROM download_jobs WHERE id=?`).get(req.params.jobId);
+  const job = req.db.prepare(`SELECT * FROM download_jobs WHERE id=? AND user_id=?`).get(req.params.jobId, req.userId);
   if (!job) return res.status(404).json({ error: 'Job not found' });
   if (activeProcesses.has(job.id) || job.status === 'running' || job.status === 'queued') {
     return res.status(400).json({ error: 'Job is already running' });
@@ -624,15 +634,16 @@ router.get('/jobs', (req, res) => {
            CASE WHEN file_list IS NOT NULL THEN json_array_length(file_list) ELSE 0 END as file_count,
            CASE WHEN meta_summary IS NOT NULL THEN 1 ELSE 0 END as has_analysis
     FROM download_jobs
+    WHERE user_id = ?
     ORDER BY created_at DESC
     LIMIT 50
-  `).all();
+  `).all(req.userId);
   res.json({ jobs });
 });
 
 // ─── GET /files/:jobId ────────────────────────────────────────────────────────
 router.get('/files/:jobId', (req, res) => {
-  const job = req.db.prepare(`SELECT file_list, output_dir FROM download_jobs WHERE id=?`).get(req.params.jobId);
+  const job = req.db.prepare(`SELECT file_list, output_dir FROM download_jobs WHERE id=? AND user_id=?`).get(req.params.jobId, req.userId);
   if (!job) return res.status(404).json({ error: 'Job not found' });
   res.json({ files: job.file_list ? JSON.parse(job.file_list) : [] });
 });
@@ -650,7 +661,7 @@ router.get('/files/:jobId', (req, res) => {
 // in localStorage, not a cookie. See channelDownloader.downloadFile, mirroring
 // the smartClipper.downloadClip pattern.
 router.get('/file/:jobId/:filename', (req, res) => {
-  const job = req.db.prepare(`SELECT output_dir FROM download_jobs WHERE id=?`).get(req.params.jobId);
+  const job = req.db.prepare(`SELECT output_dir FROM download_jobs WHERE id=? AND user_id=?`).get(req.params.jobId, req.userId);
   if (!job || !job.output_dir) return res.status(404).json({ error: 'Job not found' });
 
   // Strip any directory components to prevent path traversal, then confirm the
@@ -668,7 +679,7 @@ router.get('/file/:jobId/:filename', (req, res) => {
 
 // ─── GET /analysis/:jobId ─────────────────────────────────────────────────────
 router.get('/analysis/:jobId', (req, res) => {
-  const job = req.db.prepare(`SELECT meta_summary, channel_handle, platform FROM download_jobs WHERE id=?`).get(req.params.jobId);
+  const job = req.db.prepare(`SELECT meta_summary, channel_handle, platform FROM download_jobs WHERE id=? AND user_id=?`).get(req.params.jobId, req.userId);
   if (!job) return res.status(404).json({ error: 'Job not found' });
   res.json({
     channelHandle: job.channel_handle,
@@ -679,7 +690,7 @@ router.get('/analysis/:jobId', (req, res) => {
 
 // ─── POST /analyze/:jobId (re-run analysis) ───────────────────────────────────
 router.post('/analyze/:jobId', async (req, res) => {
-  const job = req.db.prepare(`SELECT * FROM download_jobs WHERE id=?`).get(req.params.jobId);
+  const job = req.db.prepare(`SELECT * FROM download_jobs WHERE id=? AND user_id=?`).get(req.params.jobId, req.userId);
   if (!job) return res.status(404).json({ error: 'Job not found' });
   if (job.status !== 'completed') return res.status(400).json({ error: 'Job not completed' });
 
@@ -699,7 +710,7 @@ router.post('/analyze/:jobId', async (req, res) => {
 
 // ─── POST /cleanup/:jobId ─────────────────────────────────────────────────────
 router.post('/cleanup/:jobId', (req, res) => {
-  const job = req.db.prepare(`SELECT output_dir FROM download_jobs WHERE id=?`).get(req.params.jobId);
+  const job = req.db.prepare(`SELECT output_dir FROM download_jobs WHERE id=? AND user_id=?`).get(req.params.jobId, req.userId);
   if (!job) return res.status(404).json({ error: 'Job not found' });
 
   try {
@@ -716,7 +727,7 @@ router.post('/cleanup/:jobId', (req, res) => {
 
 // ─── DELETE /job/:jobId (remove record entirely) ──────────────────────────────
 router.delete('/job/:jobId', (req, res) => {
-  const job = req.db.prepare(`SELECT output_dir FROM download_jobs WHERE id=?`).get(req.params.jobId);
+  const job = req.db.prepare(`SELECT output_dir FROM download_jobs WHERE id=? AND user_id=?`).get(req.params.jobId, req.userId);
   if (!job) return res.status(404).json({ error: 'Job not found' });
 
   // Kill if running
@@ -736,8 +747,8 @@ router.delete('/job/:jobId', (req, res) => {
 
 // ─── GET /storage-stats ───────────────────────────────────────────────────────
 router.get('/storage-stats', (req, res) => {
-  const totalMB = req.db.prepare(`SELECT COALESCE(SUM(total_size_mb),0) as total FROM download_jobs`).get().total;
-  const jobCount = req.db.prepare(`SELECT COUNT(*) as c FROM download_jobs`).get().c;
+  const totalMB = req.db.prepare(`SELECT COALESCE(SUM(total_size_mb),0) as total FROM download_jobs WHERE user_id=?`).get(req.userId).total;
+  const jobCount = req.db.prepare(`SELECT COUNT(*) as c FROM download_jobs WHERE user_id=?`).get(req.userId).c;
 
   let ytdlpVersion = 'unknown';
   try {

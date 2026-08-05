@@ -4,10 +4,18 @@ import { useIsMobile, cols } from '../lib/useIsMobile.js';
 const API_BASE = '/api/ai-studio';
 
 // ─── Shared fetch helpers ─────────────────────────────────────────────────────
+// The /api/ai-studio router is auth-gated on the server (it calls paid image/
+// video + Claude APIs on Levi's keys), so every request must carry the JWT the
+// app stores in localStorage after login.
+function authHeaders(extra = {}) {
+  const token = localStorage.getItem('ccc_token');
+  return { ...extra, ...(token ? { Authorization: `Bearer ${token}` } : {}) };
+}
+
 async function apiPost(endpoint, body) {
   const res = await fetch(`${API_BASE}${endpoint}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify(body)
   });
   if (!res.ok) {
@@ -18,7 +26,7 @@ async function apiPost(endpoint, body) {
 }
 
 async function apiGet(endpoint) {
-  const res = await fetch(`${API_BASE}${endpoint}`);
+  const res = await fetch(`${API_BASE}${endpoint}`, { headers: authHeaders() });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.error || `Request failed (${res.status})`);

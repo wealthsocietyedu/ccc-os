@@ -360,7 +360,10 @@ export default function VideoDownloader() {
     try {
       const res = await fetch(`${API_BASE}/info`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(localStorage.getItem('ccc_token') ? { Authorization: `Bearer ${localStorage.getItem('ccc_token')}` } : {})
+        },
         body: JSON.stringify({ url: cleanUrl })
       });
       const data = await res.json();
@@ -386,7 +389,10 @@ export default function VideoDownloader() {
 
       const res = await fetch(`${API_BASE}/download`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(localStorage.getItem('ccc_token') ? { Authorization: `Bearer ${localStorage.getItem('ccc_token')}` } : {})
+        },
         body: JSON.stringify({ url: url.trim(), quality, audioOnly })
       });
 

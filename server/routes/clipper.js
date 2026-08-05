@@ -55,6 +55,31 @@ function requireAuth(req, res, next) {
   next();
 }
 
+// A jobId encodes its owner: `job_<ts>_<userId>` (see /clip below). requireAuth
+// only proves the caller is *a* logged-in user, NOT that this job is theirs — so
+// every per-job route must also confirm ownership, or account B can read/delete
+// account A's clips by guessing a jobId. The regex additionally rejects any jobId
+// that isn't the exact expected shape, which blocks path traversal through the
+// :jobId route param (it flows straight into path.join below).
+function ownsJob(req) {
+  const { jobId } = req.params;
+  if (typeof jobId !== 'string' || !/^job_\d+_[A-Za-z0-9_-]+$/.test(jobId)) return false;
+  return jobId.endsWith('_' + sanitizeId(String(req.userId)));
+}
+
+// Resolve a clip file path for the given job, stripping any directory components
+// from the filename and confirming the result stays inside the job's own clips
+// dir. Returns null if the path escapes (traversal attempt) — callers 404.
+function resolveClipPath(req) {
+  const clipsDir = path.resolve(TMP, req.params.jobId, 'clips');
+  const safeName = path.basename(req.params.filename);
+  const filePath = path.resolve(clipsDir, safeName);
+  if (filePath !== path.join(clipsDir, safeName) || !filePath.startsWith(clipsDir + path.sep)) {
+    return null;
+  }
+  return filePath;
+}
+
 // ─── Check system tools ──────────────────────────────────────────────────────
 router.get('/health', async (req, res) => {
   const checks = {};
@@ -303,6 +328,7 @@ Return ONLY valid JSON array:
 
 // ─── GET: Job status ─────────────────────────────────────────────────────────
 router.get('/status/:jobId', requireAuth, (req, res) => {
+  if (!ownsJob(req)) return res.status(404).json({ error: 'Job not found' });
   const jobDir = path.join(TMP, req.params.jobId);
   const statusFile = path.join(jobDir, 'status.json');
   const errorFile = path.join(jobDir, 'error.json');
@@ -317,15 +343,17 @@ router.get('/status/:jobId', requireAuth, (req, res) => {
 
 // ─── GET: Download a clip ────────────────────────────────────────────────────
 router.get('/download/:jobId/:filename', requireAuth, (req, res) => {
-  const filePath = path.join(TMP, req.params.jobId, 'clips', req.params.filename);
-  if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'File not found' });
+  if (!ownsJob(req)) return res.status(404).json({ error: 'File not found' });
+  const filePath = resolveClipPath(req);
+  if (!filePath || !fs.existsSync(filePath)) return res.status(404).json({ error: 'File not found' });
   res.download(filePath);
 });
 
 // ─── GET: Stream a clip for preview ─────────────────────────────────────────
 router.get('/preview/:jobId/:filename', requireAuth, (req, res) => {
-  const filePath = path.join(TMP, req.params.jobId, 'clips', req.params.filename);
-  if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'File not found' });
+  if (!ownsJob(req)) return res.status(404).json({ error: 'File not found' });
+  const filePath = resolveClipPath(req);
+  if (!filePath || !fs.existsSync(filePath)) return res.status(404).json({ error: 'File not found' });
 
   const stat = fs.statSync(filePath);
   const range = req.headers.range;
@@ -349,6 +377,7 @@ router.get('/preview/:jobId/:filename', requireAuth, (req, res) => {
 
 // ─── DELETE: Cleanup job ─────────────────────────────────────────────────────
 router.delete('/job/:jobId', requireAuth, (req, res) => {
+  if (!ownsJob(req)) return res.status(404).json({ error: 'Job not found' });
   const jobDir = path.join(TMP, req.params.jobId);
   if (fs.existsSync(jobDir)) {
     fs.rmSync(jobDir, { recursive: true, force: true });
