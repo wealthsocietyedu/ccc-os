@@ -79,25 +79,25 @@ export default function ContentFlow() {
   };
 
   const s = {
-    wrap: { minHeight: '100vh', background: '#0C0A07', color: '#E5E7EB', fontFamily: 'Sora, sans-serif', padding: '32px' },
+    wrap: { minHeight: '100vh', background: '#0A0A0A', color: '#F5F5F5', fontFamily: 'Sora, sans-serif', padding: '32px' },
     header: { marginBottom: '32px' },
-    title: { fontSize: '24px', fontWeight: '700', color: '#F0A800', margin: '0 0 4px' },
-    sub: { fontSize: '13px', color: '#6B7280', fontFamily: 'DM Mono, monospace' },
+    title: { fontSize: '24px', fontWeight: '700', color: '#FF6B5E', margin: '0 0 4px' },
+    sub: { fontSize: '13px', color: '#A0A0A0', fontFamily: 'DM Mono, monospace' },
     grid: { display: 'grid', gridTemplateColumns: cols(isMobile, '320px 1fr'), gap: '24px' },
-    panel: { background: '#1A1614', border: '1px solid #2A2520', borderRadius: '12px', padding: '20px' },
-    label: { fontSize: '11px', color: '#9CA3AF', fontFamily: 'DM Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' },
-    input: { width: '100%', background: '#0C0A07', border: '1px solid #2A2520', borderRadius: '8px', color: '#E5E7EB', padding: '10px 12px', fontSize: '14px', fontFamily: 'Sora, sans-serif', boxSizing: 'border-box' },
-    nodeChip: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#0C0A07', border: '1px solid #2A2520', borderRadius: '8px', padding: '10px 12px', marginBottom: '8px' },
-    addBtn: { background: '#1A1614', border: '1px solid #F0A800', borderRadius: '6px', color: '#F0A800', padding: '6px 10px', fontSize: '12px', cursor: 'pointer', fontFamily: 'DM Mono, monospace' },
-    runBtn: { background: 'linear-gradient(135deg, #F0A800, #D4953A)', border: 'none', borderRadius: '10px', color: '#0C0A07', padding: '12px 24px', fontSize: '14px', fontWeight: '700', cursor: 'pointer', width: '100%', marginTop: '16px', fontFamily: 'Sora, sans-serif' },
-    resultCard: { background: '#0C0A07', border: '1px solid #2A2520', borderRadius: '10px', padding: '16px', marginBottom: '12px' },
-    resultLabel: { fontSize: '11px', color: '#F0A800', fontFamily: 'DM Mono, monospace', textTransform: 'uppercase', marginBottom: '8px' },
-    resultText: { fontSize: '13px', color: '#D1D5DB', fontFamily: 'Sora, sans-serif', lineHeight: '1.7', whiteSpace: 'pre-wrap', margin: 0 },
-    templateBtn: { background: '#0C0A07', border: '1px solid #2A2520', borderRadius: '6px', color: '#9CA3AF', padding: '6px 12px', fontSize: '12px', cursor: 'pointer', marginRight: '8px', marginBottom: '8px', fontFamily: 'DM Mono, monospace' },
-    removeBtn: { background: 'none', border: 'none', color: '#6B7280', cursor: 'pointer', fontSize: '16px', padding: '0 4px' },
+    panel: { background: '#1C1C1C', border: '1px solid #2A2A2A', borderRadius: '12px', padding: '20px' },
+    label: { fontSize: '11px', color: '#A0A0A0', fontFamily: 'DM Mono, monospace', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' },
+    input: { width: '100%', background: '#0A0A0A', border: '1px solid #2A2A2A', borderRadius: '8px', color: '#F5F5F5', padding: '10px 12px', fontSize: '14px', fontFamily: 'Sora, sans-serif', boxSizing: 'border-box' },
+    nodeChip: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#0A0A0A', border: '1px solid #2A2A2A', borderRadius: '8px', padding: '10px 12px', marginBottom: '8px' },
+    addBtn: { background: '#1C1C1C', border: '1px solid #FF6B5E', borderRadius: '6px', color: '#FF6B5E', padding: '6px 10px', fontSize: '12px', cursor: 'pointer', fontFamily: 'DM Mono, monospace' },
+    runBtn: { background: 'linear-gradient(135deg, #FF6B5E, #E8352B)', border: 'none', borderRadius: '10px', color: '#0A0A0A', padding: '12px 24px', fontSize: '14px', fontWeight: '700', cursor: 'pointer', width: '100%', marginTop: '16px', fontFamily: 'Sora, sans-serif' },
+    resultCard: { background: '#0A0A0A', border: '1px solid #2A2A2A', borderRadius: '10px', padding: '16px', marginBottom: '12px' },
+    resultLabel: { fontSize: '11px', color: '#FF6B5E', fontFamily: 'DM Mono, monospace', textTransform: 'uppercase', marginBottom: '8px' },
+    resultText: { fontSize: '13px', color: '#F5F5F5', fontFamily: 'Sora, sans-serif', lineHeight: '1.7', whiteSpace: 'pre-wrap', margin: 0 },
+    templateBtn: { background: '#0A0A0A', border: '1px solid #2A2A2A', borderRadius: '6px', color: '#A0A0A0', padding: '6px 12px', fontSize: '12px', cursor: 'pointer', marginRight: '8px', marginBottom: '8px', fontFamily: 'DM Mono, monospace' },
+    removeBtn: { background: 'none', border: 'none', color: '#A0A0A0', cursor: 'pointer', fontSize: '16px', padding: '0 4px' },
     saveRow: { display: 'flex', gap: '8px', marginTop: '12px' },
-    saveInput: { flex: 1, background: '#0C0A07', border: '1px solid #2A2520', borderRadius: '8px', color: '#E5E7EB', padding: '8px 12px', fontSize: '13px', fontFamily: 'Sora, sans-serif' },
-    saveBtn: { background: saved ? '#059669' : '#2A2520', border: 'none', borderRadius: '8px', color: saved ? '#fff' : '#9CA3AF', padding: '8px 16px', fontSize: '13px', cursor: 'pointer', fontFamily: 'DM Mono, monospace' },
+    saveInput: { flex: 1, background: '#0A0A0A', border: '1px solid #2A2A2A', borderRadius: '8px', color: '#F5F5F5', padding: '8px 12px', fontSize: '13px', fontFamily: 'Sora, sans-serif' },
+    saveBtn: { background: saved ? '#37B87A' : '#2A2A2A', border: 'none', borderRadius: '8px', color: saved ? '#fff' : '#A0A0A0', padding: '8px 16px', fontSize: '13px', cursor: 'pointer', fontFamily: 'DM Mono, monospace' },
   };
 
   return (
@@ -139,8 +139,8 @@ export default function ContentFlow() {
               <div key={n.type} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
                 <div>
                   <span style={{ marginRight: '8px' }}>{n.icon}</span>
-                  <span style={{ fontSize: '13px', color: '#E5E7EB' }}>{n.label}</span>
-                  <div style={{ fontSize: '11px', color: '#6B7280', fontFamily: 'DM Mono, monospace', marginLeft: '24px' }}>{n.desc}</div>
+                  <span style={{ fontSize: '13px', color: '#F5F5F5' }}>{n.label}</span>
+                  <div style={{ fontSize: '11px', color: '#A0A0A0', fontFamily: 'DM Mono, monospace', marginLeft: '24px' }}>{n.desc}</div>
                 </div>
                 <button style={s.addBtn} onClick={() => addNode(n.type)}>+ Add</button>
               </div>
@@ -155,7 +155,7 @@ export default function ContentFlow() {
                 return (
                   <div key={node.id} style={s.nodeChip}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <span style={{ fontSize: '11px', color: '#F0A800', fontFamily: 'DM Mono, monospace' }}>{i + 1}</span>
+                      <span style={{ fontSize: '11px', color: '#FF6B5E', fontFamily: 'DM Mono, monospace' }}>{i + 1}</span>
                       <span style={{ fontSize: '13px' }}>{def?.icon} {def?.label}</span>
                     </div>
                     <button style={s.removeBtn} onClick={() => removeNode(node.id)}>×</button>
@@ -186,7 +186,7 @@ export default function ContentFlow() {
           )}
 
           {error && (
-            <div style={{ background: '#1F0A0A', border: '1px solid #7F1D1D', borderRadius: '8px', padding: '12px', color: '#FCA5A5', fontSize: '13px', marginTop: '12px', fontFamily: 'DM Mono, monospace' }}>
+            <div style={{ background: '#2A0E0C', border: '1px solid #5A1512', borderRadius: '8px', padding: '12px', color: '#FF6B5E', fontSize: '13px', marginTop: '12px', fontFamily: 'DM Mono, monospace' }}>
               {error}
             </div>
           )}
@@ -206,7 +206,7 @@ export default function ContentFlow() {
                       <div style={s.resultLabel}>{def?.icon} {def?.label}</div>
                       <button
                         onClick={() => navigator.clipboard.writeText(r.output)}
-                        style={{ background: 'none', border: '1px solid #2A2520', borderRadius: '4px', color: '#6B7280', padding: '3px 8px', fontSize: '11px', cursor: 'pointer', fontFamily: 'DM Mono, monospace' }}
+                        style={{ background: 'none', border: '1px solid #2A2A2A', borderRadius: '4px', color: '#A0A0A0', padding: '3px 8px', fontSize: '11px', cursor: 'pointer', fontFamily: 'DM Mono, monospace' }}
                       >
                         Copy
                       </button>
@@ -220,15 +220,15 @@ export default function ContentFlow() {
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '400px', gap: '12px' }}>
               {running ? (
                 <>
-                  <div style={{ width: '40px', height: '40px', border: '3px solid #F0A800', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+                  <div style={{ width: '40px', height: '40px', border: '3px solid #FF6B5E', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
                   <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-                  <div style={{ color: '#F0A800', fontSize: '14px' }}>Running your flow...</div>
+                  <div style={{ color: '#FF6B5E', fontSize: '14px' }}>Running your flow...</div>
                 </>
               ) : (
                 <>
                   <div style={{ fontSize: '48px' }}>⚡</div>
-                  <div style={{ color: '#4B5563', fontSize: '14px' }}>Build a flow and hit Run</div>
-                  <div style={{ color: '#374151', fontSize: '12px', fontFamily: 'DM Mono, monospace' }}>Results appear here step by step</div>
+                  <div style={{ color: '#666666', fontSize: '14px' }}>Build a flow and hit Run</div>
+                  <div style={{ color: '#3A3A3A', fontSize: '12px', fontFamily: 'DM Mono, monospace' }}>Results appear here step by step</div>
                 </>
               )}
             </div>

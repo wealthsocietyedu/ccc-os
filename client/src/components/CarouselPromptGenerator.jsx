@@ -40,17 +40,17 @@ const SLIDE_TYPES = [
 ];
 
 const PHASE_ACCENT = {
-  H: '#F0A800',  // amber — CCC OS primary
-  E: '#3D9E8C',  // teal — CCC OS secondary
-  I: '#D4953A',  // burnt orange
-  T: '#7C6F5A',  // warm muted
+  H: '#FF6B5E',  // amber — CCC OS primary
+  E: '#37B87A',  // teal — CCC OS secondary
+  I: '#E8352B',  // burnt orange
+  T: '#A0A0A0',  // warm muted
 };
 
 const PHASE_INFO = {
-  H: { label: 'HOOK',       color: '#F0A800', slides: 'Slides 1–2', desc: 'Pain and recognition' },
-  E: { label: 'EXPLAIN',    color: '#3D9E8C', slides: 'Slides 3–4', desc: 'The why and the truth' },
-  I: { label: 'ILLUSTRATE', color: '#D4953A', slides: 'Slides 5–6', desc: 'Story and proof' },
-  T: { label: 'TEACH',      color: '#7C6F5A', slides: 'Slides 7–8', desc: 'Conviction and CTA' },
+  H: { label: 'HOOK',       color: '#FF6B5E', slides: 'Slides 1–2', desc: 'Pain and recognition' },
+  E: { label: 'EXPLAIN',    color: '#37B87A', slides: 'Slides 3–4', desc: 'The why and the truth' },
+  I: { label: 'ILLUSTRATE', color: '#E8352B', slides: 'Slides 5–6', desc: 'Story and proof' },
+  T: { label: 'TEACH',      color: '#A0A0A0', slides: 'Slides 7–8', desc: 'Conviction and CTA' },
 };
 
 // ─── Prompt Generator ─────────────────────────────────────────────────────────
@@ -75,14 +75,14 @@ Slide size: 1080 x 1350px
 
 TOP ELEMENT:
   Brand wordmark or "The Conviction Series"
-  — Small, gray (#999), top center
+  — Small, gray (#A0A0A0), top center
 
 HEADLINE STRUCTURE:
   "${hookLine || '[Your hook line — the line that opens the loop]'}"
 
   Typography treatment:
   — Key phrase → Bold black text INSIDE a rounded rectangle (black fill, white text)
-  — Supporting words → Large gray text (#AAAAAA), same size, outside the box
+  — Supporting words → Large gray text (#A0A0A0), same size, outside the box
   — Headline weight: ExtraBold or 900
   — No em dashes anywhere
 
@@ -406,50 +406,50 @@ export default function CarouselPromptGenerator() {
     container: {
       display: 'flex',
       flexDirection: 'column',
-      background: '#0C0A07',
-      color: '#E8DCC8',
+      background: '#0A0A0A',
+      color: '#F5F5F5',
       fontFamily: 'Sora, sans-serif',
       minHeight: '100vh',
     },
     header: {
-      borderBottom: '1px solid #1E1A14',
+      borderBottom: '1px solid #1C1C1C',
       padding: '20px 32px',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'space-between',
-      background: '#0C0A07',
+      background: '#0A0A0A',
       position: 'sticky',
       top: 0,
       zIndex: 20,
     },
     headerLeft: { display: 'flex', alignItems: 'center', gap: '16px' },
-    pageTitle: { fontSize: '18px', fontWeight: '700', color: '#F0A800', letterSpacing: '-0.02em' },
-    pageSubtitle: { fontSize: '13px', color: '#5A5040', fontFamily: 'DM Mono, monospace' },
+    pageTitle: { fontSize: '18px', fontWeight: '700', color: '#FF6B5E', letterSpacing: '-0.02em' },
+    pageSubtitle: { fontSize: '13px', color: '#4A4A4A', fontFamily: 'DM Mono, monospace' },
     badge: {
       padding: '3px 10px',
-      background: '#1A1510',
+      background: '#1C1C1C',
       borderRadius: '4px',
       fontSize: '10px',
-      color: '#5A5040',
+      color: '#4A4A4A',
       letterSpacing: '2px',
       textTransform: 'uppercase',
       fontFamily: 'DM Mono, monospace',
     },
-    divider: { width: '1px', height: '20px', background: '#1E1A14' },
+    divider: { width: '1px', height: '20px', background: '#1C1C1C' },
     body: { display: 'flex', flex: 1, overflow: 'hidden' },
 
     // Left panel
     leftPanel: {
       width: '300px',
       minWidth: '300px',
-      borderRight: '1px solid #1E1A14',
+      borderRight: '1px solid #1C1C1C',
       overflowY: 'auto',
       padding: '20px 16px 40px',
     },
     fieldLabel: {
       display: 'block',
       fontSize: '10px',
-      color: '#5A5040',
+      color: '#4A4A4A',
       letterSpacing: '2px',
       textTransform: 'uppercase',
       marginBottom: '6px',
@@ -457,10 +457,10 @@ export default function CarouselPromptGenerator() {
     },
     select: {
       width: '100%',
-      background: '#110F0A',
-      border: '1px solid #1E1A14',
+      background: '#141414',
+      border: '1px solid #1C1C1C',
       borderRadius: '6px',
-      color: '#C8B897',
+      color: '#C4C4C4',
       padding: '9px 12px',
       fontSize: '12px',
       fontFamily: 'Sora, sans-serif',
@@ -470,10 +470,10 @@ export default function CarouselPromptGenerator() {
     },
     textarea: {
       width: '100%',
-      background: '#0E0C09',
-      border: '1px solid #1E1A14',
+      background: '#0A0A0A',
+      border: '1px solid #1C1C1C',
       borderRadius: '6px',
-      color: '#C8B897',
+      color: '#C4C4C4',
       padding: '9px 11px',
       fontSize: '12px',
       resize: 'vertical',
@@ -485,8 +485,8 @@ export default function CarouselPromptGenerator() {
     generateBtn: {
       width: '100%',
       padding: '13px',
-      background: 'linear-gradient(135deg, #F0A800, #D4953A)',
-      color: '#0C0A07',
+      background: 'linear-gradient(135deg, #FF6B5E, #E8352B)',
+      color: '#0A0A0A',
       border: 'none',
       borderRadius: '8px',
       fontSize: '13px',
@@ -500,12 +500,12 @@ export default function CarouselPromptGenerator() {
     hookExample: {
       marginTop: '6px',
       fontSize: '11px',
-      color: '#3A3020',
+      color: '#3A3A3A',
       fontStyle: 'italic',
       lineHeight: '1.5',
       fontFamily: 'DM Mono, monospace',
     },
-    phaseDivider: { height: '1px', background: '#1A1510', margin: '16px 0' },
+    phaseDivider: { height: '1px', background: '#1C1C1C', margin: '16px 0' },
     phaseHeader: {
       display: 'flex',
       alignItems: 'center',
@@ -529,23 +529,23 @@ export default function CarouselPromptGenerator() {
       flex: 1,
       display: 'flex', flexDirection: 'column',
       alignItems: 'center', justifyContent: 'center',
-      color: '#2A2218', textAlign: 'center', padding: '40px',
+      color: '#2A2A2A', textAlign: 'center', padding: '40px',
     },
-    emptyTitle: { fontSize: '44px', marginBottom: '16px', letterSpacing: '-2px', color: '#1E1810' },
+    emptyTitle: { fontSize: '44px', marginBottom: '16px', letterSpacing: '-2px', color: '#1C1C1C' },
     emptyCards: {
       marginTop: '40px', display: 'grid',
       gridTemplateColumns: '1fr 1fr', gap: '12px',
       maxWidth: '400px', width: '100%',
     },
     emptyCard: (color) => ({
-      padding: '16px', background: '#0F0D0A',
+      padding: '16px', background: '#0A0A0A',
       borderRadius: '8px', border: `1px solid ${color}22`,
       textAlign: 'left',
     }),
 
     // Output area
     slideNav: {
-      borderBottom: '1px solid #1E1A14',
+      borderBottom: '1px solid #1C1C1C',
       padding: '12px 24px',
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       gap: '8px', flexWrap: 'wrap',
@@ -553,9 +553,9 @@ export default function CarouselPromptGenerator() {
     slideBtn: (isActive, color) => ({
       padding: '5px 11px',
       borderRadius: '6px',
-      border: isActive ? `1px solid ${color}` : '1px solid #1E1A14',
+      border: isActive ? `1px solid ${color}` : '1px solid #1C1C1C',
       background: isActive ? color + '22' : 'transparent',
-      color: isActive ? color : '#3A3020',
+      color: isActive ? color : '#3A3A3A',
       fontSize: '11px', fontWeight: '700',
       cursor: 'pointer', letterSpacing: '0.5px',
       fontFamily: 'DM Mono, monospace',
@@ -563,15 +563,15 @@ export default function CarouselPromptGenerator() {
     actionBtn: (active) => ({
       padding: '6px 14px',
       borderRadius: '6px',
-      border: '1px solid #1E1A14',
-      background: active ? '#1A150A' : 'transparent',
-      color: active ? '#4ADE80' : '#3A3020',
+      border: '1px solid #1C1C1C',
+      background: active ? '#1C1C1C' : 'transparent',
+      color: active ? '#37B87A' : '#3A3A3A',
       fontSize: '11px', cursor: 'pointer',
       fontFamily: 'DM Mono, monospace',
     }),
     slideLabel: {
       padding: '12px 24px 8px',
-      borderBottom: '1px solid #110F0A',
+      borderBottom: '1px solid #141414',
       display: 'flex', alignItems: 'center', gap: '12px',
     },
     slidePhaseBadge: (color) => ({
@@ -584,15 +584,15 @@ export default function CarouselPromptGenerator() {
     }),
     outputArea: { flex: 1, overflowY: 'auto', padding: '16px 24px 40px' },
     promptBox: (color) => ({
-      background: '#0C0A07',
-      border: `1px solid #1A1510`,
+      background: '#0A0A0A',
+      border: `1px solid #1C1C1C`,
       borderLeft: `3px solid ${color}`,
       borderRadius: '10px',
       padding: '22px',
       paddingTop: '44px',
       fontSize: '12px',
       lineHeight: '1.85',
-      color: '#7A6A50',
+      color: '#A0A0A0',
       whiteSpace: 'pre-wrap',
       wordBreak: 'break-word',
       fontFamily: "'JetBrains Mono', 'Fira Code', 'Courier New', monospace",
@@ -603,18 +603,18 @@ export default function CarouselPromptGenerator() {
       position: 'absolute', top: '10px', right: '10px',
       display: 'flex', alignItems: 'center', gap: '5px',
       padding: '5px 10px',
-      background: active ? '#1A150A' : '#1A1510',
-      border: `1px solid ${active ? '#4caf5066' : '#2A2010'}`,
+      background: active ? '#1C1C1C' : '#1C1C1C',
+      border: `1px solid ${active ? '#37B87A66' : '#242424'}`,
       borderRadius: '6px',
-      color: active ? '#4caf50' : '#3A3020',
+      color: active ? '#37B87A' : '#3A3A3A',
       fontSize: '11px', fontFamily: 'DM Mono, monospace',
       fontWeight: '500', cursor: 'pointer', letterSpacing: '0.3px',
     }),
     navRow: { display: 'flex', justifyContent: 'space-between', marginTop: '14px' },
     navBtn: (disabled) => ({
       padding: '7px 16px', borderRadius: '6px',
-      border: '1px solid #1A1510', background: 'transparent',
-      color: disabled ? '#1E1A14' : '#3A3020',
+      border: '1px solid #1C1C1C', background: 'transparent',
+      color: disabled ? '#1C1C1C' : '#3A3A3A',
       fontSize: '11px', cursor: disabled ? 'default' : 'pointer',
       fontFamily: 'DM Mono, monospace',
     }),
@@ -628,10 +628,10 @@ export default function CarouselPromptGenerator() {
         @import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300;1,400&display=swap');
         * { box-sizing: border-box; }
         ::-webkit-scrollbar { width: 5px; }
-        ::-webkit-scrollbar-track { background: #0C0A07; }
-        ::-webkit-scrollbar-thumb { background: #1E1A14; border-radius: 3px; }
-        select option { background: #110F0A; color: #C8B897; }
-        textarea::placeholder, input::placeholder { color: #2A2218; }
+        ::-webkit-scrollbar-track { background: #0A0A0A; }
+        ::-webkit-scrollbar-thumb { background: #1C1C1C; border-radius: 3px; }
+        select option { background: #141414; color: #C4C4C4; }
+        textarea::placeholder, input::placeholder { color: #2A2A2A; }
       `}</style>
 
       {/* ── Header ── */}
@@ -654,7 +654,7 @@ export default function CarouselPromptGenerator() {
               }}>
                 {letter}
               </div>
-              <span style={{ fontSize: '11px', color: '#3A3020', fontFamily: 'DM Mono, monospace' }}>{info.label}</span>
+              <span style={{ fontSize: '11px', color: '#3A3A3A', fontFamily: 'DM Mono, monospace' }}>{info.label}</span>
             </div>
           ))}
         </div>
@@ -709,7 +709,7 @@ export default function CarouselPromptGenerator() {
                     <div style={{ fontSize: '11px', fontWeight: '700', color: info.color, letterSpacing: '1px', fontFamily: 'DM Mono, monospace' }}>
                       {info.label}
                     </div>
-                    <div style={{ fontSize: '10px', color: '#3A3020', fontFamily: 'DM Mono, monospace' }}>
+                    <div style={{ fontSize: '10px', color: '#3A3A3A', fontFamily: 'DM Mono, monospace' }}>
                       {info.slides} · {info.desc}
                     </div>
                   </div>
@@ -741,10 +741,10 @@ export default function CarouselPromptGenerator() {
           {!generated ? (
             <div style={s.emptyState}>
               <div style={s.emptyTitle}>H — E — I — T</div>
-              <div style={{ fontSize: '14px', color: '#3A3020', marginBottom: '8px' }}>
+              <div style={{ fontSize: '14px', color: '#3A3A3A', marginBottom: '8px' }}>
                 Fill in the left panel and generate your prompts.
               </div>
-              <div style={{ fontSize: '12px', color: '#2A2218', maxWidth: '380px', lineHeight: '1.7', fontFamily: 'DM Mono, monospace' }}>
+              <div style={{ fontSize: '12px', color: '#2A2A2A', maxWidth: '380px', lineHeight: '1.7', fontFamily: 'DM Mono, monospace' }}>
                 Topic and hook line are the minimum. The conviction line on Slide 7 is the most important thing you'll write.
               </div>
               <div style={s.emptyCards}>
@@ -756,7 +756,7 @@ export default function CarouselPromptGenerator() {
                 ].map(({ letter, desc, color }) => (
                   <div key={letter} style={s.emptyCard(color)}>
                     <div style={{ fontSize: '18px', fontWeight: '800', color, marginBottom: '6px', fontFamily: 'DM Mono, monospace' }}>{letter}</div>
-                    <div style={{ fontSize: '11px', color: '#3A3020', lineHeight: '1.4', fontFamily: 'DM Mono, monospace' }}>{desc}</div>
+                    <div style={{ fontSize: '11px', color: '#3A3A3A', lineHeight: '1.4', fontFamily: 'DM Mono, monospace' }}>{desc}</div>
                   </div>
                 ))}
               </div>
@@ -795,16 +795,16 @@ export default function CarouselPromptGenerator() {
                 <div style={s.slidePhaseBadge(PHASE_ACCENT[activePhase])}>
                   {activeSlideData?.phaseLabel}
                 </div>
-                <div style={{ fontSize: '13px', color: '#4A4030', fontFamily: 'Sora, sans-serif' }}>
+                <div style={{ fontSize: '13px', color: '#3A3A3A', fontFamily: 'Sora, sans-serif' }}>
                   {activeSlideData?.label}
                 </div>
                 {activeSlide === 'explain2' && (
-                  <div style={{ fontSize: '11px', color: '#F0A800', marginLeft: 'auto', fontFamily: 'DM Mono, monospace' }}>
+                  <div style={{ fontSize: '11px', color: '#FF6B5E', marginLeft: 'auto', fontFamily: 'DM Mono, monospace' }}>
                     ✦ Pivot slide — conviction line lives here
                   </div>
                 )}
                 {activeSlide === 'teach1' && (
-                  <div style={{ fontSize: '11px', color: '#F0A800', marginLeft: 'auto', fontFamily: 'DM Mono, monospace' }}>
+                  <div style={{ fontSize: '11px', color: '#FF6B5E', marginLeft: 'auto', fontFamily: 'DM Mono, monospace' }}>
                     ✦ The save slide — write the conviction line last
                   </div>
                 )}

@@ -56,19 +56,19 @@ function usePoll({ endpoint, isActive, intervalMs = 4000, onComplete }) {
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 const C = {
-  bg: '#0C0A07',
-  surface: '#141008',
-  card: '#1A1610',
-  border: '#2E2818',
-  borderHover: '#4A3E2A',
-  amber: '#F0A800',
-  amberDim: '#B37D00',
-  text: '#F0EBE0',
-  textMid: '#C8BAA0',
-  textDim: '#8A7B64',
-  green: '#4ADE80',
-  red: '#F87171',
-  blue: '#60A5FA'
+  bg: '#0A0A0A',
+  surface: '#141414',
+  card: '#1C1C1C',
+  border: '#2A2A2A',
+  borderHover: '#4A4A4A',
+  amber: '#E8352B',
+  amberDim: '#8C1F19',
+  text: '#F5F5F5',
+  textMid: '#C8C8C8',
+  textDim: '#A0A0A0',
+  green: '#37B87A',
+  red: '#FF6B5E',
+  blue: '#C4C4C4'
 };
 
 const font = { sora: 'Sora, sans-serif', mono: 'DM Mono, monospace' };
@@ -84,7 +84,7 @@ function TabButton({ active, onClick, icon, label }) {
         cursor: 'pointer', fontSize: '14px', fontFamily: font.sora,
         fontWeight: active ? '600' : '400',
         background: active ? C.amber : 'transparent',
-        color: active ? '#0C0A07' : C.textDim,
+        color: active ? '#fff' : C.textDim,
         transition: 'all 0.2s',
         whiteSpace: 'nowrap'
       }}
@@ -177,13 +177,13 @@ function Btn({ onClick, disabled, loading, children, variant = 'primary', style:
     ...extraStyle
   };
   const variants = {
-    primary: { background: C.amber, color: '#0C0A07' },
+    primary: { background: C.amber, color: '#fff' },
     secondary: { background: C.card, color: C.text, border: `1px solid ${C.border}` },
     ghost: { background: 'transparent', color: C.textMid, border: `1px solid ${C.border}` }
   };
   return (
     <button onClick={onClick} disabled={disabled || loading} style={{ ...base, ...variants[variant] }}>
-      {loading && <Spinner size={14} color={variant === 'primary' ? '#0C0A07' : C.amber} />}
+      {loading && <Spinner size={14} color={variant === 'primary' ? '#fff' : C.amber} />}
       {children}
     </button>
   );
@@ -494,7 +494,7 @@ function VideoGenerator() {
       padding: '8px 18px', borderRadius: '6px', border: 'none', cursor: 'pointer',
       fontFamily: font.sora, fontSize: '13px', fontWeight: mode === m ? '600' : '400',
       background: mode === m ? C.amber : C.card,
-      color: mode === m ? '#0C0A07' : C.textDim
+      color: mode === m ? '#fff' : C.textDim
     }}>{label}</button>
   );
 
@@ -855,7 +855,7 @@ function StoryboardGenerator() {
                 padding: '7px 16px', borderRadius: '6px', border: 'none', cursor: 'pointer',
                 fontFamily: font.sora, fontSize: '13px', fontWeight: sbMode === m ? '600' : '400',
                 background: sbMode === m ? C.amber : 'transparent',
-                color: sbMode === m ? '#0C0A07' : C.textDim
+                color: sbMode === m ? '#fff' : C.textDim
               }}>
                 {m === 'quick' ? '⚡ Quick Topic' : '📝 Full Script'}
               </button>

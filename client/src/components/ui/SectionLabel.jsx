@@ -14,7 +14,7 @@ export default function SectionLabel({ children, style = {}, ...rest }) {
         textTransform: 'uppercase',
         letterSpacing: '0.14em',
         color: colors.accent2,
-        background: 'rgba(212,149,58,0.08)',
+        background: 'rgba(232,53,43,0.08)',
         border: `1px solid ${colors.glassBorder}`,
         borderRadius: 999,
         padding: '4px 12px',

@@ -10,18 +10,18 @@ async function apiFetch(endpoint, body, method='POST') {
 }
 // ─── Design tokens ────────────────────────────────────────────────────────────
 const C = {
-  bg:     '#0C0A07', surface: '#1A1610', surface2: '#231E16', surface3: '#2E2720',
-  border: '#2D2318', border2: '#3D3428', border3: '#5C4E38',
-  amber: '#F0A800', amberMid: '#D4953A', amberDim: '#7A5820', amberText: '#FCD97A', amberSub: 'rgba(212,149,58,0.08)',
-  teal: '#3D9E8C', tealDim: '#1E5050', tealText: '#6ECFBF', tealSub: 'rgba(61,158,140,0.08)',
-  red: '#C42A18', redText: '#F87060', redSub: 'rgba(196,42,24,0.1)',
-  text: '#F0EBE0', text2: '#A89880', text3: '#6B5E4E', text4: '#3D3428',
+  bg:     '#0A0A0A', surface: '#1C1C1C', surface2: '#242424', surface3: '#2E2E2E',
+  border: '#2A2A2A', border2: '#3A3A3A', border3: '#4A4A4A',
+  amber: '#E8352B', amberMid: '#C82A22', amberDim: '#8C1F19', amberText: '#FF6B5E', amberSub: 'rgba(232,53,43,0.10)',
+  teal: '#C4C4C4', tealDim: '#3A3A3A', tealText: '#D8D8D8', tealSub: 'rgba(255,255,255,0.06)',
+  red: '#E8352B', redText: '#FF6B5E', redSub: 'rgba(232,53,43,0.12)',
+  text: '#F5F5F5', text2: '#A0A0A0', text3: '#666666', text4: '#3A3A3A',
   font: "'Sora', sans-serif", mono: "'DM Mono', monospace",
 };
 // ─── Shared UI ────────────────────────────────────────────────────────────────
 const Btn = ({ children, onClick, variant='primary', disabled, style={} }) => {
   const variants = {
-    primary: { background: `linear-gradient(135deg,${C.amberMid},${C.amber})`, color:'#0C0A07', border:'none', boxShadow:`0 0 18px rgba(212,149,58,0.3)` },
+    primary: { background: `linear-gradient(135deg,${C.amberMid},${C.amber})`, color:'#fff', border:'none', boxShadow:`0 0 18px rgba(232,53,43,0.32)` },
     secondary: { background:C.surface2, color:C.text2, border:`1px solid ${C.border2}` },
     teal: { background:C.tealSub, color:C.tealText, border:`1px solid ${C.tealDim}` },
     ghost: { background:'transparent', color:C.text3, border:`1px solid ${C.border}` },
@@ -434,7 +434,7 @@ function VideoTab({ credits, onCreditUpdate }) {
                   <p style={{ color:C.text3,fontSize:12,margin:0,fontFamily:C.mono,lineHeight:1.5 }}>{result.negativePrompt}</p>
                 </div>
                 <a href={result.ltxPlaygroundUrl} target="_blank" rel="noopener noreferrer" style={{ textDecoration:'none' }}>
-                  <div style={{ background:'linear-gradient(135deg,#1A1610,#0C0A07)',border:`1px solid ${C.amberDim}`,borderRadius:12,padding:16,display:'flex',alignItems:'center',justifyContent:'space-between',cursor:'pointer' }}>
+                  <div style={{ background:'linear-gradient(135deg,#1C1C1C,#0A0A0A)',border:`1px solid ${C.amberDim}`,borderRadius:12,padding:16,display:'flex',alignItems:'center',justifyContent:'space-between',cursor:'pointer' }}>
                     <div style={{ display:'flex',alignItems:'center',gap:12 }}>
                       <span style={{ fontSize:22 }}>🚀</span>
                       <div>
@@ -611,7 +611,7 @@ export default function VisualEngine() {
       {/* Tabs */}
       <div style={{ display:'flex',gap:4,background:C.surface,borderRadius:10,padding:4,width:isMobile?'100%':'fit-content',maxWidth:'100%',overflowX:'auto',marginBottom:28,border:`1px solid ${C.border2}` }}>
         {tabs.map(t=>(
-          <button key={t.id} onClick={()=>setTab(t.id)} style={{ display:'flex',alignItems:'center',gap:7,padding:'8px 18px',borderRadius:8,border:'none',cursor:'pointer',fontSize:13,fontFamily:C.font,fontWeight:tab===t.id?600:400,background:tab===t.id?C.amber:'transparent',color:tab===t.id?'#0C0A07':C.text3,transition:'all .15s' }}>
+          <button key={t.id} onClick={()=>setTab(t.id)} style={{ display:'flex',alignItems:'center',gap:7,padding:'8px 18px',borderRadius:8,border:'none',cursor:'pointer',fontSize:13,fontFamily:C.font,fontWeight:tab===t.id?600:400,background:tab===t.id?C.amber:'transparent',color:tab===t.id?'#fff':C.text3,transition:'all .15s' }}>
             <span>{t.icon}</span>{t.label}
           </button>
         ))}

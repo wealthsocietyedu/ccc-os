@@ -16,7 +16,7 @@ const VARIANTS = {
     boxShadow: glow.amber,
   },
   secondary: {
-    background: 'rgba(212,149,58,0.07)',
+    background: 'rgba(232,53,43,0.07)',
     color: colors.text,
     border: `1px solid ${colors.border2}`,
     fontWeight: 600,
@@ -28,17 +28,17 @@ const VARIANTS = {
     fontWeight: 600,
   },
   danger: {
-    background: 'rgba(196,42,24,0.12)',
+    background: 'rgba(232,53,43,0.12)',
     color: colors.red,
-    border: '1px solid rgba(196,42,24,0.3)',
+    border: '1px solid rgba(232,53,43,0.3)',
     fontWeight: 600,
   },
 };
 
 const HOVER = {
   primary: { boxShadow: glow.amberStrong, filter: 'brightness(1.05)' },
-  secondary: { background: 'rgba(212,149,58,0.14)', borderColor: colors.accent },
-  ghost: { background: 'rgba(212,149,58,0.06)', color: colors.text, borderColor: colors.accent },
+  secondary: { background: 'rgba(232,53,43,0.14)', borderColor: colors.accent },
+  ghost: { background: 'rgba(232,53,43,0.06)', color: colors.text, borderColor: colors.accent },
   danger: { background: colors.red, color: '#fff' },
 };
 

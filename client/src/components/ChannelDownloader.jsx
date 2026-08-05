@@ -16,7 +16,7 @@ const C = {
   amber:    colors.accent2,
   amberDim: colors.accent,
   teal:     colors.green,
-  tealDim:  'rgba(61,158,140,0.35)',
+  tealDim:  'rgba(55,184,122,0.35)',
   red:      colors.red,
   green:    colors.green,
   textPri:  colors.text,
@@ -127,9 +127,9 @@ function TabBtn({ active, onClick, icon, label, badge }) {
 function StatusBadge({ status }) {
   const map = {
     queued:    { bg: C.bgInput, color: C.textSec,  dot: C.textSec,  label: 'Queued'    },
-    running:   { bg: 'rgba(61,158,140,0.12)', color: C.teal,     dot: C.teal,     label: 'Running'   },
-    completed: { bg: 'rgba(61,158,140,0.10)', color: C.green,    dot: C.green,    label: 'Completed' },
-    failed:    { bg: 'rgba(196,42,24,0.12)', color: C.red,      dot: C.red,      label: 'Failed'    },
+    running:   { bg: 'rgba(55,184,122,0.12)', color: C.teal,     dot: C.teal,     label: 'Running'   },
+    completed: { bg: 'rgba(55,184,122,0.10)', color: C.green,    dot: C.green,    label: 'Completed' },
+    failed:    { bg: 'rgba(232,53,43,0.12)', color: C.red,      dot: C.red,      label: 'Failed'    },
     cancelled: { bg: C.bgInput, color: C.textSec,  dot: C.textMut,  label: 'Cancelled' },
   };
   const s = map[status] || map.queued;
@@ -438,9 +438,9 @@ function Toggle({ value, onChange, disabled }) {
 // ─── Alert helper ─────────────────────────────────────────────────────────────
 function Alert({ type, children }) {
   const styles = {
-    error:   { bg: 'rgba(196,42,24,0.10)', border: C.red + '44',   color: '#FF8066' },
-    success: { bg: 'rgba(61,158,140,0.10)', border: C.teal + '44',  color: C.teal    },
-    warn:    { bg: 'rgba(212,149,58,0.10)', border: C.amber + '44', color: C.amberDim },
+    error:   { bg: 'rgba(232,53,43,0.10)', border: C.red + '44',   color: '#FF6B5E' },
+    success: { bg: 'rgba(55,184,122,0.10)', border: C.teal + '44',  color: C.teal    },
+    warn:    { bg: 'rgba(232,53,43,0.10)', border: C.amber + '44', color: C.amberDim },
   };
   const s = styles[type] || styles.warn;
   return (
@@ -512,7 +512,7 @@ function JobCard({ job, onCancel, onResume, onDelete, onAnalyze, onCleanup, expa
     <div style={{
       ...glass, padding: 0, overflow: 'hidden',
       border: `1px solid ${job.status === 'running' ? C.amber + '44' : colors.glassBorder}`,
-      boxShadow: job.status === 'running' ? `${glass.boxShadow}, 0 0 20px rgba(212,149,58,0.12)` : glass.boxShadow,
+      boxShadow: job.status === 'running' ? `${glass.boxShadow}, 0 0 20px rgba(232,53,43,0.12)` : glass.boxShadow,
     }}>
       {/* Card header */}
       <div style={{ padding: '14px 16px', display: 'flex', gap: 14, alignItems: 'flex-start' }}>
@@ -673,7 +673,7 @@ function AnalysisPanel({ analysis: a }) {
             <Label>Topic Clusters</Label>
             {a.topicClusters.map((t, i) => (
               <div key={i} style={{
-                padding: '7px 10px', background: 'rgba(61,158,140,0.10)',
+                padding: '7px 10px', background: 'rgba(55,184,122,0.10)',
                 border: `1px solid ${C.teal}33`, borderRadius: 6,
                 fontSize: 12, color: C.teal, fontFamily: C.sans,
               }}>

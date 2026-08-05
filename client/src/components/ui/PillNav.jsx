@@ -32,13 +32,13 @@ function PillItem({ item, active, onSelect, renderIcon }) {
     textAlign: 'left',
     marginBottom: 3,
     transition: 'all .14s',
-    color: active ? colors.bg : hover ? colors.text : colors.text3,
+    color: active ? '#fff' : hover ? colors.text : colors.text3,
     background: active
       ? gradients.amber
       : hover
-      ? 'rgba(212,149,58,0.07)'
+      ? 'rgba(232,53,43,0.09)'
       : 'transparent',
-    boxShadow: active ? '0 6px 18px rgba(212,149,58,0.28)' : 'none',
+    boxShadow: active ? '0 6px 18px rgba(232,53,43,0.38)' : 'none',
   };
   return (
     <button
@@ -57,8 +57,8 @@ function PillItem({ item, active, onSelect, renderIcon }) {
             fontSize: 8.5,
             fontWeight: 700,
             letterSpacing: '0.06em',
-            background: active ? 'rgba(12,10,7,0.25)' : colors.accent,
-            color: active ? colors.bg : '#fff',
+            background: active ? 'rgba(0,0,0,0.28)' : colors.accent,
+            color: '#fff',
             padding: '2px 6px',
             borderRadius: 999,
           }}

@@ -7,7 +7,7 @@ export default function Card({ glow = false, style = {}, children, ...rest }) {
     ...glassCard,
     padding: 20,
     ...(glow
-      ? { boxShadow: `${glassCard.boxShadow}, 0 0 40px rgba(212,149,58,0.14)` }
+      ? { boxShadow: `${glassCard.boxShadow}, 0 0 40px rgba(232,53,43,0.14)` }
       : {}),
     ...style,
   };

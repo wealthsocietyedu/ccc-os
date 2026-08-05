@@ -32,7 +32,7 @@ export default function StatCard({
             textTransform: 'uppercase',
             letterSpacing: '0.05em',
             color: deltaUp ? colors.green : colors.red,
-            background: deltaUp ? 'rgba(61,158,140,0.12)' : 'rgba(196,42,24,0.12)',
+            background: deltaUp ? 'rgba(55,184,122,0.12)' : 'rgba(232,53,43,0.12)',
             padding: '3px 9px',
             borderRadius: 999,
           }}

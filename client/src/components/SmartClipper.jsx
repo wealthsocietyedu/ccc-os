@@ -8,10 +8,10 @@ import { useIsMobile, cols } from '../lib/useIsMobile.js';
 const C = {
   bg: colors.bg, surface: colors.surface, surface2: colors.surface2, surface3: colors.surface2,
   border: colors.border, border2: colors.border2, border3: colors.border2,
-  amber: colors.accent2, amberMid: colors.accent, amberDim: 'rgba(212,149,58,0.35)',
-  amberText: colors.accent2, amberSub: 'rgba(212,149,58,0.08)',
-  teal: colors.green, tealDim: 'rgba(61,158,140,0.35)', tealText: colors.cyan, tealSub: 'rgba(61,158,140,0.08)',
-  red: colors.red, redText: '#F87060', redSub: 'rgba(196,42,24,0.1)',
+  amber: colors.accent2, amberMid: colors.accent, amberDim: 'rgba(232,53,43,0.35)',
+  amberText: colors.accent2, amberSub: 'rgba(232,53,43,0.08)',
+  teal: colors.green, tealDim: 'rgba(55,184,122,0.35)', tealText: colors.cyan, tealSub: 'rgba(55,184,122,0.08)',
+  red: colors.red, redText: '#FF6B5E', redSub: 'rgba(232,53,43,0.1)',
   text: colors.text, text2: colors.text2, text3: colors.text3, text4: colors.text3,
   font: font.display, mono: font.mono,
 };
@@ -154,7 +154,7 @@ function ClipCard({ clip, jobId, onSendToScheduler }) {
         />
         {!playing && (
           <div onClick={loadAndPlay} style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', background: 'rgba(0,0,0,0.4)' }}>
-            <div style={{ width: 48, height: 48, borderRadius: '50%', background: `rgba(240,168,0,0.9)`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>
+            <div style={{ width: 48, height: 48, borderRadius: '50%', background: `rgba(232,53,43,0.9)`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>
               {loading ? '…' : mediaError ? '⚠' : '▶'}
             </div>
           </div>

@@ -244,7 +244,7 @@ function DownloadOptions({ quality, setQuality, audioOnly, setAudioOnly, onDownl
               key={String(opt.id)}
               onClick={() => setAudioOnly(opt.id)}
               style={{
-                background: audioOnly === opt.id ? 'rgba(212,149,58,0.10)' : colors.surface2,
+                background: audioOnly === opt.id ? 'rgba(232,53,43,0.10)' : colors.surface2,
                 border: `1px solid ${audioOnly === opt.id ? C.amber : C.inputBorder}`,
                 borderRadius: radius.sm, padding: '12px', cursor: 'pointer', transition: 'all 0.15s'
               }}
@@ -504,7 +504,7 @@ export default function VideoDownloader() {
               >
                 {infoLoading ? (
                   <>
-                    <div style={{ width: '14px', height: '14px', border: '2px solid rgba(240,168,0,0.3)', borderTopColor: C.amber, borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                    <div style={{ width: '14px', height: '14px', border: '2px solid rgba(232,53,43,0.3)', borderTopColor: C.amber, borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
                     Fetching info...
                   </>
                 ) : (
@@ -515,7 +515,7 @@ export default function VideoDownloader() {
 
             {infoLoading && (
               <div style={{ marginTop: '14px', display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', background: colors.surface2, borderRadius: radius.sm }}>
-                <div style={{ width: '16px', height: '16px', border: '2px solid rgba(240,168,0,0.3)', borderTopColor: C.amber, borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                <div style={{ width: '16px', height: '16px', border: '2px solid rgba(232,53,43,0.3)', borderTopColor: C.amber, borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
                 <span style={{ fontSize: '12px', color: C.text2, fontFamily: C.mono }}>Fetching video info...</span>
               </div>
             )}
@@ -528,7 +528,7 @@ export default function VideoDownloader() {
 
           {/* Error */}
           {error && (
-            <div style={{ background: 'rgba(196,42,24,0.10)', border: `1px solid ${C.red}66`, borderRadius: radius.md, padding: '14px 18px', display: 'flex', gap: '12px', alignItems: 'flex-start', animation: 'fadeIn 0.3s ease' }}>
+            <div style={{ background: 'rgba(232,53,43,0.10)', border: `1px solid ${C.red}66`, borderRadius: radius.md, padding: '14px 18px', display: 'flex', gap: '12px', alignItems: 'flex-start', animation: 'fadeIn 0.3s ease' }}>
               <span style={{ fontSize: '18px', flexShrink: 0 }}>⚠️</span>
               <div>
                 <div style={{ fontSize: '13px', color: '#FCA5A5', fontFamily: C.sans, fontWeight: '500', marginBottom: '4px' }}>Download Error</div>
@@ -539,7 +539,7 @@ export default function VideoDownloader() {
 
           {/* Success */}
           {successMsg && (
-            <div style={{ background: 'rgba(61,158,140,0.10)', border: `1px solid ${C.green}66`, borderRadius: radius.md, padding: '14px 18px', display: 'flex', gap: '12px', alignItems: 'center', animation: 'fadeIn 0.3s ease' }}>
+            <div style={{ background: 'rgba(55,184,122,0.10)', border: `1px solid ${C.green}66`, borderRadius: radius.md, padding: '14px 18px', display: 'flex', gap: '12px', alignItems: 'center', animation: 'fadeIn 0.3s ease' }}>
               <span style={{ fontSize: '20px' }}>✅</span>
               <span style={{ fontSize: '13px', color: C.green, fontFamily: C.sans }}>{successMsg}</span>
             </div>
