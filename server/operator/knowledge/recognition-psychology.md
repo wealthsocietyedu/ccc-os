@@ -1,0 +1,2 @@
+# Recognition psychology
+Lead with a moment, frustration, desire, or tension the intended audience already recognizes. Name the internal reaction before explaining the lesson. Make the belief shift explicit and earn the CTA through the transformation promised by the content.

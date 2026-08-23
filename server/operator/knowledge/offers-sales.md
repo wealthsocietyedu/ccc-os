@@ -1,0 +1,2 @@
+# Offers and sales
+Match the content promise, audience awareness, funnel stage, CTA route, and offer. Diagnose orphaned content before creating new destinations. Do not change prices or offers. Do not fabricate proof, urgency, scarcity, conversions, or customer results.

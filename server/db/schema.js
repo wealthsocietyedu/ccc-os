@@ -412,6 +412,32 @@ const initSchema = (db) => {
     CREATE INDEX IF NOT EXISTS idx_advisor_convos_user ON advisor_conversations(user_id);
     CREATE INDEX IF NOT EXISTS idx_advisor_convos_brand ON advisor_conversations(brand_id);
 
+    -- ─── OPERATOR AI ────────────────────────────────────────────────────────
+    CREATE TABLE IF NOT EXISTS operator_conversations (
+      id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      brand_id TEXT NOT NULL REFERENCES brands(id) ON DELETE CASCADE,
+      title TEXT NOT NULL DEFAULT 'New conversation', mode TEXT NOT NULL DEFAULT 'ask',
+      messages TEXT NOT NULL DEFAULT '[]', created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_operator_conversations_owner ON operator_conversations(user_id, brand_id, updated_at);
+    CREATE TABLE IF NOT EXISTS operator_outputs (
+      id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      brand_id TEXT NOT NULL REFERENCES brands(id) ON DELETE CASCADE,
+      conversation_id TEXT REFERENCES operator_conversations(id) ON DELETE SET NULL,
+      mode TEXT NOT NULL, title TEXT NOT NULL DEFAULT '', content TEXT NOT NULL,
+      context_meta TEXT NOT NULL DEFAULT '{}', source_asset_id TEXT REFERENCES assets(id) ON DELETE SET NULL,
+      saved_idea_id TEXT REFERENCES ideas(id) ON DELETE SET NULL, saved_asset_id TEXT REFERENCES assets(id) ON DELETE SET NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_operator_outputs_owner ON operator_outputs(user_id, brand_id, created_at);
+    CREATE TABLE IF NOT EXISTS operator_feedback (
+      id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      output_id TEXT NOT NULL REFERENCES operator_outputs(id) ON DELETE CASCADE,
+      rating TEXT NOT NULL CHECK (rating IN ('helpful', 'not_helpful')), notes TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL DEFAULT (datetime('now')), UNIQUE(user_id, output_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_operator_feedback_output ON operator_feedback(output_id);
     -- ─── X ACCOUNTS ──────────────────────────────────────────────────────────────
     CREATE TABLE IF NOT EXISTS x_accounts (
       id              TEXT PRIMARY KEY,

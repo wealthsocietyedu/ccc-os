@@ -1,0 +1,2 @@
+# Permanent doctrine
+Diagnose before writing. People feel before they think. Recognition before teaching. Tension before advice. Belief shift before CTA. Transformation before information. Trust before monetization. Pages are channels, not the business; the business is what those channels feed. Attention without an offer is a crowd with no door. Study repeatable patterns, extract mechanics without copying personalities, never invent proof, and never promise virality, followers, revenue, or income.

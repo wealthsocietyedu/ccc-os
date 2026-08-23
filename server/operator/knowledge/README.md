@@ -1,0 +1,2 @@
+# Operator AI knowledge inventory
+Runtime-selected internal knowledge modules: permanent doctrine, Levi voice, recognition psychology, content frameworks, platform rules, and offers/sales. Business memory and performance memory come from the authenticated user's existing CCC OS records. Approved examples and updates can be added as narrowly scoped modules; full proprietary sources are never returned by the API.

@@ -6,8 +6,10 @@ import CarouselPromptGenerator from './components/CarouselPromptGenerator.jsx';
 import ContentFlow from './components/ContentFlow';
 import VideoDownloader from './components/VideoDownloader';
 import ChannelDownloader from './components/ChannelDownloader.jsx';
+import OperatorAI from './components/operator/OperatorAI.jsx';
 
 export const MODULES = [
+  { id: 'operator-ai', label: 'Operator AI', icon: 'advisor', badge: 'NEW', component: OperatorAI, props: (activeBrand) => ({ activeBrand }) },
   { id: 'video-downloader', label: 'Video Downloader', icon: 'download', badge: 'NEW', component: VideoDownloader, props: () => ({}) },
   { id: 'ai-studio', label: 'AI Studio', icon: 'studio', badge: 'NEW', component: AIStudio, props: (activeBrand, user) => ({ activeBrand }) },
   { id: 'content-advisor', label: 'Content Advisor', icon: 'advisor', badge: 'NEW', component: ContentAdvisor, props: (activeBrand, user) => ({ activeBrand }) },

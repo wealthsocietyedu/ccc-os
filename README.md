@@ -260,3 +260,7 @@ Apply to any route to enforce tier restrictions.
 
 Built with the Content Command Center OS framework.
 *Not a content calendar. A content business.*
+
+## Operator AI
+
+Operator AI is the authenticated reasoning layer connecting a selected brand's strategy, production, performance, offers, funnels, CTA routes, campaigns, and weekly reviews. It includes Ask, Create, Analyze, Monetize, and Learn modes; generated work remains editable and requires user approval before saving to the existing idea or asset workflow. See [`docs/operator-ai.md`](docs/operator-ai.md) for architecture, security, deployment, and rollback details.

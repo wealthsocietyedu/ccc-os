@@ -30,6 +30,14 @@ export const auth = {
   update: (data) => fetch(`${BASE}/auth/me`, { method: 'PATCH', headers: headers(), body: JSON.stringify(data) }).then(handle),
 };
 
+
+export const operator = {
+  context: (brandId) => fetch(`${BASE}/operator/context/${brandId}`, { headers: headers() }).then(handle),
+  run: (data) => fetch(`${BASE}/operator/run`, { method: 'POST', headers: headers(), body: JSON.stringify(data) }).then(handle),
+  outputs: (brandId) => fetch(`${BASE}/operator/outputs?brandId=${encodeURIComponent(brandId)}`, { headers: headers() }).then(handle),
+  saveToProduction: (id, target, overrides = {}) => fetch(`${BASE}/operator/outputs/${id}/save-to-production`, { method: 'POST', headers: headers(), body: JSON.stringify({ target, ...overrides }) }).then(handle),
+  feedback: (id, rating, notes = '') => fetch(`${BASE}/operator/outputs/${id}/feedback`, { method: 'POST', headers: headers(), body: JSON.stringify({ rating, notes }) }).then(handle),
+};
 // ─── BRANDS ──────────────────────────────────────────────────────────────────
 export const brands = {
   list: () => fetch(`${BASE}/brands`, { headers: headers() }).then(handle),
