@@ -1,0 +1,9 @@
+const test=require('node:test');
+const assert=require('node:assert/strict');
+const Database=require('better-sqlite3');
+const {initSchema}=require('../db/schema');
+const {buildOperatorContext,ownedBrand}=require('../operator/context');
+function fixture(){const db=new Database(':memory:');initSchema(db);db.prepare('INSERT INTO users (id,email,password,name) VALUES (?,?,?,?)').run('u1','one@test.local','x','One');db.prepare('INSERT INTO users (id,email,password,name) VALUES (?,?,?,?)').run('u2','two@test.local','x','Two');db.prepare('INSERT INTO brands (id,user_id,name,niche) VALUES (?,?,?,?)').run('b1','u1','One Brand','education');db.prepare('INSERT INTO brands (id,user_id,name) VALUES (?,?,?)').run('b2','u2','Private Brand');return db}
+test('Operator schema is additive and idempotent',()=>{const db=fixture();assert.doesNotThrow(()=>initSchema(db));for(const name of ['operator_conversations','operator_outputs','operator_feedback'])assert.ok(db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=?").get(name));db.close()});
+test('context is scoped to user and brand ownership',()=>{const db=fixture();db.prepare('INSERT INTO ideas (id,user_id,brand_id,title) VALUES (?,?,?,?)').run('i1','u1','b1','Owned');assert.equal(buildOperatorContext(db,'u2','b1'),null);assert.equal(ownedBrand(db,'u1','b2'),undefined);const bundle=buildOperatorContext(db,'u1','b1');assert.equal(bundle.context.ideas.length,1);assert.equal(bundle.context.ideas[0].title,'Owned');assert.ok(bundle.missing.includes('performance'));db.close()});
+test('empty brand context reports missing evidence without invention',()=>{const db=fixture();const bundle=buildOperatorContext(db,'u2','b2');assert.deepEqual(bundle.evidence,[]);assert.ok(bundle.missing.includes('assets'));assert.ok(bundle.missing.includes('offers'));db.close()});

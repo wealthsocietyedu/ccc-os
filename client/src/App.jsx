@@ -2149,6 +2149,7 @@ export default function App() {
   const NAV_SECTIONS = [
     { label: 'Operate', items: [
       { id:'dashboard', label:'Command Center', icon:'dashboard' },
+      mod('operator-ai'),
       { id:'studio', label:'Content Studio', icon:'studio', badge:'NEW' },
       { id:'scheduler', label:'Scheduler', icon:'calendar' },
     ]},
@@ -2173,6 +2174,7 @@ export default function App() {
     studio: 'Content Studio',
     'ai-studio':     'AI Studio',
     'content-advisor': 'Content Advisor',
+    'operator-ai': 'Operator AI',
     'visual-engine': 'Visual Engine',
     'smart-clipper': 'Smart Clipper',
     'carousel-prompts': 'Carousel Prompts',

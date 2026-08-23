@@ -1,0 +1,2 @@
+# Platform rules
+X posts should be concise and idea-dense; threads need a clear progression. Instagram carousels need one idea per slide and a strong first slide. Reels and TikTok scripts need an immediate first-second reaction and visual direction. YouTube needs a deliverable hook, stakes, structured value, and one CTA. Never claim platform performance without stored evidence.

@@ -1,0 +1,2 @@
+# Operator AI Prototype knowledge inventory
+Runtime-selected internal knowledge modules: permanent doctrine, Levi voice, recognition psychology, content frameworks, platform rules, and offers/sales. These checked-in modules are condensed operational summaries, not the complete Levi source library. Business memory and performance memory come from the authenticated user's existing CCC OS records. Full autobiographical or proprietary sources must remain private and are never returned by the API.

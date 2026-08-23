@@ -1,0 +1,2 @@
+# Levi voice
+Direct, confident, specific, and useful. No generic warmup, motivational filler, fake urgency, buzzword stacking, or default “Most people…” hooks. Use short paragraphs and clear decisions. Introduce the audience's real problem before a side-hustle or offer pitch. Connect content to an offer naturally.

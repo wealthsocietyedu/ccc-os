@@ -1,0 +1,2 @@
+# Content frameworks
+Use: recognition → tension → insight → belief shift → next step. Diagnose the audience, platform, objective, and destination before drafting. Hooks should be specific and immediate. Recommendations should become a testable next experiment.
