@@ -1,388 +1,867 @@
-const express = require('express');
+const express = require("express");
+const fs = require("fs");
+const path = require("path");
+const crypto = require("crypto");
+const jwt = require("jsonwebtoken");
+const {
+  run,
+  atomicJSON,
+  youtubeURL,
+  normalizeWords,
+  validateRanges,
+  clipWords,
+  makeASS,
+} = require("../clipper/core");
+const { analyze } = require("../clipper/analysis");
+const { cookieArgs } = require("../utils/ytdlpCookies");
 const router = express.Router();
-const { exec } = require('child_process');
-const fs = require('fs');
-const path = require('path');
-const multer = require('multer');
-const Anthropic = require('@anthropic-ai/sdk');
-const { cookieArgs } = require('../utils/ytdlpCookies');
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
-const TMP = '/tmp/ccc-clipper';
-if (!fs.existsSync(TMP)) fs.mkdirSync(TMP, { recursive: true });
-
-// ─── Upload handling (Smart Clipper is upload-only) ───────────────────────────
-// User uploads a long-form video file they already have; multer streams it to
-// disk (never buffered in memory — these files are large), then the same
-// transcribe → analyze → cut pipeline runs against the local file.
-const UPLOAD_TMP = path.join(TMP, 'uploads');
-if (!fs.existsSync(UPLOAD_TMP)) fs.mkdirSync(UPLOAD_TMP, { recursive: true });
-const ALLOWED_VIDEO_EXT = new Set(['.mp4', '.mov', '.mkv', '.webm', '.avi', '.m4v', '.mpeg', '.mpg']);
-const uploadStorage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, UPLOAD_TMP),
-  filename: (req, file, cb) => {
-    const ext = (path.extname(file.originalname || '') || '.mp4').toLowerCase();
-    cb(null, `up_${Date.now()}_${Math.random().toString(36).slice(2)}${ext}`);
-  },
-});
-const uploadVideo = multer({
-  storage: uploadStorage,
-  limits: { fileSize: 3 * 1024 * 1024 * 1024 }, // 3GB ceiling for long-form uploads
-  fileFilter: (req, file, cb) => {
-    const ext = path.extname(file.originalname || '').toLowerCase();
-    const looksVideo = (file.mimetype || '').startsWith('video/') || ALLOWED_VIDEO_EXT.has(ext);
-    if (looksVideo) cb(null, true);
-    else cb(new Error('Unsupported file type — upload a video file (mp4, mov, mkv, webm, avi).'));
-  },
-}).single('video');
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-function run(cmd, opts = {}) {
-  return new Promise((resolve, reject) => {
-    exec(cmd, { timeout: 300000, maxBuffer: 50 * 1024 * 1024, ...opts }, (err, stdout, stderr) => {
-      if (err) reject(new Error(stderr || err.message));
-      else resolve(stdout.trim());
-    });
-  });
-}
-
-function sanitizeId(str) {
-  return str.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 40);
-}
-
-function requireAuth(req, res, next) {
-  if (!req.userId) return res.status(401).json({ error: 'Unauthorized' });
-  next();
-}
-
-// A jobId encodes its owner: `job_<ts>_<userId>` (see /clip below). requireAuth
-// only proves the caller is *a* logged-in user, NOT that this job is theirs — so
-// every per-job route must also confirm ownership, or account B can read/delete
-// account A's clips by guessing a jobId. The regex additionally rejects any jobId
-// that isn't the exact expected shape, which blocks path traversal through the
-// :jobId route param (it flows straight into path.join below).
-function ownsJob(req) {
-  const { jobId } = req.params;
-  if (typeof jobId !== 'string' || !/^job_\d+_[A-Za-z0-9_-]+$/.test(jobId)) return false;
-  return jobId.endsWith('_' + sanitizeId(String(req.userId)));
-}
-
-// Resolve a clip file path for the given job, stripping any directory components
-// from the filename and confirming the result stays inside the job's own clips
-// dir. Returns null if the path escapes (traversal attempt) — callers 404.
-function resolveClipPath(req) {
-  const clipsDir = path.resolve(TMP, req.params.jobId, 'clips');
-  const safeName = path.basename(req.params.filename);
-  const filePath = path.resolve(clipsDir, safeName);
-  if (filePath !== path.join(clipsDir, safeName) || !filePath.startsWith(clipsDir + path.sep)) {
+const ROOT =
+  process.env.CLIPPER_PATH ||
+  path.join(
+    path.dirname(
+      process.env.DB_PATH || path.join(__dirname, "../../data/ccc_os.db"),
+    ),
+    "clips",
+  );
+fs.mkdirSync(ROOT, { recursive: true });
+const MAX_SECONDS = 10800,
+  MAX_BYTES = Number(process.env.CLIPPER_MAX_BYTES) || 12 * 1024 ** 3;
+const SECRET =
+  process.env.JWT_SECRET || "ccc-os-dev-secret-change-in-production";
+const controllers = new Map(),
+  uploadLocks = new Set(),
+  queue = [];
+let working = false;
+const file = (id, name) => path.join(ROOT, id, name);
+const read = (id) => JSON.parse(fs.readFileSync(file(id, "job.json"), "utf8"));
+const save = (j) => {
+  j.updatedAt = new Date().toISOString();
+  atomicJSON(file(j.id, "job.json"), j);
+  return j;
+};
+const update = (id, patch) => save({ ...read(id), ...patch });
+const wrap = (fn) => (req, res, next) =>
+  Promise.resolve(fn(req, res, next)).catch(next);
+function owned(req) {
+  if (!/^job_[a-f0-9-]{36}$/.test(req.params.id || "")) return null;
+  try {
+    const j = read(req.params.id);
+    return j.owner === String(req.userId) ? j : null;
+  } catch {
     return null;
   }
-  return filePath;
 }
-
-// ─── Check system tools ──────────────────────────────────────────────────────
-router.get('/health', async (req, res) => {
-  const checks = {};
-  try { await run('yt-dlp --version'); checks.ytdlp = true; } catch { checks.ytdlp = false; }
-  try { await run('ffmpeg -version'); checks.ffmpeg = true; } catch { checks.ffmpeg = false; }
-  try { await run('whisper --help'); checks.whisper = true; } catch { checks.whisper = false; }
-  try { await run('deno --version'); checks.deno = true; } catch { checks.deno = false; }
-  res.json({ checks, ready: checks.ytdlp && checks.ffmpeg, note: 'whisper optional — falls back to OpenAI API; deno required for YouTube JS-runtime challenges' });
-});
-
-// ─── POST: Clip from YouTube URL ─────────────────────────────────────────────
-router.post('/clip', requireAuth, async (req, res) => {
-  const { url, contentPillars, niche, clipCount = 5, maxDuration = 60, captionStyle = 'bold' } = req.body;
-  if (!url) return res.status(400).json({ error: 'URL is required' });
-
-  const jobId = `job_${Date.now()}_${sanitizeId(req.userId.toString())}`;
-  const jobDir = path.join(TMP, jobId);
-  fs.mkdirSync(jobDir, { recursive: true });
-
-  res.json({ success: true, job_id: jobId, status: 'processing', message: 'Clipping started — poll /status/:jobId for updates' });
-
-  runClipPipeline(jobId, jobDir, url, { contentPillars, niche, clipCount, maxDuration, captionStyle, userId: req.userId })
-    .catch(err => {
-      console.error(`Clip job ${jobId} failed:`, err.message);
-      fs.writeFileSync(path.join(jobDir, 'error.json'), JSON.stringify({ error: err.message }));
-    });
-});
-
-// ─── POST: Clip from an uploaded local file (upload-only flow) ────────────────
-// This is the Smart Clipper entry point — the user uploads a long-form video they
-// already downloaded; there is NO URL/YouTube input. Skips the download step and
-// runs transcribe → analyze → cut against the uploaded file.
-router.post('/clip-upload', requireAuth, (req, res) => {
-  uploadVideo(req, res, async (uErr) => {
-    if (uErr) return res.status(400).json({ error: uErr.message });
-    if (!req.file) return res.status(400).json({ error: 'Video file is required (multipart field name: "video").' });
-
-    const { contentPillars, niche, clipCount = 5, maxDuration = 60, captionStyle = 'bold' } = req.body || {};
-
-    const jobId = `job_${Date.now()}_${sanitizeId(req.userId.toString())}`;
-    const jobDir = path.join(TMP, jobId);
-    fs.mkdirSync(jobDir, { recursive: true });
-
-    // Move the uploaded file into the job dir as the pipeline's source video.
-    const ext = (path.extname(req.file.filename) || '.mp4').toLowerCase();
-    const localVideoPath = path.join(jobDir, `source${ext}`);
-    try {
-      fs.renameSync(req.file.path, localVideoPath);
-    } catch {
-      // rename can fail across devices — fall back to copy+unlink
-      fs.copyFileSync(req.file.path, localVideoPath);
-      try { fs.unlinkSync(req.file.path); } catch {}
-    }
-
-    res.json({ success: true, job_id: jobId, status: 'processing', message: 'Upload received — poll /status/:jobId for updates' });
-
-    runClipPipeline(jobId, jobDir, null, {
-      contentPillars,
-      niche,
-      clipCount: parseInt(clipCount) || 5,
-      maxDuration: parseInt(maxDuration) || 60,
-      captionStyle,
-      userId: req.userId,
-      localVideoPath,
-    }).catch(err => {
-      console.error(`Clip-upload job ${jobId} failed:`, err.message);
-      fs.writeFileSync(path.join(jobDir, 'error.json'), JSON.stringify({ error: err.message }));
-    });
-  });
-});
-
-// ─── Full Pipeline ────────────────────────────────────────────────────────────
-async function runClipPipeline(jobId, jobDir, url, opts) {
-  const statusFile = path.join(jobDir, 'status.json');
-  const { contentPillars, niche, clipCount, maxDuration, captionStyle, localVideoPath } = opts;
-
-  const updateStatus = (stage, progress, data = {}) => {
-    fs.writeFileSync(statusFile, JSON.stringify({ stage, progress, ...data, updated_at: new Date().toISOString() }));
-  };
-
-  // Step 1: Obtain the source video.
-  // Upload-only flow (Smart Clipper) passes a local file and skips downloading;
-  // the legacy URL flow downloads via yt-dlp.
-  let videoPath;
-  if (localVideoPath) {
-    videoPath = localVideoPath;
-    updateStatus('transcribing', 20);
-  } else {
-    updateStatus('downloading', 5);
-    videoPath = path.join(jobDir, 'source.mp4');
-    const cookieArgStr = cookieArgs().map(a => `"${a}"`).join(' ');
-    await run(
-      `yt-dlp -f "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best" --merge-output-format mp4 ` +
-      `--user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" ` +
-      `--extractor-args "youtube:player_client=web,android,tv_embedded" ` +
-      `--add-headers "Accept-Language:en-US,en;q=0.9" ` +
-      `${cookieArgStr} -o "${videoPath}" "${url}" --no-playlist`
+function publicJob(j) {
+  const { owner, source, ...rest } = j;
+  return rest;
+}
+function freeBytes() {
+  const s = fs.statfsSync(ROOT);
+  return s.bavail * s.bsize;
+}
+function space(bytes = 256 * 1024 ** 2) {
+  if (freeBytes() < bytes + 256 * 1024 ** 2)
+    throw new Error(
+      "Not enough storage. Delete finished projects or increase the Railway volume before retrying.",
     );
-    updateStatus('transcribing', 20);
-  }
-
-  // Step 2: Extract audio
-  const audioPath = path.join(jobDir, 'audio.wav');
-  await run(`ffmpeg -i "${videoPath}" -ar 16000 -ac 1 -vn "${audioPath}" -y`);
-
-  // Step 3: Transcribe
-  let transcript;
-  let whisperAvailable = false;
-  try { await run('whisper --help'); whisperAvailable = true; } catch {}
-
-  if (whisperAvailable) {
-    await run(`whisper "${audioPath}" --output_format json --output_dir "${jobDir}" --model base`);
-    const whisperOut = JSON.parse(fs.readFileSync(path.join(jobDir, 'audio.json'), 'utf8'));
-    transcript = { text: whisperOut.text, segments: whisperOut.segments };
-  } else {
-    // Cloud fallback when local whisper isn't installed. Uses Groq's
-    // OpenAI-compatible transcription endpoint with a Groq-hosted Whisper model.
-    //
-    // Build the multipart body with the global (undici) FormData + Blob, NOT the
-    // `form-data` npm package. Handing a `form-data` stream to the global fetch
-    // yields a malformed/empty multipart body (undici doesn't consume the
-    // legacy stream and the manually-spread getHeaders() boundary conflicts),
-    // which Groq's Go parser rejects with "multipart: NextPart: EOF". Reading
-    // the audio into a Blob once lets undici set the boundary + Content-Length
-    // correctly, and it's a fresh read of the file (not a reused stream handle).
-    const audioBuffer = fs.readFileSync(audioPath);
-    const form = new FormData();
-    form.append('file', new Blob([audioBuffer], { type: 'audio/wav' }), 'audio.wav');
-    form.append('model', 'whisper-large-v3-turbo');
-    form.append('response_format', 'verbose_json');
-    form.append('timestamp_granularities[]', 'segment');
-    const resp = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${process.env.GROQ_API_KEY}` },
-      body: form,
-    });
-    const data = await resp.json();
-    if (!resp.ok || data.error) {
-      throw new Error((data.error && (data.error.message || data.error)) || `Transcription failed (HTTP ${resp.status})`);
-    }
-    transcript = { text: data.text, segments: data.segments || [] };
-  }
-
-  updateStatus('analyzing', 50, { transcript_length: transcript.text.length });
-
-  // Step 4: Claude finds best clips
-  const pillarContext = contentPillars ? `\nCreator's content pillars: ${contentPillars}` : '';
-  const nicheContext = niche ? `\nCreator's niche: ${niche}` : '';
-
-  const segmentsForClaude = transcript.segments.slice(0, 200).map(s =>
-    `[${s.start?.toFixed(1) || 0}s - ${s.end?.toFixed(1) || 0}s]: ${s.text}`
-  ).join('\n');
-
-  const message = await client.messages.create({
-    model: 'claude-opus-4-5',
-    max_tokens: 1500,
-    messages: [{
-      role: 'user',
-      content: `You are a viral content strategist. Analyze this video transcript and identify the ${clipCount} best clips for short-form social media.${pillarContext}${nicheContext}
-
-TRANSCRIPT SEGMENTS:
-${segmentsForClaude}
-
-REQUIREMENTS:
-- Each clip: 20-${maxDuration} seconds max
-- Must have a strong hook in the first 3 seconds
-- Look for: emotional peaks, surprising facts, actionable advice, controversial takes, relatable moments, powerful stories
-- Prioritize clips that match the creator's content pillars if provided
-- Clips must start and end at natural sentence boundaries
-
-Return ONLY valid JSON array:
-[
-  {
-    "clip_number": 1,
-    "start_time": 12.5,
-    "end_time": 45.2,
-    "title": "Short punchy clip title",
-    "hook": "First 5 words that make you stop scrolling",
-    "why_viral": "Why this will perform",
-    "virality_score": 87,
-    "emotion": "curiosity|surprise|inspiration|relatability|controversy",
-    "pillar_match": "which content pillar this matches or null"
-  }
-]`
-    }]
-  });
-
-  const rawJson = message.content[0].text.trim().replace(/```json\n?|\n?```/g, '');
-  const clips = JSON.parse(rawJson);
-
-  updateStatus('cutting', 65);
-
-  // Step 5: Cut clips
-  const clipsDir = path.join(jobDir, 'clips');
-  fs.mkdirSync(clipsDir, { recursive: true });
-
-  const processedClips = [];
-  for (const clip of clips) {
-    const duration = clip.end_time - clip.start_time;
-    const clipFile = path.join(clipsDir, `clip_${clip.clip_number}.mp4`);
-    const captionedFile = path.join(clipsDir, `clip_${clip.clip_number}_captioned.mp4`);
-
-    await run(`ffmpeg -ss ${clip.start_time} -i "${videoPath}" -t ${duration} -c:v libx264 -c:a aac -preset fast "${clipFile}" -y`);
-
-    const clipSegments = transcript.segments
-      .filter(s => s.start >= clip.start_time && s.end <= clip.end_time)
-      .map(s => ({ ...s, start: s.start - clip.start_time, end: s.end - clip.start_time }));
-
-    if (clipSegments.length > 0) {
-      const srtContent = clipSegments.map((s, i) => {
-        const toSrt = t => {
-          const h = Math.floor(t / 3600).toString().padStart(2, '0');
-          const m = Math.floor((t % 3600) / 60).toString().padStart(2, '0');
-          const sec = Math.floor(t % 60).toString().padStart(2, '0');
-          const ms = Math.round((t % 1) * 1000).toString().padStart(3, '0');
-          return `${h}:${m}:${sec},${ms}`;
-        };
-        return `${i + 1}\n${toSrt(s.start)} --> ${toSrt(s.end)}\n${s.text.trim()}\n`;
-      }).join('\n');
-
-      const srtPath = path.join(clipsDir, `clip_${clip.clip_number}.srt`);
-      fs.writeFileSync(srtPath, srtContent);
-
-      const captionStyles = {
-        bold: `fontsize=22:fontcolor=white:fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:box=1:boxcolor=black@0.6:boxborderw=5:x=(w-text_w)/2:y=h-100`,
-        minimal: `fontsize=18:fontcolor=white:fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf:x=(w-text_w)/2:y=h-80`,
-        yellow: `fontsize=24:fontcolor=yellow:fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:box=1:boxcolor=black@0.5:boxborderw=4:x=(w-text_w)/2:y=h-100`,
-      };
-      const styleStr = captionStyles[captionStyle] || captionStyles.bold;
-
-      try {
-        await run(`ffmpeg -i "${clipFile}" -vf "subtitles=${srtPath}:force_style='${styleStr}'" -c:a copy "${captionedFile}" -y`);
-        processedClips.push({ ...clip, file: `clip_${clip.clip_number}_captioned.mp4`, duration: duration.toFixed(1) });
-      } catch {
-        fs.copyFileSync(clipFile, captionedFile);
-        processedClips.push({ ...clip, file: `clip_${clip.clip_number}_captioned.mp4`, duration: duration.toFixed(1), captions: false });
-      }
-    } else {
-      fs.copyFileSync(clipFile, captionedFile);
-      processedClips.push({ ...clip, file: `clip_${clip.clip_number}_captioned.mp4`, duration: duration.toFixed(1) });
-    }
-  }
-
-  updateStatus('complete', 100, { clips: processedClips, total_clips: processedClips.length, job_id: jobId });
 }
-
-// ─── GET: Job status ─────────────────────────────────────────────────────────
-router.get('/status/:jobId', requireAuth, (req, res) => {
-  if (!ownsJob(req)) return res.status(404).json({ error: 'Job not found' });
-  const jobDir = path.join(TMP, req.params.jobId);
-  const statusFile = path.join(jobDir, 'status.json');
-  const errorFile = path.join(jobDir, 'error.json');
-
-  if (!fs.existsSync(jobDir)) return res.status(404).json({ error: 'Job not found' });
-  if (fs.existsSync(errorFile)) return res.json({ status: 'failed', ...JSON.parse(fs.readFileSync(errorFile)) });
-  if (!fs.existsSync(statusFile)) return res.json({ status: 'queued', progress: 0 });
-
-  const status = JSON.parse(fs.readFileSync(statusFile));
-  res.json({ status: status.stage === 'complete' ? 'completed' : 'processing', ...status });
-});
-
-// ─── GET: Download a clip ────────────────────────────────────────────────────
-router.get('/download/:jobId/:filename', requireAuth, (req, res) => {
-  if (!ownsJob(req)) return res.status(404).json({ error: 'File not found' });
-  const filePath = resolveClipPath(req);
-  if (!filePath || !fs.existsSync(filePath)) return res.status(404).json({ error: 'File not found' });
-  res.download(filePath);
-});
-
-// ─── GET: Stream a clip for preview ─────────────────────────────────────────
-router.get('/preview/:jobId/:filename', requireAuth, (req, res) => {
-  if (!ownsJob(req)) return res.status(404).json({ error: 'File not found' });
-  const filePath = resolveClipPath(req);
-  if (!filePath || !fs.existsSync(filePath)) return res.status(404).json({ error: 'File not found' });
-
-  const stat = fs.statSync(filePath);
-  const range = req.headers.range;
-
-  if (range) {
-    const [startStr, endStr] = range.replace(/bytes=/, '').split('-');
-    const start = parseInt(startStr, 10);
-    const end = endStr ? parseInt(endStr, 10) : stat.size - 1;
-    res.writeHead(206, {
-      'Content-Range': `bytes ${start}-${end}/${stat.size}`,
-      'Accept-Ranges': 'bytes',
-      'Content-Length': end - start + 1,
-      'Content-Type': 'video/mp4',
+function options(body = {}) {
+  const maxDuration = Number(body.maxDuration ?? 120);
+  if (!Number.isFinite(maxDuration) || maxDuration < 20 || maxDuration > 180)
+    throw new Error("Choose a maximum clip duration of 20–180 seconds.");
+  const analysis = body.analysis === "groq" ? "groq" : "local";
+  if (analysis === "groq" && !process.env.GROQ_API_KEY)
+    throw new Error("Groq is not configured. Choose local analysis.");
+  return {
+    format: body.format === "9:16" ? "9:16" : "16:9",
+    analysis,
+    maxDuration,
+  };
+}
+function create(owner, data) {
+  const id = `job_${crypto.randomUUID()}`;
+  fs.mkdirSync(file(id, ""));
+  return save({
+    id,
+    owner: String(owner),
+    createdAt: new Date().toISOString(),
+    progress: 0,
+    clips: [],
+    ...data,
+  });
+}
+function enqueue(id, task = "analyze", clipId = null) {
+  if (queue.some((x) => x.id === id && x.task === task && x.clipId === clipId))
+    return;
+  queue.push({ id, task, clipId });
+  setImmediate(drain);
+}
+async function drain() {
+  if (working) return;
+  working = true;
+  while (queue.length) {
+    const task = queue.shift();
+    let j;
+    try {
+      j = read(task.id);
+    } catch {
+      continue;
+    }
+    if (j.status === "canceled") continue;
+    const controller = new AbortController();
+    controllers.set(j.id, controller);
+    try {
+      if (task.task === "render")
+        await render(j.id, task.clipId, controller.signal);
+      else await pipeline(j.id, controller.signal);
+    } catch (e) {
+      if (fs.existsSync(file(j.id, "job.json"))) {
+        const current = read(j.id);
+        if (task.task === "render") {
+          const clips = current.clips.map((c) =>
+            c.id === task.clipId
+              ? {
+                  ...c,
+                  renderStatus: controller.signal.aborted
+                    ? "canceled"
+                    : "failed",
+                  renderError: e.message,
+                }
+              : c,
+          );
+          update(j.id, { clips });
+        } else
+          update(j.id, {
+            status: controller.signal.aborted ? "canceled" : "failed",
+            error: e.message,
+          });
+      }
+    } finally {
+      controllers.delete(j.id);
+    }
+  }
+  working = false;
+}
+async function probe(source, signal) {
+  const p = JSON.parse(
+    await run(
+      "ffprobe",
+      ["-v", "error", "-show_format", "-show_streams", "-of", "json", source],
+      { signal, timeout: 60000 },
+    ),
+  );
+  const duration = Number(p.format?.duration);
+  if (
+    !Number.isFinite(duration) ||
+    duration <= 0 ||
+    duration > MAX_SECONDS + 0.1
+  )
+    throw new Error("Video must be playable and no longer than 3 hours.");
+  if (
+    !p.streams.some((s) => s.codec_type === "video") ||
+    !p.streams.some((s) => s.codec_type === "audio")
+  )
+    throw new Error("Video must contain both picture and spoken audio.");
+  return { duration, streams: p.streams };
+}
+async function pipeline(id, signal) {
+  let j = read(id);
+  let source = j.source;
+  if (!source) {
+    update(id, { status: "downloading", progress: 2, error: null });
+    space(500 * 1024 ** 2);
+    const common = [
+      "--no-playlist",
+      "--socket-timeout",
+      "30",
+      "--retries",
+      "2",
+      "--js-runtimes",
+      "node",
+      ...cookieArgs(),
+    ];
+    const meta = JSON.parse(
+      await run(
+        "yt-dlp",
+        [...common, "--dump-single-json", "--skip-download", "--", j.url],
+        { signal, timeout: 180000 },
+      ),
+    );
+    if (
+      meta.is_live ||
+      meta.live_status === "is_upcoming" ||
+      !Number.isFinite(meta.duration) ||
+      meta.duration > MAX_SECONDS
+    )
+      throw new Error("Use a finished video no longer than 3 hours.");
+    update(id, { title: meta.title || j.title, duration: meta.duration });
+    // 720p H.264 limits storage while preserving the landscape frame.
+    const maxSize = Math.min(
+      MAX_BYTES,
+      Math.max(0, freeBytes() - 600 * 1024 ** 2),
+    );
+    await run(
+      "yt-dlp",
+      [
+        ...common,
+        "--max-filesize",
+        String(maxSize),
+        "-f",
+        "bv*[height<=720][vcodec^=avc1]+ba[language=en]/bv*[height<=720][vcodec^=avc1]+ba/b[height<=720]/best[height<=720]",
+        "--merge-output-format",
+        "mp4",
+        "--newline",
+        "--progress-template",
+        "download:%(progress._percent_str)s",
+        "-o",
+        file(id, "source.%(ext)s"),
+        "--",
+        j.url,
+      ],
+      {
+        signal,
+        timeout: 3 * 3600000,
+        onLine: (line) => {
+          const p = parseFloat(line);
+          if (Number.isFinite(p))
+            update(id, { progress: Math.min(18, 2 + p * 0.16) });
+        },
+      },
+    );
+    source = fs
+      .readdirSync(file(id, ""))
+      .find((f) => /^source\.(mp4|mkv|webm|mov)$/.test(f));
+    if (!source)
+      throw new Error(
+        "YouTube download did not produce a video. Upload the file instead.",
+      );
+    update(id, { source });
+  }
+  const sourcePath = file(id, source),
+    info = await probe(sourcePath, signal);
+  update(id, {
+    duration: info.duration,
+    status: "transcribing",
+    progress: 20,
+    error: null,
+  });
+  if (!fs.existsSync(file(id, "transcript.json"))) {
+    space(Math.min(info.duration * 32000, 400 * 1024 ** 2));
+    // Stream decoding in a separate process; no three-hour audio Blob in Node memory.
+    const audio = file(id, "audio.wav");
+    if (!fs.existsSync(audio))
+      await run(
+        "ffmpeg",
+        [
+          "-nostdin",
+          "-v",
+          "error",
+          "-y",
+          "-i",
+          sourcePath,
+          "-vn",
+          "-ac",
+          "1",
+          "-ar",
+          "16000",
+          audio,
+        ],
+        { signal },
+      );
+    await run(
+      process.env.PYTHON_BIN || "python3",
+      [
+        path.join(__dirname, "../clipper/transcribe.py"),
+        audio,
+        file(id, "transcript.json"),
+      ],
+      {
+        signal,
+        timeout: 24 * 3600000,
+        onLine: (line) => {
+          try {
+            const p = JSON.parse(line);
+            update(id, {
+              progress: 20 + Math.min(45, (p.seconds / info.duration) * 45),
+              transcribedSeconds: p.seconds,
+            });
+          } catch {}
+        },
+      },
+    );
+    fs.rmSync(audio, { force: true });
+  }
+  const transcript = JSON.parse(
+      fs.readFileSync(file(id, "transcript.json"), "utf8"),
+    ),
+    words = normalizeWords(transcript.segments);
+  if (!words.length)
+    throw new Error(
+      "No speech was detected. Check the audio and try a different source.",
+    );
+  atomicJSON(file(id, "words.json"), words);
+  update(id, { status: "analyzing", progress: 66 });
+  j = read(id);
+  const result = await analyze(
+    words,
+    info.duration,
+    j.options,
+    signal,
+    (done, total) =>
+      update(id, {
+        progress: 66 + Math.round((done / total) * 30),
+        analysisWindows: { done, total },
+      }),
+  );
+  update(id, {
+    status: "ready",
+    progress: 100,
+    method: result.method,
+    clips: result.clips.map((c) => ({
+      ...c,
+      format: j.options.format,
+      fit: "contain",
+      cropX: 50,
+      fontSize: 52,
+      revision: 0,
+      renderStatus: "idle",
+    })),
+    error: null,
+  });
+}
+async function render(id, clipId, signal) {
+  const j = read(id),
+    clip = j.clips.find((c) => c.id === clipId);
+  if (!clip) return;
+  const ranges = validateRanges(clip.ranges, j.duration, 180),
+    duration = ranges.reduce((s, r) => s + r.end - r.start, 0);
+  space(Math.max(100 * 1024 ** 2, duration * 1000000));
+  const words =
+    clip.words ||
+    clipWords(
+      JSON.parse(fs.readFileSync(file(id, "words.json"), "utf8")),
+      ranges,
+      clip.highlights,
+    );
+  if (!words.length)
+    throw new Error(
+      "This clip has no timed speech captions. Adjust the boundaries.",
+    );
+  const prefix = `${clipId}_v${clip.revision}`,
+    ass = path.join("clips", `${prefix}.ass`);
+  fs.mkdirSync(file(id, "clips"), { recursive: true });
+  fs.writeFileSync(file(id, ass), makeASS(words, clip.format, clip.fontSize));
+  update(id, {
+    clips: read(id).clips.map((c) =>
+      c.id === clipId
+        ? { ...c, renderStatus: "rendering", renderError: null }
+        : c,
+    ),
+  });
+  const W = clip.format === "9:16" ? 1080 : 1920,
+    H = clip.format === "9:16" ? 1920 : 1080;
+  const vf =
+    clip.fit === "crop"
+      ? `scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H}:(iw-ow)*${clip.cropX / 100}:(ih-oh)/2,setsar=1`
+      : `scale=${W}:${H}:force_original_aspect_ratio=decrease,pad=${W}:${H}:(ow-iw)/2:(oh-ih)/2,setsar=1`;
+  const inputs = [],
+    filters = [];
+  ranges.forEach((r, i) => {
+    inputs.push(
+      "-ss",
+      String(r.start),
+      "-t",
+      String(r.end - r.start),
+      "-i",
+      file(id, j.source),
+    );
+    filters.push(
+      `[${i}:v]setpts=PTS-STARTPTS,${vf},fps=30[v${i}]`,
+      `[${i}:a]asetpts=PTS-STARTPTS,aresample=48000[a${i}]`,
+    );
+  });
+  filters.push(
+    `${ranges.map((_, i) => `[v${i}][a${i}]`).join("")}concat=n=${ranges.length}:v=1:a=1[v][a]`,
+  );
+  // Only generated filesystem paths enter this filter; no user-supplied shell command.
+  const assPath = file(id, ass)
+    .replace(/\\/g, "/")
+    .replace(/:/g, "\\:")
+    .replace(/'/g, "'\\''");
+  filters.push(`[v]subtitles=filename='${assPath}'[out]`);
+  const target = file(id, path.join("clips", `${prefix}.mp4`)),
+    partial = target + ".partial.mp4";
+  try {
+    await run(
+      "ffmpeg",
+      [
+        "-nostdin",
+        "-v",
+        "error",
+        "-y",
+        "-filter_complex_threads",
+        "1",
+        ...inputs,
+        "-filter_complex",
+        filters.join(";"),
+        "-map",
+        "[out]",
+        "-map",
+        "[a]",
+        "-c:v",
+        "libx264",
+        "-preset",
+        "veryfast",
+        "-crf",
+        "21",
+        "-threads",
+        "2",
+        "-pix_fmt",
+        "yuv420p",
+        "-c:a",
+        "aac",
+        "-b:a",
+        "160k",
+        "-movflags",
+        "+faststart",
+        partial,
+      ],
+      { signal },
+    );
+    await probe(partial, signal);
+    fs.renameSync(partial, target);
+    update(id, {
+      clips: read(id).clips.map((c) =>
+        c.id === clipId
+          ? {
+              ...c,
+              renderStatus: "complete",
+              file: `${prefix}.mp4`,
+              renderedRevision: clip.revision,
+              renderError: null,
+            }
+          : c,
+      ),
     });
-    fs.createReadStream(filePath, { start, end }).pipe(res);
-  } else {
-    res.writeHead(200, { 'Content-Length': stat.size, 'Content-Type': 'video/mp4' });
-    fs.createReadStream(filePath).pipe(res);
+  } finally {
+    fs.rmSync(partial, { force: true });
   }
+}
+router.get(
+  "/health",
+  wrap(async (req, res) => {
+    const checks = {};
+    for (const [key, cmd, args] of [
+      ["ffmpeg", "ffmpeg", ["-version"]],
+      ["ytdlp", "yt-dlp", ["--version"]],
+      [
+        "transcription",
+        process.env.PYTHON_BIN || "python3",
+        [
+          "-c",
+          'import faster_whisper; import os; assert os.path.isdir(os.environ.get("WHISPER_MODEL","/opt/whisper-small.en"))',
+        ],
+      ],
+    ]) {
+      try {
+        await run(cmd, args, { timeout: 30000 });
+        checks[key] = true;
+      } catch {
+        checks[key] = false;
+      }
+    }
+    res.json({
+      checks,
+      ready: checks.ffmpeg && checks.transcription,
+      groqAvailable: !!process.env.GROQ_API_KEY,
+      maxSeconds: MAX_SECONDS,
+      maxBytes: MAX_BYTES,
+      freeBytes: freeBytes(),
+      font: "Liberation Sans Bold (Classic-style substitute)",
+    });
+  }),
+);
+router.get("/jobs", (req, res) => {
+  const jobs = fs
+    .readdirSync(ROOT)
+    .filter((id) => /^job_[a-f0-9-]{36}$/.test(id))
+    .flatMap((id) => {
+      try {
+        const j = read(id);
+        return j.owner === String(req.userId) ? [publicJob(j)] : [];
+      } catch {
+        return [];
+      }
+    })
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  res.json(jobs);
 });
-
-// ─── DELETE: Cleanup job ─────────────────────────────────────────────────────
-router.delete('/job/:jobId', requireAuth, (req, res) => {
-  if (!ownsJob(req)) return res.status(404).json({ error: 'Job not found' });
-  const jobDir = path.join(TMP, req.params.jobId);
-  if (fs.existsSync(jobDir)) {
-    fs.rmSync(jobDir, { recursive: true, force: true });
-  }
+router.post(
+  "/clip",
+  wrap(async (req, res) => {
+    const url = youtubeURL(req.body.url),
+      opts = options(req.body);
+    space();
+    const j = create(req.userId, {
+      title: "YouTube video",
+      url,
+      options: opts,
+      status: "queued",
+    });
+    enqueue(j.id);
+    res.status(202).json(publicJob(j));
+  }),
+);
+router.post(
+  "/uploads",
+  wrap(async (req, res) => {
+    const size = Number(req.body.size);
+    const ext = path.extname(String(req.body.name || "")).toLowerCase();
+    if (![".mp4", ".mov", ".mkv", ".webm", ".m4v"].includes(ext))
+      throw new Error("Upload MP4, MOV, MKV, WEBM, or M4V.");
+    if (!Number.isSafeInteger(size) || size < 1 || size > MAX_BYTES)
+      throw new Error(
+        `File exceeds the ${Math.round(MAX_BYTES / 1024 ** 3)} GB upload limit.`,
+      );
+    space(size + 400 * 1024 ** 2);
+    const opts = options(req.body);
+    const j = create(req.userId, {
+      title: String(req.body.name).slice(0, 200),
+      options: opts,
+      status: "uploading",
+      expectedBytes: size,
+      uploadedBytes: 0,
+      source: `source${ext}`,
+    });
+    fs.writeFileSync(file(j.id, j.source), "");
+    res.status(201).json(publicJob(j));
+  }),
+);
+router.put(
+  "/uploads/:id",
+  express.raw({ type: "application/octet-stream", limit: "8mb" }),
+  wrap(async (req, res) => {
+    const j = owned(req);
+    if (!j) return res.sendStatus(404);
+    if (j.status !== "uploading")
+      return res.status(409).json({ error: "Upload is already finished." });
+    if (uploadLocks.has(j.id))
+      return res.status(409).json({ error: "Another chunk is being written." });
+    const offset = Number(req.headers["upload-offset"]);
+    const actual = fs.statSync(file(j.id, j.source)).size;
+    if (offset !== actual)
+      return res
+        .status(409)
+        .json({ error: "Upload offset mismatch", offset: actual });
+    if (
+      !Buffer.isBuffer(req.body) ||
+      !req.body.length ||
+      actual + req.body.length > j.expectedBytes
+    )
+      return res.status(400).json({ error: "Invalid upload chunk." });
+    space(req.body.length);
+    uploadLocks.add(j.id);
+    try {
+      fs.appendFileSync(file(j.id, j.source), req.body);
+      const offset = actual + req.body.length;
+      update(j.id, {
+        uploadedBytes: offset,
+        progress: Math.round((offset / j.expectedBytes) * 100),
+      });
+      res.json({ offset });
+    } finally {
+      uploadLocks.delete(j.id);
+    }
+  }),
+);
+router.post(
+  "/uploads/:id/complete",
+  wrap(async (req, res) => {
+    const j = owned(req);
+    if (!j) return res.sendStatus(404);
+    if (
+      j.status !== "uploading" ||
+      fs.statSync(file(j.id, j.source)).size !== j.expectedBytes
+    )
+      return res.status(409).json({ error: "Upload is incomplete." });
+    const info = await probe(file(j.id, j.source));
+    const next = update(j.id, {
+      status: "queued",
+      progress: 0,
+      duration: info.duration,
+    });
+    enqueue(j.id);
+    res.status(202).json(publicJob(next));
+  }),
+);
+router.get("/status/:id", (req, res) => {
+  const j = owned(req);
+  if (!j) return res.sendStatus(404);
+  res.json(publicJob(j));
+});
+router.post("/jobs/:id/retry", (req, res) => {
+  const j = owned(req);
+  if (!j) return res.sendStatus(404);
+  if (!["failed", "canceled"].includes(j.status) || controllers.has(j.id))
+    return res.status(409).json({ error: "Job is not ready to retry." });
+  const next = update(j.id, { status: "queued", error: null });
+  enqueue(j.id);
+  res.json(publicJob(next));
+});
+router.post("/jobs/:id/cancel", (req, res) => {
+  const j = owned(req);
+  if (!j) return res.sendStatus(404);
+  controllers.get(j.id)?.abort();
+  for (let i = queue.length - 1; i >= 0; i--)
+    if (queue[i].id === j.id) queue.splice(i, 1);
+  res.json(
+    publicJob(
+      update(j.id, {
+        status: "canceled",
+        clips: j.clips.map((c) =>
+          ["queued", "rendering"].includes(c.renderStatus)
+            ? { ...c, renderStatus: "canceled" }
+            : c,
+        ),
+      }),
+    ),
+  );
+});
+router.delete("/job/:id", (req, res) => {
+  const j = owned(req);
+  if (!j) return res.sendStatus(404);
+  if (
+    controllers.has(j.id) ||
+    queue.some((t) => t.id === j.id) ||
+    uploadLocks.has(j.id)
+  )
+    return res
+      .status(409)
+      .json({
+        error: "Cancel the job and wait for it to stop before deleting.",
+      });
+  fs.rmSync(file(j.id, ""), { recursive: true, force: true });
   res.json({ success: true });
 });
-
+router.get("/jobs/:id/transcript", (req, res) => {
+  const j = owned(req);
+  if (!j || !fs.existsSync(file(j.id, "words.json")))
+    return res.sendStatus(404);
+  res.json(JSON.parse(fs.readFileSync(file(j.id, "words.json"), "utf8")));
+});
+router.get("/jobs/:id/clips/:clipId", (req, res) => {
+  const j = owned(req),
+    c = j?.clips.find((c) => c.id === req.params.clipId);
+  if (!c) return res.sendStatus(404);
+  const words =
+    c.words ||
+    clipWords(
+      JSON.parse(fs.readFileSync(file(j.id, "words.json"), "utf8")),
+      c.ranges,
+      c.highlights,
+    );
+  res.json({ ...c, words });
+});
+router.post(
+  "/jobs/:id/clips",
+  wrap(async (req, res) => {
+    const j = owned(req);
+    if (!j || j.status !== "ready") return res.sendStatus(404);
+    const ranges = validateRanges(req.body.ranges, j.duration);
+    const c = {
+      id: `clip_${crypto.randomUUID()}`,
+      title: "Custom clip",
+      type: "custom",
+      score: null,
+      reason: "Manually selected",
+      ranges,
+      highlights: [],
+      format: j.options.format,
+      fit: "contain",
+      cropX: 50,
+      fontSize: 52,
+      revision: 0,
+      renderStatus: "idle",
+    };
+    update(j.id, { clips: [...j.clips, c] });
+    res.json(c);
+  }),
+);
+router.patch(
+  "/jobs/:id/clips/:clipId",
+  wrap(async (req, res) => {
+    const j = owned(req),
+      c = j?.clips.find((c) => c.id === req.params.clipId);
+    if (!c) return res.sendStatus(404);
+    if (["queued", "rendering"].includes(c.renderStatus))
+      return res
+        .status(409)
+        .json({ error: "Wait for this render to finish before editing." });
+    const ranges = validateRanges(req.body.ranges || c.ranges, j.duration),
+      duration = ranges.reduce((s, r) => s + r.end - r.start, 0);
+    const sameRanges = JSON.stringify(ranges) === JSON.stringify(c.ranges);
+    let words = sameRanges ? c.words : undefined;
+    if (req.body.words !== undefined) {
+      if (!Array.isArray(req.body.words) || req.body.words.length > 2000)
+        throw new Error("Invalid caption words.");
+      let last = -1;
+      words = req.body.words.map((w) => {
+        const start = Number(w.start),
+          end = Number(w.end),
+          text = String(w.text).trim();
+        if (
+          !Number.isFinite(start) ||
+          !Number.isFinite(end) ||
+          start < 0 ||
+          start < last ||
+          end <= start ||
+          end > duration + 0.1 ||
+          !text ||
+          text.length > 100
+        )
+          throw new Error(
+            "Caption timing is outside the clip or text is invalid.",
+          );
+        last = start;
+        return { start, end, text, highlight: w.highlight === true };
+      });
+    }
+    const cropX = Number(req.body.cropX ?? c.cropX),
+      fontSize = Number(req.body.fontSize ?? c.fontSize);
+    if (
+      !Number.isFinite(cropX) ||
+      cropX < 0 ||
+      cropX > 100 ||
+      !Number.isFinite(fontSize) ||
+      fontSize < 24 ||
+      fontSize > 96
+    )
+      throw new Error("Invalid crop or font size.");
+    const next = {
+      ...c,
+      title: String(req.body.title ?? c.title).slice(0, 140),
+      ranges,
+      words,
+      cropX,
+      fontSize,
+      format:
+        req.body.format === "9:16"
+          ? "9:16"
+          : req.body.format === "16:9"
+            ? "16:9"
+            : c.format,
+      fit:
+        req.body.fit === "crop"
+          ? "crop"
+          : req.body.fit === "contain"
+            ? "contain"
+            : c.fit,
+      revision: c.revision + 1,
+      renderStatus: "idle",
+      file: null,
+      renderError: null,
+    };
+    update(j.id, { clips: j.clips.map((x) => (x.id === c.id ? next : x)) });
+    res.json(next);
+  }),
+);
+router.post("/jobs/:id/render", (req, res) => {
+  const j = owned(req);
+  if (!j || j.status !== "ready")
+    return res.status(409).json({ error: "Wait for analysis to finish." });
+  const ids = Array.isArray(req.body.clipIds)
+    ? new Set(req.body.clipIds)
+    : new Set();
+  const selected = j.clips.filter(
+    (c) => ids.has(c.id) && !["queued", "rendering"].includes(c.renderStatus),
+  );
+  if (!selected.length)
+    return res.status(400).json({ error: "Select clips to export." });
+  update(j.id, {
+    clips: j.clips.map((c) =>
+      selected.includes(c)
+        ? { ...c, renderStatus: "queued", renderError: null }
+        : c,
+    ),
+  });
+  for (const c of selected) enqueue(j.id, "render", c.id);
+  res.status(202).json({ queued: selected.length });
+});
+// Short-lived, file-scoped tokens let native <video> range requests work without exposing the account JWT.
+router.post("/jobs/:id/media", (req, res) => {
+  const j = owned(req);
+  if (!j) return res.sendStatus(404);
+  const filename = req.body.file === "source" ? j.source : req.body.file;
+  if (
+    !filename ||
+    !(filename === j.source || j.clips.some((c) => c.file === filename)) ||
+    !fs.existsSync(
+      file(
+        j.id,
+        filename === j.source ? filename : path.join("clips", filename),
+      ),
+    )
+  )
+    return res.sendStatus(404);
+  const token = jwt.sign(
+    { scope: "clip-media", job: j.id, file: filename },
+    SECRET,
+    { expiresIn: "4h" },
+  );
+  res.json({
+    url: `/api/clip-media/${j.id}/${encodeURIComponent(filename)}?ticket=${token}`,
+  });
+});
+router.use((err, req, res, next) => {
+  if (res.headersSent) return next(err);
+  res
+    .status(err.type === "entity.too.large" ? 413 : 400)
+    .json({ error: err.message || "Clip operation failed." });
+});
+function media(req, res) {
+  try {
+    const p = jwt.verify(req.query.ticket, SECRET);
+    if (
+      p.scope !== "clip-media" ||
+      p.job !== req.params.id ||
+      p.file !== req.params.filename ||
+      !/^job_[a-f0-9-]{36}$/.test(p.job)
+    )
+      return res.sendStatus(403);
+    const j = read(p.job),
+      name = p.file;
+    if (
+      path.basename(name) !== name ||
+      !(name === j.source || j.clips.some((c) => c.file === name))
+    )
+      return res.sendStatus(404);
+    const target = file(
+      j.id,
+      name === j.source ? name : path.join("clips", name),
+    );
+    res.set("Cache-Control", "private, no-store");
+    if (req.query.download === "1") return res.download(target);
+    res.sendFile(target);
+  } catch {
+    return res.sendStatus(403);
+  }
+}
+// Resume durable work after a deploy. Transcripts are checkpoints, completed clips remain available.
+for (const id of fs
+  .readdirSync(ROOT)
+  .filter((id) => /^job_[a-f0-9-]{36}$/.test(id))) {
+  try {
+    const j = read(id);
+    if (
+      ["queued", "downloading", "transcribing", "analyzing"].includes(j.status)
+    ) {
+      update(id, { status: "queued" });
+      enqueue(id);
+    }
+    for (const c of j.clips || [])
+      if (["queued", "rendering"].includes(c.renderStatus))
+        enqueue(id, "render", c.id);
+  } catch {}
+}
 module.exports = router;
+module.exports.media = media;

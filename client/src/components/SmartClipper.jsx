@@ -1,523 +1,949 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { colors, radius, font, glass, gradients, glow } from '../lib/theme.js';
-import { Button, Card, StatCard, SectionLabel } from './ui/index.js';
-import { smartClipper } from '../lib/api.js';
-import { useIsMobile, cols } from '../lib/useIsMobile.js';
-
-// ─── Design tokens (TVA theme — re-pointed to shared theme.js) ───────────────
-const C = {
-  bg: colors.bg, surface: colors.surface, surface2: colors.surface2, surface3: colors.surface2,
-  border: colors.border, border2: colors.border2, border3: colors.border2,
-  amber: colors.accent2, amberMid: colors.accent, amberDim: 'rgba(232,53,43,0.35)',
-  amberText: colors.accent2, amberSub: 'rgba(232,53,43,0.08)',
-  teal: colors.green, tealDim: 'rgba(55,184,122,0.35)', tealText: colors.cyan, tealSub: 'rgba(55,184,122,0.08)',
-  red: colors.red, redText: '#FF6B5E', redSub: 'rgba(232,53,43,0.1)',
-  text: colors.text, text2: colors.text2, text3: colors.text3, text4: colors.text3,
-  font: font.display, mono: font.mono,
-};
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-const fmtBytes = (b) => {
-  if (!b && b !== 0) return '';
-  if (b >= 1024 ** 3) return `${(b / 1024 ** 3).toFixed(2)} GB`;
-  if (b >= 1024 ** 2) return `${(b / 1024 ** 2).toFixed(1)} MB`;
-  if (b >= 1024) return `${(b / 1024).toFixed(0)} KB`;
-  return `${b} B`;
-};
-const ACCEPTED = ['.mp4', '.mov', '.mkv', '.webm', '.avi', '.m4v'];
-const isVideoFile = (file) =>
-  !!file && ((file.type || '').startsWith('video/') || ACCEPTED.some(ext => file.name.toLowerCase().endsWith(ext)));
-
-// ─── Shared UI ────────────────────────────────────────────────────────────────
-const Input = ({ label, value, onChange, placeholder, multiline, rows = 3 }) => (
-  <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-    {label && <label style={{ fontFamily: C.mono, fontSize: 10, color: C.text3, textTransform: 'uppercase', letterSpacing: '0.1em' }}>{label}</label>}
-    {multiline
-      ? <textarea value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} rows={rows} style={{ background: C.surface, border: `1px solid ${C.border2}`, borderRadius: radius.sm, color: C.text, padding: '10px 12px', fontSize: 13, fontFamily: C.font, outline: 'none', resize: 'vertical' }} />
-      : <input value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} style={{ background: C.surface, border: `1px solid ${C.border2}`, borderRadius: radius.sm, color: C.text, padding: '10px 12px', fontSize: 13, fontFamily: C.font, outline: 'none' }} />
-    }
-  </div>
-);
-const Tag = ({ children, color = 'amber' }) => {
-  const s = { amber: { bg: C.amberSub, text: C.amberText, border: C.amberDim }, teal: { bg: C.tealSub, text: C.tealText, border: C.tealDim }, neutral: { bg: C.surface2, text: C.text3, border: C.border } }[color] || { bg: C.surface2, text: C.text3, border: C.border };
-  return <span style={{ display: 'inline-flex', alignItems: 'center', padding: '2px 8px', borderRadius: radius.pill, fontFamily: C.mono, fontSize: 10, background: s.bg, color: s.text, border: `1px solid ${s.border}` }}>{children}</span>;
-};
-const Spinner = ({ size = 36 }) => (
-  <div style={{ width: size, height: size, border: `3px solid ${C.amberMid}`, borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
-);
-
-// ─── Virality Score Ring ──────────────────────────────────────────────────────
-function ScoreRing({ score }) {
-  const r = 22, circ = 2 * Math.PI * r;
-  const fill = (score / 100) * circ;
-  const color = score >= 80 ? C.amber : score >= 60 ? C.teal : C.text3;
-  return (
-    <div style={{ position: 'relative', width: 56, height: 56, flexShrink: 0 }}>
-      <svg width="56" height="56" style={{ transform: 'rotate(-90deg)' }}>
-        <circle cx="28" cy="28" r={r} fill="none" stroke={C.border2} strokeWidth="3" />
-        <circle cx="28" cy="28" r={r} fill="none" stroke={color} strokeWidth="3" strokeDasharray={`${fill} ${circ}`} strokeLinecap="round" />
-      </svg>
-      <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 800, color, fontFamily: C.mono }}>
-        {score}
-      </div>
-    </div>
-  );
+import { useEffect, useRef, useState } from "react";
+const API = "/api/smart-clipper";
+async function request(p, body, method) {
+  const r = await fetch(API + p, {
+    method: method || (body ? "POST" : "GET"),
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${localStorage.getItem("ccc_token")}`,
+    },
+    ...(body ? { body: JSON.stringify(body) } : {}),
+  });
+  const d = await r
+    .json()
+    .catch(() => ({ error: `Request failed (${r.status})` }));
+  if (!r.ok) throw new Error(d.error);
+  return d;
 }
-
-// ─── Progress Bar (upload-only pipeline: no "download" stage) ─────────────────
-function ProgressBar({ stage, progress }) {
-  const stages = ['uploading', 'transcribing', 'analyzing', 'cutting', 'complete'];
-  const labels = { uploading: '⬆ Uploading', transcribing: '🎙 Transcribing', analyzing: '🧠 Analyzing', cutting: '✂ Cutting Clips', complete: '✓ Done' };
-  const idx = Math.max(stages.indexOf(stage), 0);
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <span style={{ fontFamily: C.mono, fontSize: 11, color: C.amberText, textTransform: 'uppercase' }}>{labels[stage] || stage}</span>
-        <span style={{ fontFamily: C.mono, fontSize: 11, color: C.text3 }}>{progress}%</span>
-      </div>
-      <div style={{ height: 6, background: C.border, borderRadius: 3, overflow: 'hidden' }}>
-        <div style={{ height: '100%', width: `${progress}%`, background: `linear-gradient(90deg,${C.amberMid},${C.amber})`, borderRadius: 3, transition: 'width .5s ease' }} />
-      </div>
-      <div style={{ display: 'flex', gap: 4 }}>
-        {stages.map((s, i) => (
-          <div key={s} style={{ flex: 1, height: 3, borderRadius: 2, background: i <= idx ? C.amberMid : C.border, transition: 'background .3s' }} />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ─── Clip Card ────────────────────────────────────────────────────────────────
-function ClipCard({ clip, jobId, onSendToScheduler }) {
-  const [playing, setPlaying] = useState(false);
-  const [blobUrl, setBlobUrl] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [downloading, setDownloading] = useState(false);
-  const [mediaError, setMediaError] = useState(null);
-  const videoRef = useRef(null);
-
-  // Preview bytes are fetched with the auth header (native <video src> can't send
-  // it), then played from a blob URL. Revoke it when the card unmounts.
-  useEffect(() => () => { if (blobUrl) URL.revokeObjectURL(blobUrl); }, [blobUrl]);
-
-  // Once the blob URL is bound to the <video>, start playback. Doing this in an
-  // effect (rather than right after setBlobUrl) avoids a race where play() runs
-  // before React commits the new src.
+const time = (n) =>
+  `${Math.floor(n / 60)}:${String(Math.floor(n % 60)).padStart(2, "0")}`;
+const labels = {
+  "bold-statement": "Bold statement",
+  "question-answer": "Question + answer",
+  opinion: "Opinion",
+  insight: "Insight",
+  custom: "Custom",
+};
+const active = (j) =>
+  ["queued", "downloading", "transcribing", "analyzing"].includes(j?.status);
+function ClipEditor({ job, clip, onClose, onSaved }) {
+  const [draft, setDraft] = useState(null),
+    [url, setURL] = useState(""),
+    [error, setError] = useState(""),
+    [busy, setBusy] = useState(false),
+    [position, setPosition] = useState(0),
+    [tab, setTab] = useState("words");
+  const video = useRef(null);
   useEffect(() => {
-    if (blobUrl && videoRef.current) {
-      videoRef.current.play().then(() => setPlaying(true)).catch(() => {});
-    }
-  }, [blobUrl]);
-
-  const loadAndPlay = async () => {
-    setMediaError(null);
-    if (blobUrl) {
-      videoRef.current?.play();
-      setPlaying(true);
-      return;
-    }
+    let alive = true;
+    request(`/jobs/${job.id}/clips/${clip.id}`)
+      .then((d) => {
+        if (alive) setDraft(d);
+      })
+      .catch((e) => setError(e.message));
+    request(`/jobs/${job.id}/media`, { file: clip.file || "source" })
+      .then((d) => {
+        if (alive) setURL(d.url);
+      })
+      .catch((e) => setError(e.message));
+    return () => {
+      alive = false;
+    };
+  }, [job.id, clip.id]);
+  async function save() {
+    setBusy(true);
+    setError("");
     try {
-      setLoading(true);
-      const url = await smartClipper.fetchClipObjectUrl(jobId, clip.file);
-      setBlobUrl(url); // the effect above starts playback once src is committed
+      const r = await request(
+        `/jobs/${job.id}/clips/${clip.id}`,
+        draft,
+        "PATCH",
+      );
+      await onSaved(r);
+      onClose();
     } catch (e) {
-      setMediaError('Preview unavailable');
+      setError(e.message);
     } finally {
-      setLoading(false);
+      setBusy(false);
     }
-  };
-
-  const handleDownload = async () => {
-    try {
-      setMediaError(null);
-      setDownloading(true);
-      await smartClipper.downloadClip(jobId, clip.file, `clip_${clip.clip_number}.mp4`);
-    } catch (e) {
-      setMediaError('Download failed');
-    } finally {
-      setDownloading(false);
-    }
-  };
-
-  const emotionColors = { curiosity: C.teal, surprise: C.amber, inspiration: '#4ADE80', relatability: '#A78BFA', controversy: C.red };
-  const emotionColor = emotionColors[clip.emotion] || C.text3;
-  return (
-    <div style={{ ...glass, padding: 0, overflow: 'hidden' }}>
-      {/* Video preview */}
-      <div style={{ position: 'relative', background: '#000', aspectRatio: '16/9' }}>
-        <video
-          ref={videoRef}
-          src={blobUrl || undefined}
-          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-          onClick={() => { if (!blobUrl) return loadAndPlay(); playing ? videoRef.current.pause() : videoRef.current.play(); setPlaying(!playing); }}
-          onEnded={() => setPlaying(false)}
-        />
-        {!playing && (
-          <div onClick={loadAndPlay} style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', background: 'rgba(0,0,0,0.4)' }}>
-            <div style={{ width: 48, height: 48, borderRadius: '50%', background: `rgba(232,53,43,0.9)`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>
-              {loading ? '…' : mediaError ? '⚠' : '▶'}
-            </div>
-          </div>
-        )}
-        {/* Badges */}
-        <div style={{ position: 'absolute', top: 10, left: 10, display: 'flex', gap: 6 }}>
-          <div style={{ background: 'rgba(0,0,0,0.8)', borderRadius: 6, padding: '3px 8px', fontFamily: C.mono, fontSize: 10, color: C.text }}>
-            Clip {clip.clip_number}
-          </div>
-          <div style={{ background: 'rgba(0,0,0,0.8)', borderRadius: 6, padding: '3px 8px', fontFamily: C.mono, fontSize: 10, color: C.amberText }}>
-            {clip.duration}s
-          </div>
-        </div>
-        <div style={{ position: 'absolute', top: 10, right: 10 }}>
-          <ScoreRing score={clip.virality_score} />
-        </div>
-      </div>
-      {/* Info */}
-      <div style={{ padding: 16 }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 10 }}>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: C.text, marginBottom: 4 }}>{clip.title}</div>
-            <div style={{ fontSize: 12, color: C.text3, fontStyle: 'italic' }}>"{clip.hook}"</div>
-          </div>
-        </div>
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
-          <Tag color="amber">🔥 {clip.virality_score} virality</Tag>
-          <span style={{ display: 'inline-flex', alignItems: 'center', padding: '2px 8px', borderRadius: radius.pill, fontFamily: C.mono, fontSize: 10, background: `${emotionColor}15`, color: emotionColor, border: `1px solid ${emotionColor}40` }}>{clip.emotion}</span>
-          {clip.pillar_match && <Tag color="teal">✦ {clip.pillar_match}</Tag>}
-        </div>
-        <div style={{ background: C.surface2, borderRadius: radius.sm, padding: '8px 10px', marginBottom: 12, fontSize: 12, color: C.text3, lineHeight: 1.5 }}>
-          {clip.why_viral}
-        </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <Button variant="primary" size="sm" style={{ flex: 1 }} onClick={handleDownload} disabled={downloading}>
-            {downloading ? 'Downloading…' : '↓ Download'}
-          </Button>
-          <Button variant="secondary" size="sm" style={{ color: C.tealText, borderColor: C.tealDim }} onClick={() => onSendToScheduler(clip)}>
-            📅 Schedule
-          </Button>
-        </div>
-        {mediaError && (
-          <div style={{ marginTop: 8, fontSize: 11, color: C.red, fontFamily: C.mono }}>{mediaError}</div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ─── Drop zone (upload-only ingest) ───────────────────────────────────────────
-function DropZone({ file, onPick, onClear, disabled }) {
-  const [dragging, setDragging] = useState(false);
-  const inputRef = useRef(null);
-
-  const handleDrop = (e) => {
-    e.preventDefault();
-    setDragging(false);
-    if (disabled) return;
-    const dropped = e.dataTransfer.files?.[0];
-    if (dropped) onPick(dropped);
-  };
-
-  if (file) {
-    return (
-      <div style={{ ...glass, padding: 16, display: 'flex', alignItems: 'center', gap: 14 }}>
-        <div style={{ width: 44, height: 44, borderRadius: radius.sm, background: gradients.amber, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>🎬</div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{file.name}</div>
-          <div style={{ fontSize: 11, color: C.text3, fontFamily: C.mono, marginTop: 2 }}>{fmtBytes(file.size)} · ready to clip</div>
-        </div>
-        {!disabled && (
-          <Button variant="ghost" size="sm" onClick={onClear}>✕ Remove</Button>
-        )}
-      </div>
-    );
   }
-
+  function range(i, key, value) {
+    const ranges = draft.ranges.map((r, j) =>
+      j === i ? { ...r, [key]: Number(value) } : r,
+    );
+    setDraft({ ...draft, ranges, words: undefined });
+  }
+  async function reloadWords() {
+    setBusy(true);
+    try {
+      await request(`/jobs/${job.id}/clips/${clip.id}`, draft, "PATCH");
+      setDraft(await request(`/jobs/${job.id}/clips/${clip.id}`));
+      await onSaved();
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
   return (
-    <div
-      onClick={() => !disabled && inputRef.current?.click()}
-      onDragOver={(e) => { e.preventDefault(); if (!disabled) setDragging(true); }}
-      onDragLeave={() => setDragging(false)}
-      onDrop={handleDrop}
-      style={{
-        border: `1.5px dashed ${dragging ? C.amber : C.border2}`,
-        borderRadius: radius.lg,
-        background: dragging ? C.amberSub : C.surface,
-        padding: '40px 24px',
-        textAlign: 'center',
-        cursor: disabled ? 'not-allowed' : 'pointer',
-        transition: 'border-color .18s, background .18s',
-        opacity: disabled ? 0.6 : 1,
-      }}
-    >
-      <input
-        ref={inputRef}
-        type="file"
-        accept="video/*,.mp4,.mov,.mkv,.webm,.avi,.m4v"
-        style={{ display: 'none' }}
-        onChange={(e) => { const f = e.target.files?.[0]; if (f) onPick(f); e.target.value = ''; }}
-      />
-      <div style={{ fontSize: 40, marginBottom: 12 }}>⬆</div>
-      <div style={{ fontSize: 15, fontWeight: 700, color: C.text, marginBottom: 6 }}>Drop your video here</div>
-      <div style={{ fontSize: 12, color: C.text3, marginBottom: 4 }}>or click to browse — upload a long-form video you already have</div>
-      <div style={{ fontSize: 11, color: C.text4, fontFamily: C.mono }}>MP4 · MOV · MKV · WEBM · AVI (up to 3GB)</div>
+    <div className="modal-backdrop">
+      <section
+        className="editor"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Edit clip"
+      >
+        <header>
+          <h2>Edit clip</h2>
+          <button onClick={onClose} aria-label="Close editor">
+            ✕
+          </button>
+        </header>
+        {error && (
+          <p className="error" role="alert">
+            {error}
+          </p>
+        )}
+        {!draft ? (
+          <p>Loading captions…</p>
+        ) : (
+          <>
+            <div className="editor-grid">
+              <div>
+                <video
+                  ref={video}
+                  src={url}
+                  controls
+                  playsInline
+                  preload="metadata"
+                  onLoadedMetadata={() => {
+                    if (!clip.file)
+                      video.current.currentTime = draft.ranges[0].start;
+                  }}
+                  onTimeUpdate={() =>
+                    setPosition(video.current?.currentTime || 0)
+                  }
+                />
+                <p className="muted">
+                  {clip.file
+                    ? "Last exported version. Save and export again to apply edits."
+                    : "Source preview. Captions and formatting are applied when you export."}{" "}
+                  · {time(position)}
+                </p>
+                <div className="caption-sample">
+                  Your next <mark>great clip</mark> starts here.
+                </div>
+                <p className="muted">
+                  Classic-style bold captions with a dark outline. Liberation
+                  Sans is an Arial-compatible substitute; exact TikTok Classic
+                  is not bundled.
+                </p>
+                <label>
+                  Title
+                  <input
+                    value={draft.title}
+                    onChange={(e) =>
+                      setDraft({ ...draft, title: e.target.value })
+                    }
+                  />
+                </label>
+                <div className="fields">
+                  <label>
+                    Format
+                    <select
+                      value={draft.format}
+                      onChange={(e) =>
+                        setDraft({ ...draft, format: e.target.value })
+                      }
+                    >
+                      <option>16:9</option>
+                      <option>9:16</option>
+                    </select>
+                  </label>
+                  <label>
+                    Framing
+                    <select
+                      value={draft.fit}
+                      onChange={(e) =>
+                        setDraft({ ...draft, fit: e.target.value })
+                      }
+                    >
+                      <option value="contain">Fit whole frame</option>
+                      <option value="crop">Fill / crop</option>
+                    </select>
+                  </label>
+                  <label>
+                    Caption size
+                    <input
+                      type="number"
+                      min="24"
+                      max="96"
+                      value={draft.fontSize}
+                      onChange={(e) =>
+                        setDraft({ ...draft, fontSize: Number(e.target.value) })
+                      }
+                    />
+                  </label>
+                </div>
+                {draft.fit === "crop" && (
+                  <label>
+                    Horizontal crop position: {draft.cropX}%
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={draft.cropX}
+                      onChange={(e) =>
+                        setDraft({ ...draft, cropX: Number(e.target.value) })
+                      }
+                    />
+                  </label>
+                )}
+              </div>
+              <div>
+                <div className="tabs">
+                  <button
+                    className={tab === "words" ? "active" : ""}
+                    onClick={() => setTab("words")}
+                  >
+                    Captions
+                  </button>
+                  <button
+                    className={tab === "ranges" ? "active" : ""}
+                    onClick={() => setTab("ranges")}
+                  >
+                    Source ranges
+                  </button>
+                </div>
+                {tab === "ranges" ? (
+                  <>
+                    <p>
+                      Seconds in the original video. For separate answers, keep
+                      the question as range 1 and its answer as range 2.
+                    </p>
+                    {draft.ranges.map((r, i) => (
+                      <div className="fields" key={i}>
+                        <label>
+                          Start
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={r.start}
+                            onChange={(e) => range(i, "start", e.target.value)}
+                          />
+                        </label>
+                        <label>
+                          End
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={r.end}
+                            onChange={(e) => range(i, "end", e.target.value)}
+                          />
+                        </label>
+                        <button
+                          disabled={draft.ranges.length === 1}
+                          onClick={() =>
+                            setDraft({
+                              ...draft,
+                              ranges: draft.ranges.filter((_, j) => i !== j),
+                              words: undefined,
+                            })
+                          }
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ))}
+                    <button
+                      disabled={draft.ranges.length >= 8}
+                      onClick={() => {
+                        const end = draft.ranges.at(-1).end;
+                        setDraft({
+                          ...draft,
+                          ranges: [
+                            ...draft.ranges,
+                            {
+                              start: end,
+                              end: Math.min(end + 20, job.duration),
+                            },
+                          ],
+                          words: undefined,
+                        });
+                      }}
+                    >
+                      Add answer range
+                    </button>
+                    <p className="muted">
+                      Changing ranges resets caption edits to the original
+                      transcript.
+                    </p>
+                    {!draft.words && (
+                      <button onClick={reloadWords} disabled={busy}>
+                        Save ranges & reload captions
+                      </button>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <p>
+                      Correct any word. Tap its yellow swatch to highlight it.
+                      Timings are relative to the assembled clip.
+                    </p>
+                    <div className="word-list">
+                      {draft.words?.map((w, i) => (
+                        <div className="word-row" key={i}>
+                          <button
+                            title="Toggle yellow highlight"
+                            aria-label={`Highlight ${w.text}`}
+                            aria-pressed={w.highlight}
+                            className={w.highlight ? "highlighted" : ""}
+                            onClick={() =>
+                              setDraft({
+                                ...draft,
+                                words: draft.words.map((v, k) =>
+                                  k === i
+                                    ? { ...v, highlight: !v.highlight }
+                                    : v,
+                                ),
+                              })
+                            }
+                          >
+                            ●
+                          </button>
+                          <input
+                            aria-label={`Caption word ${i + 1}`}
+                            value={w.text}
+                            onChange={(e) =>
+                              setDraft({
+                                ...draft,
+                                words: draft.words.map((v, k) =>
+                                  k === i ? { ...v, text: e.target.value } : v,
+                                ),
+                              })
+                            }
+                          />
+                          <input
+                            aria-label={`Word ${i + 1} start`}
+                            type="number"
+                            step="0.01"
+                            value={w.start}
+                            onChange={(e) =>
+                              setDraft({
+                                ...draft,
+                                words: draft.words.map((v, k) =>
+                                  k === i
+                                    ? { ...v, start: Number(e.target.value) }
+                                    : v,
+                                ),
+                              })
+                            }
+                          />
+                          <input
+                            aria-label={`Word ${i + 1} end`}
+                            type="number"
+                            step="0.01"
+                            value={w.end}
+                            onChange={(e) =>
+                              setDraft({
+                                ...draft,
+                                words: draft.words.map((v, k) =>
+                                  k === i
+                                    ? { ...v, end: Number(e.target.value) }
+                                    : v,
+                                ),
+                              })
+                            }
+                          />
+                        </div>
+                      )) || <p>Save ranges and reload captions first.</p>}
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+            <footer>
+              <button onClick={onClose}>Close</button>
+              <button className="primary" onClick={save} disabled={busy}>
+                {busy ? "Saving…" : "Save changes"}
+              </button>
+            </footer>
+          </>
+        )}
+      </section>
     </div>
   );
 }
-
-// ─── Main Component (upload-only) ─────────────────────────────────────────────
+function Preview({ job, clip }) {
+  const [url, setURL] = useState(""),
+    [error, setError] = useState("");
+  useEffect(() => {
+    let alive = true;
+    request(`/jobs/${job.id}/media`, { file: clip.file })
+      .then((d) => {
+        if (alive) setURL(d.url);
+      })
+      .catch((e) => setError(e.message));
+    return () => {
+      alive = false;
+    };
+  }, [job.id, clip.file]);
+  return (
+    <>
+      {error && <p className="error">{error}</p>}
+      <video src={url} controls playsInline preload="metadata" />
+      {url && (
+        <a className="download" href={`${url}&download=1`}>
+          Download MP4 ↓
+        </a>
+      )}
+    </>
+  );
+}
 export default function SmartClipper() {
-  const isMobile = useIsMobile();
-  const [file, setFile] = useState(null);
-  const [pillars, setPillars] = useState('');
-  const [niche, setNiche] = useState('');
-  const [clipCount, setClipCount] = useState('5');
-  const [captionStyle, setCaptionStyle] = useState('bold');
-  const [uploadPct, setUploadPct] = useState(0);
-  const [loading, setLoading] = useState(false);
-  const [jobId, setJobId] = useState(null);
-  const [status, setStatus] = useState(null);
-  const [clips, setClips] = useState([]);
-  const [error, setError] = useState('');
-  const [health, setHealth] = useState(null);
-  const pollRef = useRef(null);
-
-  // Check system health on mount (upload flow needs FFmpeg + transcription, not yt-dlp)
+  const [jobs, setJobs] = useState([]),
+    [jobId, setJobId] = useState(null),
+    [health, setHealth] = useState(null),
+    [mode, setMode] = useState("url"),
+    [url, setURL] = useState(""),
+    [source, setSource] = useState(null),
+    [format, setFormat] = useState("16:9"),
+    [analysis, setAnalysis] = useState("local"),
+    [maxDuration, setMaxDuration] = useState(120),
+    [busy, setBusy] = useState(false),
+    [error, setError] = useState(""),
+    [uploadProgress, setUploadProgress] = useState(0),
+    [selected, setSelected] = useState([]),
+    [filter, setFilter] = useState("all"),
+    [editing, setEditing] = useState(null),
+    [custom, setCustom] = useState(false),
+    [customStart, setCustomStart] = useState(0),
+    [customEnd, setCustomEnd] = useState(45);
+  const uploadController = useRef(null);
+  const job = jobs.find((j) => j.id === jobId);
+  async function refresh() {
+    const list = await request("/jobs");
+    setJobs(list);
+  }
   useEffect(() => {
-    smartClipper.health().then(setHealth).catch(() => {});
+    refresh().catch((e) => setError(e.message));
+    request("/health")
+      .then(setHealth)
+      .catch((e) => setError(e.message));
+    const timer = setInterval(() => refresh().catch(() => {}), 8000);
+    return () => clearInterval(timer);
   }, []);
-
-  // Poll job status once a job exists
   useEffect(() => {
-    if (!jobId) return;
-    pollRef.current = setInterval(async () => {
-      try {
-        const data = await smartClipper.status(jobId);
-        setStatus(data);
-        if (data.status === 'completed') {
-          clearInterval(pollRef.current);
-          setLoading(false);
-          setClips(data.clips || []);
-        }
-        if (data.status === 'failed') {
-          clearInterval(pollRef.current);
-          setLoading(false);
-          setError(data.error || 'Processing failed');
-        }
-      } catch (e) {
-        clearInterval(pollRef.current);
-        setLoading(false);
-        setError(e.message);
-      }
-    }, 3000);
-    return () => clearInterval(pollRef.current);
+    setSelected([]);
+    setFilter("all");
+    setEditing(null);
   }, [jobId]);
-
-  const handlePick = (f) => {
-    if (!isVideoFile(f)) { setError('That file is not a supported video format. Use MP4, MOV, MKV, WEBM, or AVI.'); return; }
-    setError('');
-    setFile(f);
-  };
-
-  const handleClip = async () => {
-    if (!file) return;
-    setLoading(true); setError(''); setClips([]); setStatus({ stage: 'uploading', progress: 0 }); setJobId(null); setUploadPct(0);
-    try {
-      const data = await smartClipper.uploadAndClip({
-        file,
-        contentPillars: pillars,
-        niche,
-        clipCount: parseInt(clipCount),
-        captionStyle,
-        onProgress: (pct) => {
-          setUploadPct(pct);
-          setStatus({ stage: 'uploading', progress: pct });
-        },
+  async function upload(file, resume) {
+    let j = resume;
+    if (!j)
+      j = await request("/uploads", {
+        name: file.name,
+        size: file.size,
+        format,
+        analysis,
+        maxDuration,
       });
-      setJobId(data.job_id);
-      setStatus({ stage: 'transcribing', progress: 20 });
+    setJobId(j.id);
+    await refresh();
+    localStorage.setItem(
+      "ccc_upload",
+      JSON.stringify({
+        id: j.id,
+        name: file.name,
+        size: file.size,
+        lastModified: file.lastModified,
+      }),
+    );
+    const controller = new AbortController();
+    uploadController.current = controller;
+    let offset = j.uploadedBytes || 0;
+    while (offset < file.size) {
+      const end = Math.min(offset + 8 * 1024 ** 2, file.size);
+      let success = false;
+      for (let attempt = 0; attempt < 3 && !success; attempt++) {
+        try {
+          const r = await fetch(`${API}/uploads/${j.id}`, {
+            method: "PUT",
+            signal: controller.signal,
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("ccc_token")}`,
+              "Content-Type": "application/octet-stream",
+              "Upload-Offset": String(offset),
+            },
+            body: file.slice(offset, end),
+          });
+          const d = await r.json();
+          if (r.status === 409 && Number.isFinite(d.offset)) {
+            offset = d.offset;
+            success = true;
+            break;
+          }
+          if (!r.ok) throw new Error(d.error);
+          offset = d.offset;
+          success = true;
+        } catch (e) {
+          if (controller.signal.aborted || attempt === 2) throw e;
+        }
+      }
+      setUploadProgress(Math.round((offset / file.size) * 100));
+    }
+    await request(`/uploads/${j.id}/complete`, {});
+    localStorage.removeItem("ccc_upload");
+    await refresh();
+    uploadController.current = null;
+  }
+  async function start(e) {
+    e.preventDefault();
+    setBusy(true);
+    setError("");
+    setUploadProgress(0);
+    try {
+      if (mode === "url") {
+        const j = await request("/clip", {
+          url,
+          format,
+          analysis,
+          maxDuration,
+        });
+        setJobId(j.id);
+        await refresh();
+      } else {
+        if (!source) throw new Error("Choose a video file.");
+        await upload(source);
+      }
     } catch (e) {
-      setLoading(false);
+      setError(
+        e.name === "AbortError"
+          ? "Upload paused. Reselect the same file and resume below."
+          : e.message,
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function resume(e, j) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setError("");
+    setBusy(true);
+    try {
+      const saved = JSON.parse(localStorage.getItem("ccc_upload") || "null");
+      if (
+        file.size !== j.expectedBytes ||
+        file.name !== j.title ||
+        (saved?.id === j.id && file.lastModified !== saved.lastModified)
+      )
+        throw new Error("Select the original, unchanged video file.");
+      await upload(file, j);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function action(p, body, method) {
+    setError("");
+    try {
+      await request(p, body, method);
+      await refresh();
+    } catch (e) {
       setError(e.message);
     }
-  };
-
-  const handleSendToScheduler = (clip) => {
-    alert(`"${clip.title}" — send to scheduler coming soon! Download the clip first and use your Distribution Room.`);
-  };
-
-  const handleReset = () => {
-    if (jobId) smartClipper.remove(jobId).catch(() => {});
-    if (pollRef.current) clearInterval(pollRef.current);
-    setJobId(null); setStatus(null); setClips([]); setLoading(false); setError(''); setFile(null); setUploadPct(0);
-  };
-
-  const displayStatus = status || (loading ? { stage: 'uploading', progress: uploadPct } : null);
-
+  }
+  const visible = (job?.clips || []).filter(
+    (c) => filter === "all" || c.type === filter,
+  );
   return (
-    <div style={{ minHeight: '100%', background: C.bg, color: C.text, fontFamily: C.font, padding: 32 }}>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&family=DM+Mono:wght@300;400;500&display=swap');
-        @keyframes spin { to { transform: rotate(360deg); } }
-        @keyframes fadeUp { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
-        * { box-sizing: border-box; }
-        ::-webkit-scrollbar { width: 5px; }
-        ::-webkit-scrollbar-track { background: ${C.bg}; }
-        ::-webkit-scrollbar-thumb { background: ${C.border2}; border-radius: 3px; }
-        input::placeholder, textarea::placeholder { color: ${C.text4}; }
-        select option { background: ${C.surface}; color: ${C.text}; }
-      `}</style>
-
-      {/* Header */}
-      <div style={{ marginBottom: 28, animation: 'fadeUp .3s ease' }}>
-        <SectionLabel>AI Pipeline</SectionLabel>
-        <h1 style={{ margin: '10px 0 0', fontSize: 32, fontWeight: 800, color: C.text, letterSpacing: '-0.03em', fontFamily: C.font, lineHeight: 1.04 }}>Smart Clipper</h1>
-        <p style={{ margin: '6px 0 0', fontSize: 13, color: C.text3 }}>Upload a long-form video → AI finds your best moments → export ready-to-post clips</p>
+    <div className="clip-page">
+      <div className="heading">
+        <div>
+          <span className="eyebrow">MORE SIGNAL. LESS EDITING.</span>
+          <h1>Find your next great clip.</h1>
+          <p>
+            Bold statements. Real answers. Strong opinions.
+            <br />
+            Keep the moments that stand on their own.
+          </p>
+        </div>
+        <div className="format-stamp">
+          16:9 <span>/</span> 9:16
+        </div>
       </div>
-
-      {/* System health */}
-      {health?.checks && (
-        <div style={{ display: 'flex', gap: 10, marginBottom: 20, flexWrap: 'wrap' }}>
-          {[
-            { label: 'FFmpeg', ok: health.checks.ffmpeg, note: 'video cutting' },
-            { label: 'Whisper', ok: health.checks.whisper, note: health.checks.whisper ? 'local — free' : 'using OpenAI API' },
-          ].map(({ label, ok, note }) => (
-            <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 12px', background: ok ? C.tealSub : C.amberSub, border: `1px solid ${ok ? C.tealDim : C.amberDim}`, borderRadius: radius.pill }}>
-              <span style={{ fontSize: 10 }}>{ok ? '●' : '○'}</span>
-              <span style={{ fontFamily: C.mono, fontSize: 10, color: ok ? C.tealText : C.amberText }}>{label}</span>
-              <span style={{ fontFamily: C.mono, fontSize: 9, color: C.text3 }}>{note}</span>
-            </div>
-          ))}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 12px', background: C.tealSub, border: `1px solid ${C.tealDim}`, borderRadius: radius.pill }}>
-            <span style={{ fontSize: 10, color: C.tealText }}>●</span>
-            <span style={{ fontFamily: C.mono, fontSize: 10, color: C.tealText }}>Claude AI</span>
-            <span style={{ fontFamily: C.mono, fontSize: 9, color: C.text3 }}>moment detection</span>
-          </div>
+      {error && (
+        <div className="error" role="alert">
+          {error}
+          <button onClick={() => setError("")}>Dismiss</button>
         </div>
       )}
-
-      <div style={{ display: 'grid', gridTemplateColumns: cols(isMobile, clips.length ? '360px 1fr' : '500px 1fr'), gap: 28 }}>
-        {/* Controls */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <DropZone file={file} onPick={handlePick} onClear={() => setFile(null)} disabled={loading} />
-
-          <Input label="Your Content Pillars (optional — improves matching)" value={pillars} onChange={setPillars} placeholder="Faith, Business, Productivity, Mindset..." multiline rows={2} />
-          <Input label="Your Niche (optional)" value={niche} onChange={setNiche} placeholder="Christian entrepreneurs, fitness coaches..." />
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-              <label style={{ fontFamily: C.mono, fontSize: 10, color: C.text3, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Clips to find</label>
-              <select value={clipCount} onChange={e => setClipCount(e.target.value)} style={{ background: C.surface, border: `1px solid ${C.border2}`, borderRadius: radius.sm, color: C.text, padding: '10px 12px', fontSize: 13, fontFamily: C.font, outline: 'none', appearance: 'none' }}>
-                {['3','5','7','10'].map(n => <option key={n} value={n}>{n} clips</option>)}
-              </select>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-              <label style={{ fontFamily: C.mono, fontSize: 10, color: C.text3, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Caption style</label>
-              <select value={captionStyle} onChange={e => setCaptionStyle(e.target.value)} style={{ background: C.surface, border: `1px solid ${C.border2}`, borderRadius: radius.sm, color: C.text, padding: '10px 12px', fontSize: 13, fontFamily: C.font, outline: 'none', appearance: 'none' }}>
-                <option value="bold">Bold White</option>
-                <option value="yellow">Yellow Bold</option>
-                <option value="minimal">Minimal</option>
-              </select>
-            </div>
-          </div>
-
-          {!loading && !clips.length && (
-            <Button onClick={handleClip} disabled={!file || loading} style={{ width: '100%' }}>
-              ✂ Extract Clips
-            </Button>
-          )}
-          {(loading || clips.length > 0) && (
-            <Button variant="ghost" onClick={handleReset} style={{ fontSize: 12 }}>
-              ← New Upload
-            </Button>
-          )}
-          {error && (
-            <div style={{ background: C.redSub, border: `1px solid ${C.red}`, borderRadius: radius.sm, padding: 12, color: C.redText, fontSize: 12, fontFamily: C.mono }}>
-              {error}
-            </div>
-          )}
-
-          {/* How it works */}
-          {!loading && !clips.length && (
-            <Card style={{ padding: 14 }}>
-              <div style={{ fontFamily: C.mono, fontSize: 9, color: C.text3, textTransform: 'uppercase', marginBottom: 10 }}>Pipeline</div>
-              {[
-                ['⬆', 'Upload your long-form video'],
-                ['🎙', 'Transcribe audio (Whisper)'],
-                ['🧠', 'Claude finds best moments'],
-                ['✂', 'FFmpeg cuts + crops clips'],
-                ['💬', 'Captions burned in'],
-                ['✓', 'Download or schedule each clip'],
-              ].map(([icon, text]) => (
-                <div key={text} style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 8 }}>
-                  <span style={{ fontSize: 14, width: 20 }}>{icon}</span>
-                  <span style={{ fontSize: 12, color: C.text3 }}>{text}</span>
-                </div>
-              ))}
-            </Card>
-          )}
+      <section className="panel import-panel">
+        <div className="tabs">
+          <button
+            className={mode === "url" ? "active" : ""}
+            onClick={() => setMode("url")}
+          >
+            YouTube link
+          </button>
+          <button
+            className={mode === "file" ? "active" : ""}
+            onClick={() => setMode("file")}
+          >
+            Upload video
+          </button>
         </div>
-
-        {/* Output */}
-        <div>
-          {/* Processing state */}
-          {loading && displayStatus && (
-            <Card style={{ padding: 28 }}>
-              <div style={{ marginBottom: 20 }}>
-                <ProgressBar stage={displayStatus.stage} progress={displayStatus.progress} />
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'center', gap: 16, alignItems: 'center' }}>
-                <Spinner />
-                <div>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: C.text, marginBottom: 4 }}>
-                    {displayStatus.stage === 'uploading' && 'Uploading your video...'}
-                    {displayStatus.stage === 'transcribing' && 'Transcribing with Whisper...'}
-                    {displayStatus.stage === 'analyzing' && 'Claude is finding your best clips...'}
-                    {displayStatus.stage === 'cutting' && 'Cutting & captioning clips...'}
-                  </div>
-                  <div style={{ fontSize: 12, color: C.text3, fontFamily: C.mono }}>
-                    {displayStatus.stage === 'uploading' && `${uploadPct}% uploaded — keep this tab open`}
-                    {displayStatus.stage === 'transcribing' && 'Free local transcription — no API cost'}
-                    {displayStatus.stage === 'analyzing' && `Transcript ready — ${displayStatus.transcript_length || 0} characters`}
-                    {displayStatus.stage === 'cutting' && 'Burning in captions...'}
-                  </div>
-                </div>
-              </div>
-            </Card>
+        <form onSubmit={start}>
+          {mode === "url" ? (
+            <label className="source-label">
+              Video URL
+              <input
+                type="url"
+                placeholder="https://www.youtube.com/watch?v=…"
+                value={url}
+                onChange={(e) => setURL(e.target.value)}
+                required
+              />
+            </label>
+          ) : (
+            <label className="dropzone">
+              Choose a video up to 3 hours
+              <input
+                type="file"
+                accept="video/*,.mkv"
+                onChange={(e) => setSource(e.target.files[0])}
+              />
+              <small>
+                {source
+                  ? `${source.name} · ${(source.size / 1024 ** 3).toFixed(2)} GB`
+                  : "MP4, MOV, MKV, WEBM or M4V · resumable uploads"}
+              </small>
+            </label>
           )}
-
-          {/* Clips grid */}
-          {clips.length > 0 && !loading && (
-            <div style={{ animation: 'fadeUp .3s ease' }}>
-              <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
-                <StatCard value={clips.length} label="Clips Extracted" style={{ flex: '1 1 140px' }} />
-                <StatCard value={Math.round(clips.reduce((s, c) => s + c.virality_score, 0) / clips.length) || 0} label="Avg Virality" style={{ flex: '1 1 140px' }} />
-                <StatCard value={clips.reduce((s, c) => s + Math.round(parseFloat(c.duration) || 0), 0) + 's'} label="Total Runtime" style={{ flex: '1 1 140px' }} />
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-                <div style={{ fontSize: 12, color: C.text3, fontFamily: C.mono }}>
-                  Sorted by virality score — click ▶ to preview
-                </div>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <Tag color="teal">Upload pipeline</Tag>
-                </div>
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16 }}>
-                {[...clips].sort((a, b) => b.virality_score - a.virality_score).map(clip => (
-                  <ClipCard key={clip.clip_number} clip={clip} jobId={jobId} onSendToScheduler={handleSendToScheduler} />
+          <div className="fields">
+            <label>
+              Output format
+              <select
+                value={format}
+                onChange={(e) => setFormat(e.target.value)}
+              >
+                <option>16:9</option>
+                <option>9:16</option>
+              </select>
+            </label>
+            <label>
+              Max clip length
+              <select
+                value={maxDuration}
+                onChange={(e) => setMaxDuration(Number(e.target.value))}
+              >
+                {[60, 90, 120, 180].map((n) => (
+                  <option key={n} value={n}>
+                    {n} seconds
+                  </option>
                 ))}
+              </select>
+            </label>
+            <label>
+              Find moments with
+              <select
+                value={analysis}
+                onChange={(e) => setAnalysis(e.target.value)}
+              >
+                <option value="local">Local rules · no AI API calls</option>
+                {health?.groqAvailable && (
+                  <option value="groq">
+                    Groq semantic review · account limits apply
+                  </option>
+                )}
+              </select>
+            </label>
+            <button
+              type="submit"
+              className="primary"
+              disabled={busy || health?.ready === false}
+            >
+              {busy ? `Uploading ${uploadProgress}%` : "Find clips ↗"}
+            </button>
+            {busy && (
+              <button
+                type="button"
+                onClick={() => uploadController.current?.abort()}
+              >
+                Pause upload
+              </button>
+            )}
+          </div>
+          <p className="muted">
+            {analysis === "local"
+              ? "Local rules find candidates; review them for complete meaning. No fixed clip count."
+              : "Semantic review reads the full transcript in overlapping sections and looks for complete setup and payoff. Uses your configured Groq account."}{" "}
+            {health &&
+              `Available storage: ${(health.freeBytes / 1024 ** 3).toFixed(1)} GB.`}
+          </p>
+          {health?.ready === false && (
+            <p className="error">
+              Processing is not ready:{" "}
+              {Object.entries(health.checks)
+                .filter(([k, v]) => !v && k !== "ytdlp")
+                .map(([k]) => k)
+                .join(", ")}{" "}
+              unavailable.
+            </p>
+          )}
+        </form>
+      </section>
+      <div className="project-layout">
+        <aside className="projects">
+          <div className="section-title">
+            <h2>Projects</h2>
+            <span>{jobs.length}</span>
+          </div>
+          {jobs.length === 0 ? (
+            <p className="muted">Your imported videos will appear here.</p>
+          ) : (
+            jobs.map((j) => (
+              <button
+                key={j.id}
+                className={`project ${j.id === jobId ? "active" : ""}`}
+                onClick={() => setJobId(j.id)}
+              >
+                <strong>{j.title}</strong>
+                <small>
+                  {j.status} {j.duration ? `· ${time(j.duration)}` : ""}
+                </small>
+              </button>
+            ))
+          )}
+        </aside>
+        <section className="results">
+          {!job ? (
+            <div className="empty">
+              <span>✂</span>
+              <h2>A full idea. A clean cut.</h2>
+              <p>Import a video or select a project to review its moments.</p>
+              <div className="caption-sample">
+                Make the <mark>important words</mark> stand out.
               </div>
             </div>
+          ) : (
+            <>
+              <div className="section-title">
+                <div>
+                  <h2>{job.title}</h2>
+                  <p className="muted">
+                    {job.method === "groq-semantic"
+                      ? "Semantic suggestions"
+                      : job.method === "local-rules"
+                        ? "Local suggestions · review required"
+                        : job.status}{" "}
+                    {job.duration && `· ${time(job.duration)}`}
+                  </p>
+                </div>
+                <button
+                  className="danger"
+                  onClick={() => {
+                    if (
+                      window.confirm(
+                        "Delete this project, its source video and all exported clips?",
+                      )
+                    )
+                      action(`/job/${job.id}`, null, "DELETE");
+                  }}
+                >
+                  Delete
+                </button>
+              </div>
+              {active(job) && (
+                <div className="progress-panel">
+                  <strong>
+                    {job.status} · {Math.round(job.progress)}%
+                  </strong>
+                  <progress value={job.progress} max="100" />
+                  <p>
+                    Long videos run in the background. You can leave this page
+                    after the upload finishes.
+                  </p>
+                  <button onClick={() => action(`/jobs/${job.id}/cancel`, {})}>
+                    Cancel job
+                  </button>
+                </div>
+              )}
+              {job.status === "uploading" && (
+                <div className="panel">
+                  <p>
+                    Upload{" "}
+                    {Math.round((job.uploadedBytes / job.expectedBytes) * 100)}%
+                    complete. Reselect the same file to resume.
+                  </p>
+                  <input
+                    type="file"
+                    disabled={busy}
+                    onChange={(e) => resume(e, job)}
+                  />
+                </div>
+              )}
+              {["failed", "canceled"].includes(job.status) && (
+                <div className="error">
+                  <p>{job.error || "Job canceled."}</p>
+                  <button onClick={() => action(`/jobs/${job.id}/retry`, {})}>
+                    Retry from checkpoint
+                  </button>
+                </div>
+              )}
+              {job.status === "ready" && (
+                <>
+                  <div className="toolbar">
+                    <select
+                      aria-label="Filter clips"
+                      value={filter}
+                      onChange={(e) => setFilter(e.target.value)}
+                    >
+                      <option value="all">
+                        All moments ({job.clips.length})
+                      </option>
+                      {Object.entries(labels).map(([k, v]) => (
+                        <option key={k} value={k}>
+                          {v}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={() => setSelected(visible.map((c) => c.id))}
+                    >
+                      Select visible
+                    </button>
+                    <button onClick={() => setSelected([])}>Clear</button>
+                    <button onClick={() => setCustom(!custom)}>
+                      + Custom clip
+                    </button>
+                    <button
+                      className="primary"
+                      disabled={!selected.length}
+                      onClick={() =>
+                        action(`/jobs/${job.id}/render`, { clipIds: selected })
+                      }
+                    >
+                      Export selected ({selected.length})
+                    </button>
+                  </div>
+                  {custom && (
+                    <form
+                      className="panel fields"
+                      onSubmit={async (e) => {
+                        e.preventDefault();
+                        await action(`/jobs/${job.id}/clips`, {
+                          ranges: [{ start: customStart, end: customEnd }],
+                        });
+                        setCustom(false);
+                      }}
+                    >
+                      <label>
+                        Start (seconds)
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.1"
+                          value={customStart}
+                          onChange={(e) =>
+                            setCustomStart(Number(e.target.value))
+                          }
+                        />
+                      </label>
+                      <label>
+                        End (seconds)
+                        <input
+                          type="number"
+                          step="0.1"
+                          value={customEnd}
+                          onChange={(e) => setCustomEnd(Number(e.target.value))}
+                        />
+                      </label>
+                      <button className="primary">Create clip</button>
+                    </form>
+                  )}
+                  {!visible.length && (
+                    <p className="empty">
+                      No candidates in this view. Add a custom clip or choose
+                      another filter.
+                    </p>
+                  )}
+                  <div className="clip-grid">
+                    {visible.map((c) => (
+                      <article key={c.id} className="clip-card">
+                        <div className="section-title">
+                          <label className="check">
+                            <input
+                              type="checkbox"
+                              checked={selected.includes(c.id)}
+                              onChange={(e) =>
+                                setSelected(
+                                  e.target.checked
+                                    ? [...selected, c.id]
+                                    : selected.filter((id) => id !== c.id),
+                                )
+                              }
+                            />
+                            {labels[c.type]}
+                          </label>
+                          <span className="badge">{c.format}</span>
+                        </div>
+                        <h3>{c.title}</h3>
+                        <p>{c.reason}</p>
+                        <div className="ranges">
+                          {c.ranges.map((r, i) => (
+                            <span key={i}>
+                              {time(r.start)}–{time(r.end)}
+                            </span>
+                          ))}
+                          <strong>
+                            {Math.round(
+                              c.ranges.reduce((s, r) => s + r.end - r.start, 0),
+                            )}
+                            s
+                          </strong>
+                        </div>
+                        {c.renderStatus === "complete" && c.file && (
+                          <Preview job={job} clip={c} />
+                        )}
+                        <div className="fields">
+                          <button
+                            disabled={["queued", "rendering"].includes(
+                              c.renderStatus,
+                            )}
+                            onClick={() => setEditing(c)}
+                          >
+                            Edit & preview
+                          </button>
+                          <span className="muted">
+                            {c.renderStatus === "idle"
+                              ? "Ready for review"
+                              : c.renderStatus}
+                          </span>
+                        </div>
+                        {c.renderError && (
+                          <p className="error">{c.renderError}</p>
+                        )}
+                      </article>
+                    ))}
+                  </div>
+                </>
+              )}
+            </>
           )}
-
-          {/* Empty state */}
-          {!loading && !clips.length && !error && (
-            <Card style={{ minHeight: 400, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
-              <span style={{ fontSize: 48 }}>✂</span>
-              <div style={{ fontSize: 14, color: C.text4 }}>Upload a video to extract clips</div>
-              <div style={{ fontSize: 11, color: C.text4, fontFamily: C.mono }}>Your file is analyzed for highlight moments — no link needed</div>
-            </Card>
-          )}
-        </div>
+        </section>
       </div>
+      {editing && job && (
+        <ClipEditor
+          job={job}
+          clip={editing}
+          onClose={() => setEditing(null)}
+          onSaved={refresh}
+        />
+      )}
     </div>
   );
 }

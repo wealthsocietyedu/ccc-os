@@ -9,22 +9,18 @@ const rateLimit = require('express-rate-limit');
 const path = require('path');
 
 const authRoutes = require('./routes/auth');
-const brandRoutes = require('./routes/brands');
-const productionRoutes = require('./routes/production');
-const distributionRoutes = require('./routes/distribution');
-const dataRoutes = require('./routes/data');
-const billingRoutes = require('./routes/billing');
-const schedulerRoutes = require('./routes/scheduler');
-const studioRoutes = require('./routes/aistudio');
-const visualEngineRoutes = require('./routes/visual-engine');
 const clipperRoutes = require('./routes/clipper');
-const contentFlowRoutes = require('./routes/contentFlow');
 const videoDownloaderRoutes = require('./routes/videoDownloader');
-const csvImportRoutes = require('./routes/csvImport');
-const advisorRoutes = require('./routes/advisor');
 const channelDownloaderRoutes = require('./routes/channelDownloader');
 const { getDB, reseedUserData } = require('./db');
 const { authenticate } = require('./middleware/auth');
+const personalAccess = (req,res,next) => {
+  const allowed=(process.env.CLIPPER_OWNER_EMAILS || process.env.ADMIN_EMAIL || '').split(',').map(s=>s.trim().toLowerCase()).filter(Boolean);
+  if (!allowed.length) return next();
+  const user=getDB().prepare('SELECT email FROM users WHERE id = ?').get(req.userId);
+  if (!user || !allowed.includes(user.email.toLowerCase())) return res.status(403).json({error:'This is a private workspace.'});
+  next();
+};
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -57,7 +53,7 @@ const authLimiter = rateLimit({
   message: { error: 'Too many login attempts. Please try again later.' }
 });
 
-app.use(limiter);
+app.use((req, res, next) => req.path.startsWith('/api/smart-clipper') || req.path.startsWith('/api/clip-media') ? next() : limiter(req,res,next));
 
 // ─── STRIPE WEBHOOK — must receive raw body, BEFORE json middleware ───────────
 app.use('/api/billing/webhooks/stripe', express.raw({ type: 'application/json' }));
@@ -67,20 +63,10 @@ app.use(express.urlencoded({ extended: true }));
 
 // ─── ROUTES ───────────────────────────────────────────────────────────────────
 app.use('/api/auth', authLimiter, authRoutes);
-app.use('/api/brands', brandRoutes);
-app.use('/api/production', productionRoutes);
-app.use('/api/distribution', distributionRoutes);
-app.use('/api/data', dataRoutes);
-app.use('/api/billing', billingRoutes);
-app.use('/api/scheduler', schedulerRoutes);
-app.use('/api/ai-studio',     authenticate, studioRoutes);
-app.use('/api/visual-engine', authenticate, visualEngineRoutes);
-app.use('/api/smart-clipper', authenticate, clipperRoutes);
-app.use('/api/flows', authenticate, contentFlowRoutes);
-app.use('/api/video-downloader', authenticate, videoDownloaderRoutes);
-app.use('/api/csv-import', csvImportRoutes);
-app.use('/api/advisor', advisorRoutes);
-app.use('/api/channel-downloader', authenticate, channelDownloaderRoutes);
+app.get('/api/clip-media/:id/:filename', clipperRoutes.media);
+app.use('/api/smart-clipper', authenticate, personalAccess, rateLimit({ windowMs: 60000, max: 600 }), clipperRoutes);
+app.use('/api/video-downloader', authenticate, personalAccess, videoDownloaderRoutes);
+app.use('/api/channel-downloader', authenticate, personalAccess, channelDownloaderRoutes);
 
 // ─── ADMIN ENDPOINTS ──────────────────────────────────────────────────────────
 
@@ -123,7 +109,7 @@ app.get('/api/health', (req, res) => {
   res.json({
     status: 'ok',
     app: 'Content Command Center OS',
-    version: '1.0.0',
+    version: '2.0.0-clipper',
     timestamp: new Date().toISOString()
   });
 });

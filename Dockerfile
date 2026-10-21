@@ -1,30 +1,16 @@
-FROM node:22-alpine
-
-# deno isn't in this Alpine base's stable repos (node:22-alpine tracks a
-# stable release; deno is edge-only in apk), so pull just that one package
-# from edge/community. Installing via the deno.land curl script instead is
-# not reliable on Alpine — its prebuilt binaries target glibc, not musl.
-RUN apk add --no-cache \
-    ffmpeg \
-    python3 \
-    py3-pip \
-    make \
-    g++ \
-    && apk add --no-cache --repository=https://dl-cdn.alpinelinux.org/alpine/edge/community deno \
-    && pip3 install yt-dlp yt-dlp-ejs curl_cffi --break-system-packages
-
+FROM node:22-bookworm-slim
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg python3 python3-venv python3-dev build-essential fonts-liberation ca-certificates && rm -rf /var/lib/apt/lists/*
+RUN python3 -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+RUN pip install --no-cache-dir 'faster-whisper==1.2.1' 'av==15.1.0' 'yt-dlp[default]' curl_cffi
+# Download once at build time, never during a user's first three-hour job.
+RUN python3 -c "from huggingface_hub import snapshot_download; snapshot_download('Systran/faster-whisper-small.en', local_dir='/opt/whisper-small.en')"
+ENV WHISPER_MODEL=/opt/whisper-small.en WHISPER_THREADS=2 NODE_ENV=production
 WORKDIR /app
-
-COPY package*.json ./
 COPY server/package*.json ./server/
 COPY client/package*.json ./client/
-
-RUN npm install
-RUN npm install --prefix server
-RUN npm install --prefix client
-
+RUN npm ci --prefix server --omit=dev && npm ci --prefix client --include=dev
 COPY . .
-RUN npm run build
-
+RUN npm run build --prefix client && fc-cache -f
 EXPOSE 8080
-CMD ["node", "server/index.js"]
+CMD ["node","server/index.js"]

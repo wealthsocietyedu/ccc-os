@@ -1,0 +1,9 @@
+.git
+node_modules
+**/node_modules
+**/.env
+.env
+client/dist
+data
+*.log
+project_sources
