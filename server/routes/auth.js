@@ -11,6 +11,7 @@ const router = express.Router();
 
 // POST /api/auth/register
 router.post('/register', async (req, res) => {
+  if (process.env.CLIPPER_OWNER_EMAILS) return res.status(403).json({ error: 'Registration is closed for this private workspace.' });
   try {
     const { email, password, name } = req.body;
 
